@@ -116,7 +116,11 @@
 
 ## 📊 Sample Output
 
-![Sample Output](https://static/sample_output.png)
+![Sample 1](static/sample1.png)  
+![Sample 2](static/sample2.png)  
+![Sample 3](static/sample3.png)  
+![Sample 4](static/sample4.png)  
+![Sample 5](static/sample5.png)
 
 ---
 
