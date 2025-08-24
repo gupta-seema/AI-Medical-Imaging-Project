@@ -1,0 +1,72 @@
+{
+  "version": "1.2.0",
+  "generated_at": 1756033294,
+  "language": "en",
+  "headline": "Screening result: findings that may need follow-up.",
+  "decision": "Suspicious findings",
+  "risk_tier": "High",
+  "suspect_nodule": true,
+  "nodule_proxy_score": 0.84,
+  "positives": [
+    "Enlarged Cardiomediastinum",
+    "Lung Opacity",
+    "Lung Lesion",
+    "Edema",
+    "Consolidation",
+    "Pneumonia",
+    "Atelectasis",
+    "Pleural Effusion",
+    "Fracture"
+  ],
+  "top_findings": [
+    {
+      "label": "Edema",
+      "score": 0.96
+    },
+    {
+      "label": "Consolidation",
+      "score": 0.91
+    },
+    {
+      "label": "Lung Opacity",
+      "score": 0.84
+    }
+  ],
+  "scores": {
+    "No Finding": 0.74,
+    "Enlarged Cardiomediastinum": 0.54,
+    "Cardiomegaly": 0.36,
+    "Lung Opacity": 0.84,
+    "Lung Lesion": 0.61,
+    "Edema": 0.96,
+    "Consolidation": 0.91,
+    "Pneumonia": 0.69,
+    "Atelectasis": 0.51,
+    "Pneumothorax": 0.47,
+    "Pleural Effusion": 0.77,
+    "Pleural Other": 0.16,
+    "Fracture": 0.66,
+    "Support Devices": 0.38
+  },
+  "explanations": [
+    "Small round opacity may represent a nodule. Compare with prior films and consider CT if persistent.",
+    "Focal or diffuse opacity may be infection or fluid. Correlate with symptoms and temperature."
+  ],
+  "summary_en": {
+    "impression": "Interstitial/alveolar markings raise concern for pulmonary edema. (marked). Focal air-space consolidation is present. (marked).",
+    "consider": [
+      "Assess volume status; consider diuresis per clinician.",
+      "Consider antibiotics if clinically indicated.",
+      "Short-interval follow-up if unresolved."
+    ],
+    "nodule_risk": "high"
+  },
+  "safety_notice_en": "This is decision support for health professionals, not a diagnosis.",
+  "safety_notice_np": "\u092f\u094b \u0938\u094d\u0935\u093e\u0938\u094d\u0925\u094d\u092f\u0915\u0930\u094d\u092e\u0940\u0915\u094b \u0938\u0939\u093e\u092f\u0915 \u0939\u094b, \u0905\u0928\u094d\u0924\u093f\u092e \u0928\u093f\u0926\u093e\u0928 \u0939\u094b\u0907\u0928\u0964",
+  "cam_image_path": null,
+  "patient_id": "",
+  "study_uid": null,
+  "warnings": [
+    "Threshold file not found; using safe defaults."
+  ]
+}
