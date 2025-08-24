@@ -1,0 +1,35 @@
+{
+  "labels": [
+    "No Finding",
+    "Enlarged Cardiomediastinum",
+    "Cardiomegaly",
+    "Lung Opacity",
+    "Lung Lesion",
+    "Edema",
+    "Consolidation",
+    "Pneumonia",
+    "Atelectasis",
+    "Pneumothorax",
+    "Pleural Effusion",
+    "Pleural Other",
+    "Fracture",
+    "Support Devices"
+  ],
+  "aucs": [
+    0.7381993006993007,
+    0.8413352970054001,
+    0.8557263814616756,
+    0.9178481649069884,
+    0.7114427860696517,
+    0.9133928571428571,
+    0.9079044117647059,
+    0.8537371134020619,
+    0.8586876640419947,
+    0.8542124542124542,
+    0.9130434782608696,
+    0.8308457711442786,
+    null,
+    0.9092870452093753
+  ],
+  "mean_auc": 0.8542817481016626
+}

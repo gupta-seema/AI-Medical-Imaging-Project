@@ -1,0 +1,60 @@
+{
+  "No Finding": {
+    "auroc": 0.8999125874125875,
+    "auprc": 0.49751444273637657
+  },
+  "Enlarged Cardiomediastinum": {
+    "auroc": 0.8185567010309278,
+    "auprc": 0.7983199989048041
+  },
+  "Cardiomegaly": {
+    "auroc": 0.8478163992869876,
+    "auprc": 0.7337039849711555
+  },
+  "Lung Opacity": {
+    "auroc": 0.8985419808949221,
+    "auprc": 0.9149197138546343
+  },
+  "Lung Lesion": {
+    "auroc": 0.9701492537313433,
+    "auprc": 0.14285714285714285
+  },
+  "Edema": {
+    "auroc": 0.906547619047619,
+    "auprc": 0.7499801721008189
+  },
+  "Consolidation": {
+    "auroc": 0.9174632352941177,
+    "auprc": 0.6262614064466475
+  },
+  "Pneumonia": {
+    "auroc": 0.8492268041237112,
+    "auprc": 0.15040471915471917
+  },
+  "Atelectasis": {
+    "auroc": 0.8614173228346457,
+    "auprc": 0.7507970264587076
+  },
+  "Pneumothorax": {
+    "auroc": 0.906959706959707,
+    "auprc": 0.6646062797961532
+  },
+  "Pleural Effusion": {
+    "auroc": 0.9025135869565217,
+    "auprc": 0.7948856406404732
+  },
+  "Pleural Other": {
+    "auroc": 0.7960199004975125,
+    "auprc": 0.023809523809523808
+  },
+  "Fracture": {
+    "auroc": null,
+    "auprc": null
+  },
+  "Support Devices": {
+    "auroc": 0.8896734333627536,
+    "auprc": 0.8983261862787975
+  },
+  "macro_auroc": 0.8819075793410274,
+  "macro_auprc": 0.5958758644623041
+}

@@ -1,0 +1,14 @@
+{
+  "cmd": "train",
+  "data_root": "/home/lib-ai/Desktop/chestray/CheXpert-v1.0-small",
+  "policy": "ignore",
+  "img_size": 380,
+  "batch_size": 16,
+  "epochs": 10,
+  "lr": 0.0003,
+  "backbone": "efficientnet_b4",
+  "num_workers": 4,
+  "out_dir": "outputs_b4",
+  "patience": 3,
+  "no_frontal_only": false
+}
