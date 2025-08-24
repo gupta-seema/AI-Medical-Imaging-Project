@@ -72,7 +72,7 @@
 
 ## 💻 Installation
 
-### Easiest Setup (Windows)
+### Easiest Setup (Windows) THIS MIGHT NOT WORK!! PLEASE USE THE MANUAL (PIP INSTALL -R REQUIREMENTS.TXT) --> PYTHON APP.PY AND MOVE TO NO.5
 
 1. **Clone or download** this repository:
 
