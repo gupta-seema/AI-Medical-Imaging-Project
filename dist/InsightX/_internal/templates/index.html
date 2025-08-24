@@ -1,0 +1,671 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>InsightX - Medical Imaging Analysis</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'primary': {
+              50: '#faf6f0',
+              100: '#f3e8da',
+              200: '#e9d5ba',
+              300: '#d8b48e',
+              400: '#c08452',
+              500: '#a85520',
+              600: '#933314',
+              700: '#7e220e',
+              800: '#6b210a',
+              900: '#581c07',
+            },
+            'secondary': {
+              50: '#f8f6f0',
+              100: '#efe8da',
+              200: '#e2d5ba',
+              300: '#cfb48e',
+              400: '#b68452',
+              500: '#965520',
+              600: '#7f3314',
+              700: '#69220e',
+              800: '#56210a',
+              900: '#461c07',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+  --primary: #4B5563;        
+  --primary-light: #9CA3AF;  
+  --primary-dark: #1F2937;   
+  --secondary: #6B7280;      
+  --accent: #94A3B8;         
+  --success: #10B981;        
+  --warning: #FBBF24;       
+  --danger: #EF4444;         
+  --surface: #ffffff;        
+  --on-surface: #111827;     
+  --on-primary: #ffffff;     
+  --card-bg: #ffffff;        
+  --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+
+    @keyframes gradientBG {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    body {
+    background: linear-gradient(
+      135deg,
+      #f9f5f0 0%,
+      #f3ede6 50%,
+      #ece6df 100%
+    );
+    background-size: 200% 200%;
+    animation: gradientBG 18s ease infinite;
+    }
+
+
+    .header-gradient {
+      background: linear-gradient(90deg, var(--primary-dark) 0%, var(--primary) 50%, var(--secondary) 100%);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+    }
+
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+      transition: var(--transition);
+      border: 1px solid #E8E2D9;
+    }
+
+    .card:hover {
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+    }
+
+    .button-primary {
+      background: var(--primary);
+      color: var(--on-primary);
+      padding: 16px 32px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 1.1rem;
+      transition: var(--transition);
+    }
+
+    .button-primary:hover {
+      background: var(--primary-dark);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px rgba(139, 95, 61, 0.25);
+    }
+
+    .file-upload-area {
+      border: 2px dashed #D1C8B8;
+      border-radius: 16px;
+      padding: 40px 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: var(--transition);
+      background: #F9F7F3;
+    }
+
+    .file-upload-area:hover {
+      border-color: var(--primary);
+      background: #F5F1EA;
+    }
+
+    .upload-icon {
+      font-size: 3.5rem;
+      margin-bottom: 15px;
+      color: var(--primary);
+    }
+
+    .patient-avatar {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 2.2rem;
+      font-weight: bold;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+    }
+
+    .result-badge {
+      padding: 10px 20px;
+      border-radius: 50px;
+      font-weight: 600;
+      font-size: 0.95rem;
+    }
+
+    .input-field {
+      padding: 16px 20px;
+      border: 2px solid #E8E2D9;
+      border-radius: 12px;
+      transition: var(--transition);
+      font-size: 1rem;
+      background: white;
+    }
+
+    .input-field:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(139, 95, 61, 0.15);
+      outline: none;
+    }
+
+    .lung-image {
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.06);
+      transition: var(--transition);
+      height: 350px;
+      background: #F9F7F3;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .lung-image:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+    }
+
+    .comparison-container {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 20px;
+    }
+
+    /* Animation for the background */
+    @keyframes subtleFloat {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+
+    .floating-element {
+      animation: subtleFloat 8s ease-in-out infinite;
+    }
+
+    /* Accessibility improvements */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* Focus states for accessibility */
+    button:focus, input:focus, select:focus, textarea:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    /* Interactive elements */
+    .progress-bar {
+      height: 6px;
+      background: #E8E2D9;
+      border-radius: 3px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: var(--primary);
+      width: 0%;
+      transition: width 0.5s ease;
+    }
+    
+    .info-tooltip {
+      position: relative;
+      display: inline-block;
+      cursor: help;
+    }
+    
+    .info-tooltip:hover::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: 100%;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 8px 12px;
+      background: #2D3748;
+      color: white;
+      border-radius: 6px;
+      font-size: 14px;
+      white-space: nowrap;
+      z-index: 100;
+    }
+
+    /* Elegant text treatment */
+    .text-primary {
+      color: var(--primary);
+    }
+    
+    .text-secondary {
+      color: var(--secondary);
+    }
+    
+    .section-title {
+      position: relative;
+      padding-left: 1.5rem;
+    }
+    
+    .section-title::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 50%;
+      transform: translateY(-50%);
+      height: 24px;
+      width: 4px;
+      background: var(--primary);
+      border-radius: 2px;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+  <!-- Header -->
+  <header class="fixed inset-x-0 top-0 z-50">
+    <div class="header-gradient relative">
+      <div class="h-24 flex items-center justify-center px-6">
+        <div class="flex items-center space-x-4">
+          <div class="text-4xl floating-element">🔍</div>
+          <h1 class="text-3xl text-white font-['Outfit'] font-bold tracking-wide">InsightX</h1>
+        </div>
+        
+        <!-- Right side controls -->
+        <div class="absolute right-6 flex space-x-4 items-center">
+          <button id="langToggle" class="px-4 py-2 rounded-lg bg-white/10 text-white font-semibold hover:bg-white/20 transition-background flex items-center space-x-2">
+            <i class="fas fa-language"></i>
+            <span>नेपाली</span>
+          </button>
+          <button id="settingsBtn" class="p-3 rounded-lg bg-white/10 text-white font-semibold hover:bg-white/20 transition-background">
+            <i class="fas fa-cog"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="pt-28 pb-10">
+    <div class="max-w-7xl mx-auto px-4 grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <!-- LEFT: Upload & form -->
+      <section class="card p-8">
+        <div class="flex items-center mb-6">
+          <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+            <i class="fas fa-upload text-primary"></i>
+          </div>
+          <h2 class="text-2xl font-bold text-primary section-title" 
+              data-en="Upload Chest X-ray" 
+              data-np="छाती एक्स-रे अपलोड गर्नुहोस्">Upload Chest X-ray</h2>
+        </div>
+
+        <form id="analyzeForm" action="/analyze" method="post" enctype="multipart/form-data" class="space-y-8">
+          <div class="file-upload-area" onclick="document.getElementById('fileInput').click()">
+            <div class="upload-icon">
+              <i class="fas fa-cloud-upload-alt"></i>
+            </div>
+            <p class="text-xl font-semibold mb-2 text-gray-800" data-en="Click to upload X-ray image" data-np="एक्स-रे छवि अपलोड गर्न क्लिक गर्नुहोस्">Click to upload X-ray image</p>
+            <p class="text-gray-600" data-en="Supports JPG, PNG (Max 10MB)" data-np="JPG, PNG समर्थन गर्दछ (अधिकतम 10MB)">Supports JPG, PNG (Max 10MB)</p>
+            <input id="fileInput" class="hidden" type="file" name="image" accept="image/jpeg,image/png" required>
+            <span id="fileName" class="block mt-4 text-primary font-semibold"><i class="fas fa-file-medical mr-2"></i>No file selected</span>
+            
+            <!-- Progress bar (initially hidden) -->
+            <div id="uploadProgress" class="progress-bar hidden">
+              <div class="progress-fill"></div>
+            </div>
+          </div>
+
+          <div class="pt-4">
+            <div class="flex items-center mb-6">
+              <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+                <i class="fas fa-user-injured text-primary"></i>
+              </div>
+              <h3 class="text-2xl font-semibold text-primary section-title" data-en="Patient details" data-np="रोगी विवरण">Patient details</h3>
+            </div>
+            
+            <div class="mb-6">
+              <label class="block text-lg font-medium mb-3 text-gray-700" data-en="Full name" data-np="पूरा नाम">Full name</label>
+              <input class="input-field w-full" type="text" name="patient_name" placeholder="e.g., Sita Rai" required>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+              <div>
+                <label class="block text-lg font-medium mb-3 text-gray-700" data-en="Age" data-np="उमेर">Age</label>
+                <input class="input-field w-full" type="number" name="patient_age" placeholder="e.g., 45" min="0" max="120">
+              </div>
+              <div>
+                <label class="block text-lg font-medium mb-3 text-gray-700" data-en="Sex" data-np="लिङ्ग">Sex</label>
+                <select class="input-field w-full" name="patient_sex">
+                  <option value="F">Female</option>
+                  <option value="M">Male</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-lg font-medium mb-3 text-gray-700" data-en="Patient ID (optional)" data-np="रोगी ID (वैकल्पिक)">Patient ID (optional)</label>
+              <input class="input-field w-full" type="text" name="patient_id" placeholder="Auto-generate if blank">
+            </div>
+          </div>
+
+          <button class="button-primary w-full mt-6 flex items-center justify-center" type="submit" data-en="Analyze X-ray Image" data-np="एक्स-रे छवि विश्लेषण गर्नुहोस्">
+            <i class="fas fa-search-medical mr-3"></i>
+            <span>Analyze X-ray Image</span>
+          </button>
+
+          {% if error %}
+            <div class="mt-6 text-lg text-red-700 bg-red-50 border border-red-200 rounded-xl p-4 flex items-start">
+              <i class="fas fa-exclamation-circle mt-1 mr-3"></i>
+              <span>{{ error }}</span>
+            </div>
+          {% endif %}
+        </form>
+      </section>
+
+      <!-- RIGHT: Patient profile + results -->
+      <section class="lg:col-span-2 space-y-8">
+        {% if orig_url and cam_url %}
+        <div class="card p-8">
+          <div class="flex items-start justify-between flex-wrap gap-6">
+            <div class="flex items-center">
+              <div class="patient-avatar">
+                {{ (patient.name[0] if patient and patient.name) or 'P' }}
+              </div>
+              <div class="ml-6">
+                <p class="text-2xl font-semibold text-gray-800">{{ (patient.name if patient else 'Patient') }}</p>
+                <p class="text-lg text-gray-600 flex items-center">
+                  <i class="fas fa-id-card mr-2 text-gray-500"></i>
+                  ID: {{ (patient.id if patient else '—') }} • 
+                  <i class="fas fa-birthday-cake ml-3 mr-2 text-gray-500"></i>
+                  Age: {{ (patient.age if patient else '—') }} • 
+                  <i class="fas fa-venus-mars ml-3 mr-2 text-gray-500"></i>
+                  Sex: {{ (patient.sex if patient else '—') }}
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-wrap gap-4">
+              <span class="result-badge bg-primary-100 text-primary-800 flex items-center">
+                <i class="fas fa-diagnoses mr-2"></i>
+                Decision: {{ decision }}
+              </span>
+              <span class="result-badge bg-secondary-100 text-secondary-800 flex items-center">
+                <i class="fas fa-exclamation-triangle mr-2"></i>
+                Risk: {{ risk_tier }}
+              </span>
+            </div>
+          </div>
+
+          <div class="flex items-center mt-10 mb-6">
+            <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+              <i class="fas fa-lungs text-primary"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-primary section-title" data-en="Lung Comparison Analysis" data-np="फोक्सो तुलना विश्लेषण">Lung Comparison Analysis</h3>
+          </div>
+          
+          <div class="comparison-container">
+            <div class="text-center">
+              <p class="text-lg font-semibold text-gray-700 mb-4 flex items-center justify-center" data-en="Original X-ray" data-np="मूल एक्स-रे">
+                <i class="fas fa-x-ray mr-2 text-primary"></i>
+                Original X-ray
+              </p>
+              <div class="lung-image">
+                <img class="rounded-lg shadow-md w-full zoomable" src="{{ orig_url }}" alt="original x-ray">
+              </div>
+            </div>
+            <div class="text-center">
+              <p class="text-lg font-semibold text-gray-700 mb-4 flex items-center justify-center" data-en="AI Analysis (Grad-CAM)" data-np="AI विश्लेषण (Grad-CAM)">
+                <i class="fas fa-brain mr-2 text-secondary"></i>
+                AI Analysis (Grad-CAM)
+              </p>
+              <div class="lung-image">
+                <img class="rounded-lg shadow-md w-full zoomable" src="{{ cam_url }}" alt="gradcam analysis">
+              </div>
+            </div>
+          </div>
+
+          {% if pdf_url %}
+          <a class="button-primary w-full mt-8 text-center block flex items-center justify-center" target="_blank" href="{{ pdf_url }}">
+            <i class="fas fa-file-pdf mr-3"></i>
+            View Full Patient Report (PDF)
+          </a>
+          {% endif %}
+        </div>
+
+        <div class="card p-8">
+          <div class="flex items-center mb-6">
+            <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+              <i class="fas fa-file-medical text-primary"></i>
+            </div>
+            <h3 class="text-2xl font-bold text-primary section-title" data-en="Screening Summary" data-np="स्क्रिनिङ सारांश">Screening Summary</h3>
+          </div>
+          
+          <div class="p-4 bg-primary-50 rounded-xl mb-6">
+            <p class="text-xl font-medium text-primary-800">{{ headline }}</p>
+          </div>
+
+          <!-- Equal division with divider -->
+          <div class="mt-8 grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-300">
+            <div class="pr-6">
+              <h4 class="font-semibold text-lg mb-4 flex items-center text-gray-800" data-en="Clinical Impression" data-np="क्लिनिकल छाप">
+                <i class="fas fa-stethoscope mr-2 text-primary"></i>
+                Clinical Impression
+              </h4>
+              <p class="text-gray-700 text-lg">{{ summary_en.impression }}</p>
+            </div>
+            <div class="pl-6 pt-6 md:pt-0">
+              <h4 class="font-semibold text-lg mb-4 flex items-center text-gray-800" data-en="Recommendations" data-np="सिफारिस">
+                <i class="fas fa-list-check mr-2 text-success"></i>
+                Recommendations
+              </h4>
+              <ul class="space-y-3 text-lg">
+                {% for tip in summary_en.consider %}
+                <li class="text-gray-700 flex items-start">
+                  <i class="fas fa-circle-check text-success mt-1 mr-3"></i>
+                  <span>{{ tip }}</span>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <!-- Empty state -->
+        <div class="card p-12 text-center">
+          <div class="text-6xl mb-6 floating-element">🔍</div>
+          <h3 class="text-2xl font-bold mb-4 text-primary" data-en="Upload a Chest X-ray to Begin Analysis" data-np="विश्लेषण सुरु गर्न छाती एक्स-रे अपलोड गर्नुहोस्">Upload a Chest X-ray to Begin Analysis</h3>
+          <p class="text-xl text-gray-600 mb-6" data-en="InsightX will analyze the image and provide a detailed report with visual explanations." data-np="InsightX ले छवि विश्लेषण गरेर विस्तृत रिपोर्ट दृश्य व्याख्यासहित प्रदान गर्नेछ।">InsightX will analyze the image and provide a detailed report with visual explanations.</p>
+          <div class="flex justify-center">
+            <div class="bg-primary-50 rounded-xl p-4 max-w-md">
+              <div class="flex items-center">
+                <div class="bg-primary-100 p-3 rounded-full mr-4">
+                  <i class="fas fa-lightbulb text-primary text-xl"></i>
+                </div>
+                <p class="text-left text-primary-800" data-en="For best results, ensure the X-ray image is clear and properly centered." data-np="उत्तम नतिजाको लागि, एक्स-रे छवि स्पष्ट र ठीक संग केन्द्रित भएको सुनिश्चित गर्नुहोस्।">For best results, ensure the X-ray image is clear and properly centered.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+      </section>
+    </div>
+  </main>
+
+  <!-- Lightbox -->
+  <div id="lightbox" class="fixed inset-0 bg-black/90 hidden flex items-center justify-center z-[999]">
+    <button id="lbClose" class="absolute top-6 right-6 text-white text-3xl bg-black/50 rounded-full w-12 h-12 flex items-center justify-center">
+      <i class="fas fa-times"></i>
+    </button>
+    <img id="lbImg" class="max-h-[90%] max-w-[90%] rounded-lg shadow-lg" alt="zoomed">
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/70 hidden flex items-center justify-center z-[1000]">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-8 relative">
+      <button id="closeSettings" class="absolute top-4 right-4 text-2xl text-gray-500 hover:text-gray-700">
+        <i class="fas fa-times"></i>
+      </button>
+      
+      <div class="flex items-center mb-6">
+        <div class="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center mr-3">
+          <i class="fas fa-cog text-primary"></i>
+        </div>
+        <h3 class="text-2xl font-bold text-primary">Settings</h3>
+      </div>
+
+      <!-- Language toggle inside settings -->
+      <div class="mb-8">
+        <h4 class="font-semibold mb-3 text-lg flex items-center text-gray-800">
+          <i class="fas fa-language mr-2 text-primary"></i>
+          Language
+        </h4>
+        <button id="langToggleModal" class="px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition flex items-center">
+          <i class="fas fa-language mr-2"></i>
+          <span>नेपाली</span>
+        </button>
+      </div>
+
+      <div class="mb-8">
+        <h4 class="font-semibold mb-3 text-lg flex items-center text-gray-800">
+          <i class="fas fa-comment-dots mr-2 text-primary"></i>
+          Feedback
+        </h4>
+        <textarea id="feedbackBox" class="input-field w-full" rows="4" placeholder="Share your feedback..."></textarea>
+        <button id="sendFeedback" class="button-primary mt-3 w-full flex items-center justify-center">
+          <i class="fas fa-paper-plane mr-2"></i>
+          Submit Feedback
+        </button>
+      </div>
+      
+      <div class="pt-4 border-t border-gray-200">
+        <p class="text-center text-gray-500 text-sm">
+          InsightX v2.0 • Advanced Medical Imaging Analysis
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // File input display
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const fileName = e.target.files[0]?.name || 'No file selected';
+      document.getElementById('fileName').innerHTML = '<i class="fas fa-file-medical mr-2"></i>' + fileName;
+      
+      // Show and animate progress bar
+      const progressBar = document.getElementById('uploadProgress');
+      const progressFill = progressBar.querySelector('.progress-fill');
+      progressBar.classList.remove('hidden');
+      
+      // Simulate upload progress
+      let width = 0;
+      const interval = setInterval(() => {
+        if (width >= 100) {
+          clearInterval(interval);
+        } else {
+          width += 5;
+          progressFill.style.width = width + '%';
+        }
+      }, 100);
+    });
+
+    // Lightbox functionality
+    const lightbox = document.getElementById('lightbox');
+    const lbImg = document.getElementById('lbImg');
+    const lbClose = document.getElementById('lbClose');
+
+    function openLightbox(src) {
+      lbImg.src = src;
+      lightbox.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeLightbox() {
+      lightbox.classList.add('hidden');
+      document.body.style.overflow = 'auto';
+    }
+
+    document.querySelectorAll('.zoomable').forEach(img => {
+      img.addEventListener('click', () => openLightbox(img.src));
+    });
+
+    lbClose.addEventListener('click', closeLightbox);
+    lightbox.addEventListener('click', (e) => {
+      if (e.target === lightbox) closeLightbox();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeLightbox();
+    });
+
+    // Language toggle
+    let currentLang = "en";
+    const langToggles = document.querySelectorAll('#langToggle, #langToggleModal');
+    
+    langToggles.forEach(toggle => {
+      toggle.addEventListener('click', () => {
+        if (currentLang === "en") {
+          document.querySelectorAll('[data-en]').forEach(el => {
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+              el.placeholder = el.getAttribute('data-np');
+            } else {
+              el.textContent = el.getAttribute('data-np');
+            }
+          });
+          langToggles.forEach(btn => {
+            btn.innerHTML = '<i class="fas fa-language mr-2"></i><span>English</span>';
+          });
+          currentLang = "np";
+        } else {
+          document.querySelectorAll('[data-en]').forEach(el => {
+            if (el.tagName === 'INPUT' || el.tagName === 'SELECT') {
+              el.placeholder = el.getAttribute('data-en');
+            } else {
+              el.textContent = el.getAttribute('data-en');
+            }
+          });
+          langToggles.forEach(btn => {
+            btn.innerHTML = '<i class="fas fa-language mr-2"></i><span>नेपाली</span>';
+          });
+          currentLang = "en";
+        }
+      });
+    });
+
+    // Settings modal
+    const settingsBtn = document.getElementById('settingsBtn');
+    const settingsModal = document.getElementById('settingsModal');
+    const closeSettings = document.getElementById('closeSettings');
+
+    settingsBtn.addEventListener('click', () => settingsModal.classList.remove('hidden'));
+    closeSettings.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+    // Feedback submit
+    document.getElementById('sendFeedback').addEventListener('click', () => {
+      const feedback = document.getElementById('feedbackBox').value;
+      if (feedback.trim() !== '') {
+        alert("✅ Thank you for your feedback!");
+        document.getElementById('feedbackBox').value = "";
+      } else {
+        alert("Please enter your feedback before submitting.");
+      }
+    });
+  </script>
+</body>
+</html>

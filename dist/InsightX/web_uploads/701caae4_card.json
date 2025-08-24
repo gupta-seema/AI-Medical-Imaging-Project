@@ -1,0 +1,61 @@
+{
+  "version": "1.2.0",
+  "generated_at": 1756033207,
+  "language": "en",
+  "headline": "Screening result: findings that may need follow-up.",
+  "decision": "Suspicious findings",
+  "risk_tier": "Slight",
+  "suspect_nodule": false,
+  "nodule_proxy_score": 0.32,
+  "positives": [
+    "Edema"
+  ],
+  "top_findings": [
+    {
+      "label": "No Finding",
+      "score": 0.68
+    },
+    {
+      "label": "Edema",
+      "score": 0.52
+    },
+    {
+      "label": "Atelectasis",
+      "score": 0.36
+    }
+  ],
+  "scores": {
+    "No Finding": 0.68,
+    "Enlarged Cardiomediastinum": 0.34,
+    "Cardiomegaly": 0.19,
+    "Lung Opacity": 0.22,
+    "Lung Lesion": 0.32,
+    "Edema": 0.52,
+    "Consolidation": 0.1,
+    "Pneumonia": 0.25,
+    "Atelectasis": 0.36,
+    "Pneumothorax": 0.22,
+    "Pleural Effusion": 0.09,
+    "Pleural Other": 0.29,
+    "Fracture": 0.11,
+    "Support Devices": 0.27
+  },
+  "explanations": [
+    "No specific abnormality detected on this view."
+  ],
+  "summary_en": {
+    "impression": "Interstitial/alveolar markings raise concern for pulmonary edema. (mild).",
+    "consider": [
+      "Assess volume status; consider diuresis per clinician."
+    ],
+    "nodule_risk": "slight"
+  },
+  "safety_notice_en": "This is decision support for health professionals, not a diagnosis.",
+  "safety_notice_np": "\u092f\u094b \u0938\u094d\u0935\u093e\u0938\u094d\u0925\u094d\u092f\u0915\u0930\u094d\u092e\u0940\u0915\u094b \u0938\u0939\u093e\u092f\u0915 \u0939\u094b, \u0905\u0928\u094d\u0924\u093f\u092e \u0928\u093f\u0926\u093e\u0928 \u0939\u094b\u0907\u0928\u0964",
+  "cam_image_path": null,
+  "patient_id": "",
+  "study_uid": null,
+  "warnings": [
+    "Threshold file not found; using safe defaults."
+  ]
+}
