@@ -1,12 +1,21 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_all
+
+datas = [('templates', 'templates'), ('static', 'static'), ('outputs/chestray_best.pt', 'outputs')]
+binaries = []
+hiddenimports = ['pytorch_grad_cam', 'sklearn.utils._cython_blas', 'sklearn.utils._weight_vector', 'sklearn.neighbors._partition_nodes']
+tmp_ret = collect_all('torch')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('torchvision')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
     ['app.py'],
     pathex=[],
-    binaries=[],
-    datas=[('templates', 'templates'), ('static', 'static'), ('outputs/chestray_best.pt', 'outputs')],
-    hiddenimports=['pytorch_grad_cam', 'sklearn.utils._cython_blas', 'sklearn.utils._weight_vector', 'sklearn.neighbors._partition_nodes'],
+    binaries=binaries,
+    datas=datas,
+    hiddenimports=hiddenimports,
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

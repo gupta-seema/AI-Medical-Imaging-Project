@@ -1,5 +1,5 @@
 # Distribution / packaging
-build/
+!build/
 develop-eggs/
 downloads/
 eggs/
