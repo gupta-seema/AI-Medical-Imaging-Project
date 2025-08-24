@@ -25,9 +25,6 @@
 #include <ATen/ops/_amp_foreach_non_finite_check_and_unscale_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_amp_update_scale_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_assert_scalar_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_assert_tensor_metadata_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_batch_norm_no_update_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_batch_norm_with_update_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_cdist_backward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_cdist_forward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_cholesky_solve_helper_compositeexplicitautograd_dispatch.h>
@@ -86,7 +83,6 @@
 #include <ATen/ops/_foreach_log10_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_log1p_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_log2_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_foreach_max_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_maximum_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_minimum_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_mul_compositeexplicitautograd_dispatch.h>
@@ -95,7 +91,6 @@
 #include <ATen/ops/_foreach_pow_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_reciprocal_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_round_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_foreach_rsqrt_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_sigmoid_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_sign_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_foreach_sin_compositeexplicitautograd_dispatch.h>
@@ -109,7 +104,6 @@
 #include <ATen/ops/_functional_assert_scalar_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_functional_sym_constrain_range_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_functional_sym_constrain_range_for_size_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_fused_adagrad_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_fused_adam_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_fused_adamw_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_fused_dropout_compositeexplicitautograd_dispatch.h>
@@ -165,15 +159,11 @@
 #include <ATen/ops/_reshape_alias_copy_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_reshape_copy_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_resize_output_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_safe_softmax_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_sample_dirichlet_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_scaled_dot_product_fused_attention_overrideable_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_scaled_dot_product_fused_attention_overrideable_backward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_segment_reduce_backward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_slow_conv2d_backward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_sparse_addmm_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_sparse_broadcast_to_copy_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_sparse_compressed_tensor_with_dims_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_sparse_coo_tensor_with_dims_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_sparse_coo_tensor_with_dims_and_tensors_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_sparse_csr_prod_compositeexplicitautograd_dispatch.h>
@@ -219,14 +209,11 @@
 #include <ATen/ops/_unique2_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_unsafe_index_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_unsafe_index_put_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_unsafe_masked_index_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/_unsafe_masked_index_put_accumulate_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_unsafe_view_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_values_copy_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_weight_norm_interface_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/_weight_norm_interface_backward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/abs_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/adaptive_avg_pool1d_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/add_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/addr_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/affine_grid_generator_compositeexplicitautograd_dispatch.h>
@@ -236,9 +223,9 @@
 #include <ATen/ops/allclose_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/any_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/arange_compositeexplicitautograd_dispatch.h>
+#include <ATen/ops/argsort_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/as_strided_copy_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/as_strided_scatter_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/avg_pool1d_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/bartlett_window_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/batch_norm_backward_elemt_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/batch_norm_backward_reduce_compositeexplicitautograd_dispatch.h>
@@ -294,7 +281,6 @@
 #include <ATen/ops/cummax_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/cummin_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/deg2rad_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/dense_dim_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/dequantize_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/detach_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/detach_copy_compositeexplicitautograd_dispatch.h>
@@ -465,7 +451,6 @@
 #include <ATen/ops/rot90_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/row_indices_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/row_indices_copy_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/rrelu_with_noise_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/rrelu_with_noise_backward_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/rshift_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/rsub_compositeexplicitautograd_dispatch.h>
@@ -490,7 +475,6 @@
 #include <ATen/ops/sort_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/sparse_compressed_tensor_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/sparse_coo_tensor_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/sparse_dim_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/sparse_mask_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/sparse_resize_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/sparse_resize_and_clear_compositeexplicitautograd_dispatch.h>
@@ -541,8 +525,6 @@
 #include <ATen/ops/unsafe_split_with_sizes_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/unsqueeze_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/unsqueeze_copy_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/upsample_bilinear2d_compositeexplicitautograd_dispatch.h>
-#include <ATen/ops/upsample_nearest2d_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/values_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/values_copy_compositeexplicitautograd_dispatch.h>
 #include <ATen/ops/var_mean_compositeexplicitautograd_dispatch.h>

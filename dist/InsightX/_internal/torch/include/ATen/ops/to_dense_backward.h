@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,7 +23,7 @@ namespace at {
 
 
 // aten::to_dense_backward(Tensor grad, Tensor input, bool? masked_grad=None) -> Tensor
-inline at::Tensor to_dense_backward(const at::Tensor & grad, const at::Tensor & input, ::std::optional<bool> masked_grad=::std::nullopt) {
+inline at::Tensor to_dense_backward(const at::Tensor & grad, const at::Tensor & input, c10::optional<bool> masked_grad=c10::nullopt) {
     return at::_ops::to_dense_backward::call(grad, input, masked_grad);
 }
 

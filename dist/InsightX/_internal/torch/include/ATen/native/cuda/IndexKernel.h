@@ -7,9 +7,10 @@ struct TensorIteratorBase;
 class TensorBase;
 }
 
-namespace at::native {
+namespace at {
+namespace native {
 /// @param maskPrefixSum[in,out]
 void launch_masked_scatter_kernel(
     const TensorBase &self, const TensorBase &mask,
     const TensorBase &maskPrefixSum, const TensorBase &source);
-}
+}}

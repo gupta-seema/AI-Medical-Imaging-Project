@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional, Union
 
 import PIL.Image
 import torch
@@ -9,7 +9,7 @@ from ._tv_tensor import TVTensor
 
 
 class Mask(TVTensor):
-    """:class:`torch.Tensor` subclass for segmentation and detection masks with shape ``[..., H, W]``.
+    """:class:`torch.Tensor` subclass for segmentation and detection masks.
 
     Args:
         data (tensor-like, PIL.Image.Image): Any data that can be turned into a tensor with :func:`torch.as_tensor` as
@@ -26,9 +26,9 @@ class Mask(TVTensor):
         cls,
         data: Any,
         *,
-        dtype: torch.dtype | None = None,
-        device: torch.device | str | int | None = None,
-        requires_grad: bool | None = None,
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[Union[torch.device, str, int]] = None,
+        requires_grad: Optional[bool] = None,
     ) -> Mask:
         if isinstance(data, PIL.Image.Image):
             from torchvision.transforms.v2 import functional as F

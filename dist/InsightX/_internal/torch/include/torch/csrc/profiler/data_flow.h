@@ -7,7 +7,9 @@
 #include <c10/macros/Macros.h>
 #include <c10/util/strong_type.h>
 
-namespace torch::profiler::impl {
+namespace torch {
+namespace profiler {
+namespace impl {
 
 // Identity is a complex concept in PyTorch. A Tensor might not have a
 // an associated storage, multiple Tensors might share the same underlying
@@ -35,7 +37,7 @@ using AllocationID = strong::type<
     strong::regular,
     strong::hashable>;
 
-// We use a Tensor's TensorImpl address and StorageImpl data start to build the
+// We use a Tensor's TensorImpl adress and StorageImpl data start to build the
 // data flow graph. We do not hold an owning reference so we wrap them in strong
 // types to prevent direct access.
 using TensorImplAddress = strong::type<
@@ -87,4 +89,6 @@ struct Result;
 void calculateUniqueTensorIDs(
     std::vector<std::shared_ptr<Result>>& sorted_results);
 
-} // namespace torch::profiler::impl
+} // namespace impl
+} // namespace profiler
+} // namespace torch

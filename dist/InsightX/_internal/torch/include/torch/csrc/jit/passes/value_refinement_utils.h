@@ -9,7 +9,8 @@
 #include <torch/csrc/jit/passes/peephole_list_idioms.h>
 #include <torch/csrc/jit/runtime/graph_executor.h>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 // Refine from Value of type List -> len of list
 // If a refinement mapping of List Value * -> len is present in a block
@@ -29,7 +30,7 @@ struct BooleanRefinementMapping {
       ListRefinement true_refine,
       ListRefinement false_refine)
       : true_refine_(std::move(true_refine)),
-        false_refine_(std::move(false_refine)) {}
+        false_refine_(std::move(false_refine)){};
   BooleanRefinementMapping() = default; // empty
 
   static BooleanRefinementMapping FalseRefinements(
@@ -76,4 +77,5 @@ TORCH_API bool handleCommonRefinentOperators(
     std::unordered_set<Block*>& throwing_blocks,
     std::unordered_map<Value*, BooleanRefinementMapping>& info);
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor embedding_dense_backward(const at::Tensor & grad_output, const
     return at::_ops::embedding_dense_backward::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor embedding_dense_backward(const at::Tensor & grad_output, const at::Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
     return at::_ops::embedding_dense_backward::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
   }
@@ -39,7 +38,7 @@ inline at::Tensor embedding_dense_backward_symint(const at::Tensor & grad_output
     return at::_ops::embedding_dense_backward::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor embedding_dense_backward(const at::Tensor & grad_output, const at::Tensor & indices, c10::SymInt num_weights, c10::SymInt padding_idx, bool scale_grad_by_freq) {
     return at::_ops::embedding_dense_backward::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq);
   }
@@ -50,7 +49,7 @@ inline at::Tensor & embedding_dense_backward_out(at::Tensor & out, const at::Ten
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & embedding_dense_backward_out(at::Tensor & out, const at::Tensor & grad_output, const at::Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq) {
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
   }
@@ -61,7 +60,7 @@ inline at::Tensor & embedding_dense_backward_outf(const at::Tensor & grad_output
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & embedding_dense_backward_outf(const at::Tensor & grad_output, const at::Tensor & indices, int64_t num_weights, int64_t padding_idx, bool scale_grad_by_freq, at::Tensor & out) {
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
   }
@@ -72,7 +71,7 @@ inline at::Tensor & embedding_dense_backward_symint_out(at::Tensor & out, const 
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & embedding_dense_backward_out(at::Tensor & out, const at::Tensor & grad_output, const at::Tensor & indices, c10::SymInt num_weights, c10::SymInt padding_idx, bool scale_grad_by_freq) {
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
   }
@@ -83,7 +82,7 @@ inline at::Tensor & embedding_dense_backward_symint_outf(const at::Tensor & grad
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & embedding_dense_backward_outf(const at::Tensor & grad_output, const at::Tensor & indices, c10::SymInt num_weights, c10::SymInt padding_idx, bool scale_grad_by_freq, at::Tensor & out) {
     return at::_ops::embedding_dense_backward_out::call(grad_output, indices, num_weights, padding_idx, scale_grad_by_freq, out);
   }

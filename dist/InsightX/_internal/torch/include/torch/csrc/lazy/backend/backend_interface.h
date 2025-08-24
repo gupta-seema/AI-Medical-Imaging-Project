@@ -7,8 +7,10 @@
 #include <torch/csrc/lazy/core/lazy_graph_executor.h>
 #include <torch/csrc/lazy/core/shape.h>
 #include <torch/csrc/lazy/core/tensor.h>
+#include <atomic>
 
-namespace torch::lazy {
+namespace torch {
+namespace lazy {
 
 struct IrBuilder;
 
@@ -61,7 +63,7 @@ class TORCH_API BackendImplInterface {
 
   virtual at::Tensor MakeTensorFromComputationData(
       const BackendDataPtr data,
-      std::optional<at::ScalarType> logical_scalar_type) const = 0;
+      c10::optional<at::ScalarType> logical_scalar_type) const = 0;
 
   /**
    * Lowering, Compilation, Execution
@@ -152,4 +154,5 @@ TORCH_API const BackendImplInterface* getBackend();
 
 TORCH_API const IrBuilder* getIrBuilder();
 
-} // namespace torch::lazy
+} // namespace lazy
+} // namespace torch

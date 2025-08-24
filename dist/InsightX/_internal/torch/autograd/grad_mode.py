@@ -1,13 +1,12 @@
-# mypy: allow-untyped-defs
-from typing import Any, Union
+from typing import Any
 
 import torch
+
 from torch.utils._contextlib import (
     _DecoratorContextManager,
     _NoParamDecoratorContextManager,
     F,
 )
-
 
 __all__ = [
     "no_grad",
@@ -59,7 +58,7 @@ class no_grad(_NoParamDecoratorContextManager):
         >>> z = doubler(x)
         >>> z.requires_grad
         False
-        >>> @torch.no_grad()
+        >>> @torch.no_grad
         ... def tripler(x):
         ...     return x * 3
         >>> z = tripler(x)
@@ -122,7 +121,7 @@ class enable_grad(_NoParamDecoratorContextManager):
         ...     z = doubler(x)
         >>> z.requires_grad
         True
-        >>> @torch.enable_grad()
+        >>> @torch.enable_grad
         ... def tripler(x):
         ...     return x * 3
         >>> with torch.no_grad():
@@ -196,12 +195,6 @@ class set_grad_enabled(_DecoratorContextManager):
     def __exit__(self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         torch._C._set_grad_enabled(self.prev)
 
-    def __str__(self) -> str:
-        return f"{torch.typename(self)}(mode={self.mode})"
-
-    def __repr__(self) -> str:
-        return str(self)
-
     def clone(self) -> "set_grad_enabled":
         r"""
         Create a copy of this class
@@ -212,7 +205,7 @@ class set_grad_enabled(_DecoratorContextManager):
 class inference_mode(_DecoratorContextManager):
     r"""Context-manager that enables or disables inference mode.
 
-    InferenceMode is a context manager analogous to :class:`~no_grad`
+    InferenceMode is a new context manager analogous to :class:`~no_grad`
     to be used when you are certain your operations will have no interactions
     with autograd (e.g., model training). Code run under this mode gets better
     performance by disabling view tracking and version counter bumps. Note that
@@ -253,7 +246,7 @@ class inference_mode(_DecoratorContextManager):
         >>> out = func(x)
         >>> out.requires_grad
         False
-        >>> @torch.inference_mode()
+        >>> @torch.inference_mode
         ... def doubler(x):
         ...     return x * 2
         >>> out = doubler(x)
@@ -392,13 +385,12 @@ class _unsafe_preserve_version_counter(_DecoratorContextManager):
 
     """
 
-    def __init__(self, tensors: Union[torch.Tensor, tuple[torch.Tensor, ...]]) -> None:
-        self.tensors = (tensors,) if isinstance(tensors, torch.Tensor) else tensors
-        assert isinstance(self.tensors, tuple)
-        self.prev_versions = tuple(t._version for t in self.tensors)
+    def __init__(self, tensor: torch.Tensor) -> None:
+        self.tensor = tensor
+        self.prev_version = tensor._version
 
     def __enter__(self) -> None:
         pass
 
     def __exit__(self, *args) -> None:
-        torch._C._autograd._unsafe_set_version_counter(self.tensors, self.prev_versions)
+        torch._C._autograd._unsafe_set_version_counter(self.tensor, self.prev_version)

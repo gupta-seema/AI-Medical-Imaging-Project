@@ -7,12 +7,13 @@
 namespace torch::jit {
 
 struct TORCH_API GraphFunction : public Function {
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   GraphFunction(
       c10::QualifiedName name,
       std::shared_ptr<Graph> graph,
       std::function<void(GraphFunction&)> function_creator,
-      std::optional<ExecutorExecutionMode> executor_execution_mode =
-          std::nullopt)
+      c10::optional<ExecutorExecutionMode> executor_execution_mode =
+          c10::nullopt)
       : name_(std::move(name)),
         graph_(std::move(graph)),
         executor_execution_mode_(executor_execution_mode),
@@ -107,7 +108,7 @@ struct TORCH_API GraphFunction : public Function {
   using Function::call;
   bool call(
       Stack& stack,
-      std::optional<size_t> bailOut,
+      c10::optional<size_t> bailOut,
       c10::function_ref<void(const Code&)> f) override {
     f(get_executor().getPlanFor(stack, bailOut).code);
     return true;
@@ -138,7 +139,7 @@ struct TORCH_API GraphFunction : public Function {
 
   // allows users to specify Simple/Profiling Executor for function
   // TODO: add more executors
-  mutable std::optional<ExecutorExecutionMode> executor_execution_mode_;
+  mutable c10::optional<ExecutorExecutionMode> executor_execution_mode_;
 
   // if invoked on a graph that has already traced through amp
   // don't invoke amp pass
@@ -158,7 +159,7 @@ struct TORCH_API GraphFunction : public Function {
   // executor_[1] - autocast cpu on
   // executor_[2] - autocast gpu on
   // executor_[3] - autocast cpu & gpu on
-  std::array<std::optional<GraphExecutor>, SpecializationKey::TotalCount>
+  std::array<c10::optional<GraphExecutor>, SpecializationKey::TotalCount>
       executors_;
 
   // an optional function that actually creates the method when
@@ -176,5 +177,5 @@ struct TORCH_API GraphFunction : public Function {
 TORCH_API GraphFunction* tryToGraphFunction(Function&) noexcept;
 TORCH_API GraphFunction& toGraphFunction(Function&);
 TORCH_API const GraphFunction& toGraphFunction(const Function&);
+
 } // namespace torch::jit
-C10_DECLARE_bool(torch_jit_do_not_store_optimized_graph);

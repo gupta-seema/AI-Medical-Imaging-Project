@@ -1,18 +1,17 @@
-# mypy: allow-untyped-defs
 import functools
+
+from typing import Dict, Set, Tuple
 
 import torch
 from torch._dynamo.utils import counters
+
 from torch._ops import OpOverload, OpOverloadPacket
-from torch.utils._ordered_set import OrderedSet
-
 from ..pattern_matcher import fwd_only, register_replacement
-
 
 aten = torch.ops.aten
 
 
-@functools.cache
+@functools.lru_cache(None)
 def _misc_patterns_init():
     from .joint_graph import patterns as joint_graph_patterns
     from .post_grad import pass_patterns as post_grad_patterns_all
@@ -59,7 +58,7 @@ def _misc_patterns_init():
         index = torch.randperm(x.shape[0], device=x.device)[:slice_shape]
         return torch.ops.aten._unsafe_index(x, (index,)), index
 
-    register_replacement(
+    pattern = register_replacement(
         randperm_index_pattern,
         randperm_index_replacement,
         [torch.empty(4, 8, device=device)],
@@ -70,16 +69,16 @@ def _misc_patterns_init():
 
 
 class NumpyCompatNormalization:
-    numpy_compat: dict[str, tuple[str, ...]] = {
+    numpy_compat: Dict[str, Tuple[str, ...]] = {
         "dim": ("axis",),
         "keepdim": ("keepdims",),
         "input": ("x", "a", "x1"),
         "other": ("x2",),
     }
-    inverse_mapping: dict[str, str]
-    cache: dict["torch.fx.graph.Target", OrderedSet[str]]
+    inverse_mapping: Dict[str, str]
+    cache: Dict["torch.fx.graph.Target", Set[str]]
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.cache = {}  # callable -> tuple of replaceable args e.g. ["axis"]
         self.inverse_mapping = {}
         for actual_kwarg, numpy_kwargs in self.numpy_compat.items():
@@ -103,7 +102,7 @@ class NumpyCompatNormalization:
                     node.target
                 )
                 signatures = () if signatures is None else signatures
-                replaceable_kwargs = OrderedSet()
+                replaceable_kwargs = set()
                 for sig in signatures:
                     for param_name in sig.parameters.keys():
                         if param_name in self.numpy_compat:

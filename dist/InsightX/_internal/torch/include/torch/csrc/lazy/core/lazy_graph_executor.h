@@ -8,7 +8,8 @@
 #include <torch/csrc/lazy/core/tensor.h>
 #include <torch/csrc/lazy/core/util.h>
 
-namespace torch::lazy {
+namespace torch {
+namespace lazy {
 
 class TORCH_API LazyGraphExecutor {
  public:
@@ -130,11 +131,6 @@ class TORCH_API LazyGraphExecutor {
   ComputationCache* GetComputationCache();
 
   hash_t GetGraphHash(const std::vector<LazyTensorPtr>& tensors);
-
-  // Clear the computation cache.
-  void ClearComputationCache();
-  // Remove a specific computation cache entry from its hash.
-  void RemoveFromComputationCache(const hash_t& hash);
 
  protected:
   // TODO(alanwaketan): Revisit if all of them need to be accessible to
@@ -426,4 +422,5 @@ class TORCH_API LazyGraphExecutor {
       c10::ArrayRef<BackendDataPtr> tensors_data);
 };
 
-} // namespace torch::lazy
+} // namespace lazy
+} // namespace torch

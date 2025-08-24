@@ -2,11 +2,10 @@
 
 import collections
 import warnings
-from collections.abc import Sequence
 from functools import partial, wraps
+from typing import Sequence
 
 import numpy as np
-import numpy.typing as npt
 
 import torch
 from torch.testing._internal.common_cuda import TEST_CUDA
@@ -86,7 +85,7 @@ def get_supported_dtypes(op, sample_inputs_fn, device_type):
         for sample in samples:
             try:
                 op(sample.input, *sample.args, **sample.kwargs)
-            except RuntimeError:
+            except RuntimeError as re:
                 # dtype is not supported
                 supported = False
                 break
@@ -104,7 +103,7 @@ def dtypes_dispatch_hint(dtypes):
 
     # CUDA is not available, dtypes will be empty.
     if len(dtypes) == 0:
-        return return_type((), "()")
+        return return_type((), str(tuple()))
 
     set_dtypes = set(dtypes)
     for dispatch in COMPLETE_DTYPES_DISPATCH:
@@ -156,7 +155,7 @@ def np_unary_ufunc_integer_promotion_wrapper(fn):
     # Wrapper that passes PyTorch's default scalar
     #   type as an argument to the wrapped NumPy
     #   unary ufunc when given an integer input.
-    #   This mimics PyTorch's integer->floating point
+    #   This mimicks PyTorch's integer->floating point
     #   type promotion.
     #
     # This is necessary when NumPy promotes
@@ -207,7 +206,7 @@ def reference_reduction_numpy(f, supports_keepdims=True):
     """
 
     @wraps(f)
-    def wrapper(x: npt.NDArray, *args, **kwargs):
+    def wrapper(x: np.ndarray, *args, **kwargs):
         # Copy keys into a set
         keys = set(kwargs.keys())
 

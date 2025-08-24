@@ -7,6 +7,7 @@
 #pragma once
 
 #include <bitset>
+#include <utility>
 
 #include <ATen/ArrayRef.h>
 #include <ATen/SmallVector.h>
@@ -118,15 +119,15 @@ inline bool isBatchedTensor(const Tensor& tensor) {
 
 // It is unsafe to call this on a Tensor that is not backed by a
 // BatchedTensorImpl. Please use `maybeGetBatchedImpl` whenever possible.
-inline BatchedTensorImpl* unsafeGetBatchedImpl(const Tensor& tensor) {
+inline BatchedTensorImpl* unsafeGetBatchedImpl(Tensor tensor) {
   return static_cast<BatchedTensorImpl*>(tensor.unsafeGetTensorImpl());
 }
 
-inline BatchedTensorImpl* maybeGetBatchedImpl(const Tensor& tensor) {
+inline BatchedTensorImpl* maybeGetBatchedImpl(Tensor tensor) {
   if (!isBatchedTensor(tensor)) {
     return nullptr;
   }
-  return unsafeGetBatchedImpl(tensor);
+  return unsafeGetBatchedImpl(std::move(tensor));
 }
 
 // Returns a bitset. If bit i is set, then that means dim i is a batchdim.
@@ -144,10 +145,10 @@ inline std::bitset<kVmapNumLevels> createVmapLevelsBitset(int64_t level) {
 }
 
 // Use this to construct a BatchedTensor from a regular Tensor
-TORCH_API Tensor makeBatched(Tensor tensor, int64_t dim, int64_t level);
+TORCH_API Tensor makeBatched(const Tensor& tensor, int64_t dim, int64_t level);
 
 // Adds a batch dim to `tensor`, returning a BatchedTensor
-TORCH_API Tensor addBatchDim(Tensor tensor, int64_t dim, int64_t level);
+TORCH_API Tensor addBatchDim(const Tensor& tensor, int64_t dim, int64_t level);
 
 // Certain dispatch keys must be propagated to the BatchedTensor (or, in general,
 // any wrapper Tensor subclasses). This is because there are methods on Tensor
@@ -159,7 +160,6 @@ constexpr DispatchKeySet kKeysToPropagateToWrapper({
   DispatchKey::XLA,
   DispatchKey::CUDA,
   DispatchKey::CPU,
-  DispatchKey::PrivateUse1,
 });
 
 inline DispatchKeySet getKeysToPropagateToWrapper(const Tensor& tensor, DispatchKeySet to_propagate=kKeysToPropagateToWrapper) {

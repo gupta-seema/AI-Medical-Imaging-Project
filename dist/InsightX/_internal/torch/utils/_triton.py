@@ -1,169 +1,103 @@
 import functools
 import hashlib
-from typing import Any
+import os
 
-
-@functools.cache
-def has_triton_package() -> bool:
-    try:
-        from triton.compiler.compiler import triton_key
-
-        return triton_key is not None
-    except ImportError:
-        return False
-    except RuntimeError:
-        return False
-
-
-@functools.cache
-def _device_supports_tma() -> bool:
-    import torch
-
-    return (
-        torch.cuda.is_available()
-        and torch.cuda.get_device_capability() >= (9, 0)
-        and not torch.version.hip
-    )
-
-
-@functools.cache
-def has_triton_experimental_host_tma() -> bool:
-    if has_triton_package():
-        if _device_supports_tma():
-            try:
-                from triton.tools.experimental_descriptor import (  # noqa: F401
-                    create_1d_tma_descriptor,
-                    create_2d_tma_descriptor,
-                )
-
-                return True
-            except ImportError:
-                pass
-
-    return False
-
-
-@functools.cache
-def has_triton_tensor_descriptor_host_tma() -> bool:
-    if has_triton_package():
-        if _device_supports_tma():
-            try:
-                from triton.tools.tensor_descriptor import (  # noqa: F401
-                    TensorDescriptor,
-                )
-
-                return True
-            except ImportError:
-                pass
-
-    return False
-
-
-@functools.cache
-def has_triton_tma() -> bool:
-    return has_triton_tensor_descriptor_host_tma() or has_triton_experimental_host_tma()
-
-
-@functools.cache
-def has_triton_tma_device() -> bool:
-    if has_triton_package():
-        import torch
-
-        if (
-            torch.cuda.is_available()
-            and torch.cuda.get_device_capability() >= (9, 0)
-            and not torch.version.hip
-        ):
-            # old API
-            try:
-                from triton.language.extra.cuda import (  # noqa: F401
-                    experimental_device_tensormap_create1d,
-                    experimental_device_tensormap_create2d,
-                )
-
-                return True
-            except ImportError:
-                pass
-
-            # new API
-            try:
-                from triton.language import make_tensor_descriptor  # noqa: F401
-
-                return True
-            except ImportError:
-                pass
-
-    return False
+from torch._dynamo.device_interface import get_interface_for_device
 
 
 @functools.lru_cache(None)
-def has_triton_stable_tma_api() -> bool:
-    if has_triton_package():
-        import torch
+def has_triton_package() -> bool:
+    try:
+        import triton
 
-        if (
-            torch.cuda.is_available()
-            and torch.cuda.get_device_capability() >= (9, 0)
-            and not torch.version.hip
-        ):
-            try:
-                from triton.language import make_tensor_descriptor  # noqa: F401
-
-                return True
-            except ImportError:
-                pass
-    return False
-
-
-@functools.cache
-def has_triton() -> bool:
-    if not has_triton_package():
+        return triton is not None
+    except ImportError:
         return False
 
-    from torch._dynamo.device_interface import get_interface_for_device
 
-    def cuda_extra_check(device_interface: Any) -> bool:
+@functools.lru_cache(None)
+def has_triton() -> bool:
+    def cuda_extra_check(device_interface):
         return device_interface.Worker.get_device_properties().major >= 7
 
-    def cpu_extra_check(device_interface: Any) -> bool:
-        import triton.backends
+    triton_supported_devices = {"cuda": cuda_extra_check}
 
-        return "cpu" in triton.backends.backends
-
-    def _return_true(device_interface: Any) -> bool:
-        return True
-
-    triton_supported_devices = {
-        "cuda": cuda_extra_check,
-        "xpu": _return_true,
-        "cpu": cpu_extra_check,
-    }
-
-    def is_device_compatible_with_triton() -> bool:
+    def is_device_compatible_with_triton():
         for device, extra_check in triton_supported_devices.items():
             device_interface = get_interface_for_device(device)
             if device_interface.is_available() and extra_check(device_interface):
                 return True
         return False
 
-    return is_device_compatible_with_triton()
+    return is_device_compatible_with_triton() and has_triton_package()
 
 
-@functools.cache
-def triton_backend() -> Any:
-    from triton.compiler.compiler import make_backend
-    from triton.runtime.driver import driver
+@functools.lru_cache(None)
+def triton_backend_hash():
+    from triton.common.backend import get_backend, get_cuda_version_key
 
-    target = driver.active.get_current_target()
-    return make_backend(target)
+    import torch
+
+    if torch.version.hip:
+        # Does not work with ROCm
+        return None
+
+    if not torch.cuda.is_available():
+        return None
+
+    backend = get_backend("cuda")
+    if backend is None:
+        return get_cuda_version_key()
+    else:
+        return backend.get_version_key()
 
 
-@functools.cache
-def triton_hash_with_backend() -> str:
-    from triton.compiler.compiler import triton_key
+@functools.lru_cache
+def triton_key():
+    import pkgutil
 
-    backend = triton_backend()
-    key = f"{triton_key()}-{backend.hash()}"
+    import triton
 
-    # Hash is upper case so that it can't contain any Python keywords.
-    return hashlib.sha256(key.encode("utf-8")).hexdigest().upper()
+    TRITON_PATH = os.path.dirname(os.path.abspath(triton.__file__))
+    contents = []
+    # This is redundant. Doing it to be consistent with upstream.
+    # frontend
+    with open(os.path.join(TRITON_PATH, "compiler", "compiler.py"), "rb") as f:
+        contents += [hashlib.sha256(f.read()).hexdigest()]
+
+    # compiler
+    compiler_path = os.path.join(TRITON_PATH, "compiler")
+    backends_path = os.path.join(TRITON_PATH, "compiler", "backends")
+    for lib in pkgutil.iter_modules([compiler_path, backends_path]):
+        with open(lib.module_finder.find_spec(lib.name).origin, "rb") as f:  # type: ignore[call-arg, union-attr, arg-type]
+            contents += [hashlib.sha256(f.read()).hexdigest()]
+    # backend
+    libtriton_hash = hashlib.sha256()
+    with open(os.path.join(TRITON_PATH, "_C/libtriton.so"), "rb") as f:
+        while True:
+            chunk = f.read(1024**2)
+            if not chunk:
+                break
+            libtriton_hash.update(chunk)
+    contents.append(libtriton_hash.hexdigest())
+    # language
+    language_path = os.path.join(TRITON_PATH, "language")
+    for lib in pkgutil.iter_modules([language_path]):
+        with open(lib.module_finder.find_spec(lib.name).origin, "rb") as f:  # type: ignore[call-arg, union-attr, arg-type]
+            contents += [hashlib.sha256(f.read()).hexdigest()]
+    from triton import __version__
+
+    return f"{__version__}" + "-".join(contents)
+
+
+@functools.lru_cache(None)
+def triton_hash_with_backend():
+    import torch
+
+    if torch.version.hip:
+        # Does not work with ROCm
+        return None
+
+    backend_hash = triton_backend_hash()
+    key = f"{triton_key()}-{backend_hash}"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()

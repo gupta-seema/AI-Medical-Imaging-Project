@@ -17,7 +17,7 @@ namespace at {
 
 namespace compositeimplicitautograd {
 
-TORCH_API at::Tensor pin_memory(const at::Tensor & self, ::std::optional<at::Device> device=::std::nullopt);
+TORCH_API at::Tensor pin_memory(const at::Tensor & self, c10::optional<at::Device> device=c10::nullopt);
 
 } // namespace compositeimplicitautograd
 } // namespace at

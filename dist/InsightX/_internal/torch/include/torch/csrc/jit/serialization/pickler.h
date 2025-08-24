@@ -2,7 +2,6 @@
 
 #include <ATen/core/qualified_name.h>
 #include <string>
-#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -12,9 +11,11 @@
 #include <c10/util/ArrayRef.h>
 #include <c10/util/FbcodeMaps.h>
 #include <c10/util/intrusive_ptr.h>
+#include <c10/util/string_view.h>
 #include <torch/csrc/Export.h>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 // See Python's pickletools.py for a detailed description of each of these codes
 enum class PickleOpCode : char {
@@ -94,6 +95,7 @@ enum class PickleOpCode : char {
 
 using ::c10::IValue;
 
+// NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
 struct WriteableTensorData {
   const char* data() const {
     return static_cast<const char*>(tensor_.storage().data());
@@ -114,6 +116,9 @@ struct WriteableTensorData {
   at::Tensor tensor_;
   uint64_t size_;
 };
+
+void setTypeTags(bool state);
+bool getTypeTags();
 
 class TORCH_API Pickler {
   AT_DISALLOW_COPY_AND_ASSIGN(Pickler);
@@ -136,6 +141,7 @@ class TORCH_API Pickler {
         memoized_class_types_(memoized_class_types),
         get_tensor_id_(std::move(get_tensor_id)),
         tag_aggregates_(tag_aggregates) {}
+  // NOLINTNEXTLINE(bugprone-exception-escape)
   ~Pickler();
 
   // Push protocol onto the stack
@@ -187,7 +193,7 @@ class TORCH_API Pickler {
       const IValue& ivalue,
       const char* list_name,
       const std::function<void(const IValue&)>& item_pusher);
-  void pushGlobal(std::string_view module_name, std::string_view class_name);
+  void pushGlobal(c10::string_view module_name, c10::string_view class_name);
   // raw string data is appended directly to the byte stream
   void pushBytes(const std::string& string);
   void pushTensorData(const at::Tensor& tensor);
@@ -213,9 +219,9 @@ class TORCH_API Pickler {
   // the left of a '::', its type cannot be deduced by the compiler so one must
   // explicitly instantiate the template, i.e. push<int>(int) works, push(int)
   // does not)
-  static constexpr size_t kBufferSize = 256;
+  static CONSTEXPR_EXCEPT_WIN_CUDA size_t kBufferSize = 256;
   template <typename T>
-  void push(std::common_type_t<T> value) {
+  void push(typename std::common_type<T>::type value) {
     const char* begin = reinterpret_cast<const char*>(&value);
     if (bufferPos_ + sizeof(T) > buffer_.size()) {
       flushNonEmpty();
@@ -226,7 +232,7 @@ class TORCH_API Pickler {
   }
 
   // Stream to write binary data to
-  // Code shouldn't call writer_ directly without first flushing.
+  // Code shouldn't call writer_ directly without first flush()ing.
   std::function<void(const char*, size_t)> writer_;
 
   // Buffer to avoid calling a writer_ on a per-byte basis.
@@ -283,6 +289,9 @@ class TORCH_API Pickler {
 TORCH_API WriteableTensorData
 getWriteableTensorData(const at::Tensor& tensor, bool to_cpu = true);
 
+// return the value of the tensor's storage pointer
+uint64_t getStorageKey(const at::Tensor& tensor);
+
 // if the cls has __getstate__/__setstate__
 // assert they have the right schema and return true,
 // otherwise return false
@@ -302,14 +311,14 @@ inline std::unordered_set<c10::DeviceType>& GetBackendMetaAllowlist() {
 // Dynamically obtain serialization function pairs
 // that require the corresponding backend.
 inline std::array<
-    std::optional<std::pair<BackendMetaPtr, BackendMetaPtr>>,
+    c10::optional<std::pair<BackendMetaPtr, BackendMetaPtr>>,
     at::COMPILE_TIME_MAX_DEVICE_TYPES>&
 GetBackendMetaSerialization() {
   // The array to save function pointer for BackendMeta serialization.
   // key is the DeviceType, value is std::pair obj.
   // value.first represent get function and value.seconde represent set function
   static std::array<
-      std::optional<std::pair<BackendMetaPtr, BackendMetaPtr>>,
+      c10::optional<std::pair<BackendMetaPtr, BackendMetaPtr>>,
       at::COMPILE_TIME_MAX_DEVICE_TYPES>
       BackendMetaSerialization;
   return BackendMetaSerialization;
@@ -339,7 +348,7 @@ TORCH_API inline void TensorBackendMetaRegistry(
       t,
       " has been registered.");
   BackendMetaSerialization[device_type] =
-      std::optional<std::pair<BackendMetaPtr, BackendMetaPtr>>(
+      c10::optional<std::pair<BackendMetaPtr, BackendMetaPtr>>(
           std::make_pair(get_fptr, set_fptr));
 }
 
@@ -416,4 +425,5 @@ inline void setTensorMetadata(
   setTensorMetadata(t, std::move(metadata));
 }
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

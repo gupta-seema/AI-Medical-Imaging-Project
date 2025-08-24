@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,7 +23,7 @@ namespace at {
 
 
 // aten::fft_ifftshift(Tensor self, int[1]? dim=None) -> Tensor
-inline at::Tensor fft_ifftshift(const at::Tensor & self, at::OptionalIntArrayRef dim=::std::nullopt) {
+inline at::Tensor fft_ifftshift(const at::Tensor & self, at::OptionalIntArrayRef dim=c10::nullopt) {
     return at::_ops::fft_ifftshift::call(self, dim);
 }
 

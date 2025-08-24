@@ -1,10 +1,8 @@
-from collections.abc import Iterable
-from typing import Any, no_type_check
+from typing import Any, Dict, Iterable, List, no_type_check, Type
 
 import torch
 
-
-__all__: list[str] = []
+__all__: List[str] = []
 
 # WeakTensorKeyDictionary to store relevant meta-data for the Tensor/Parameter
 # without changing it's life-time.
@@ -13,12 +11,11 @@ __all__: list[str] = []
 param_to_optim_hook_handle_map = torch.utils.weak.WeakTensorKeyDictionary()
 param_to_acc_grad_map = torch.utils.weak.WeakTensorKeyDictionary()
 
-
 @no_type_check
 def _apply_optimizer_in_backward(
-    optimizer_class: type[torch.optim.Optimizer],
+    optimizer_class: Type[torch.optim.Optimizer],
     params: Iterable[torch.nn.Parameter],
-    optimizer_kwargs: dict[str, Any],
+    optimizer_kwargs: Dict[str, Any],
     register_hook: bool = True,
 ) -> None:
     """
@@ -44,14 +41,16 @@ def _apply_optimizer_in_backward(
         param_1 = next(params_generator)
         remainder_params = list(params_generator)
 
-        apply_optimizer_in_backward(torch.optim.SGD, [param_1], {"lr": 0.02})
-        apply_optimizer_in_backward(torch.optim.Adam, remainder_params, {"lr": 0.04})
+        apply_optimizer_in_backward(torch.optim.SGD, [param_1], {"lr": .02})
+        apply_optimizer_in_backward(torch.optim.Adam, remainder_params, {"lr": .04})
 
-        model(...).sum().backward()  # after backward, parameters will already
+        model(...).sum().backward() # after backward, parameters will already
         # have their registered optimizer(s) applied.
 
     """
-    torch._C._log_api_usage_once("torch.distributed.optim.apply_optimizer_in_backward")
+    torch._C._log_api_usage_once(
+        "torch.distributed.optim.apply_optimizer_in_backward"
+    )
 
     @no_type_check
     def _apply_optimizer_in_backward_to_param(param: torch.nn.Parameter) -> None:
@@ -63,9 +62,7 @@ def _apply_optimizer_in_backward(
         # Don't create a new acc_grad if we already have one
         # i.e. for shared parameters or attaching multiple optimizers to a param.
         if param not in param_to_acc_grad_map:
-            param_to_acc_grad_map[param] = param.view_as(param).grad_fn.next_functions[
-                0
-            ][0]
+            param_to_acc_grad_map[param] = param.view_as(param).grad_fn.next_functions[0][0]
 
         optimizer = optimizer_class([param], **optimizer_kwargs)
 
@@ -98,7 +95,7 @@ def _apply_optimizer_in_backward(
         _apply_optimizer_in_backward_to_param(param)
 
 
-def _get_in_backward_optimizers(module: torch.nn.Module) -> list[torch.optim.Optimizer]:
+def _get_in_backward_optimizers(module: torch.nn.Module) -> List[torch.optim.Optimizer]:
     """
     Return a list of in-backward optimizers applied to ``module``'s parameters. Note that these
     optimizers are not intended to directly have their ``step`` or ``zero_grad`` methods called
@@ -111,10 +108,10 @@ def _get_in_backward_optimizers(module: torch.nn.Module) -> list[torch.optim.Opt
         List[torch.optim.Optimizer]: the in-backward optimizers.
 
     Example::
-        _apply_optimizer_in_backward(torch.optim.SGD, model.parameters(), {"lr": 0.01})
+        _apply_optimizer_in_backward(torch.optim.SGD, model.parameters(), {'lr': 0.01})
         optims = _get_optimizers_in_backward(model)
     """
-    optims: list[torch.optim.Optimizer] = []
+    optims: List[torch.optim.Optimizer] = []
     for param in module.parameters():
         optims.extend(getattr(param, "_in_backward_optimizers", []))
 

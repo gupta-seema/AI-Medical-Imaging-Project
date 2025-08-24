@@ -1,9 +1,8 @@
 import copy
 import math
-from collections.abc import Sequence
 from dataclasses import dataclass
 from functools import partial
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import nn, Tensor
@@ -117,7 +116,7 @@ class MBConv(nn.Module):
 
         self.use_res_connect = cnf.stride == 1 and cnf.input_channels == cnf.out_channels
 
-        layers: list[nn.Module] = []
+        layers: List[nn.Module] = []
         activation_layer = nn.SiLU
 
         # expand
@@ -183,7 +182,7 @@ class FusedMBConv(nn.Module):
 
         self.use_res_connect = cnf.stride == 1 and cnf.input_channels == cnf.out_channels
 
-        layers: list[nn.Module] = []
+        layers: List[nn.Module] = []
         activation_layer = nn.SiLU
 
         expanded_channels = cnf.adjust_channels(cnf.input_channels, cnf.expand_ratio)
@@ -265,7 +264,7 @@ class EfficientNet(nn.Module):
         if norm_layer is None:
             norm_layer = nn.BatchNorm2d
 
-        layers: list[nn.Module] = []
+        layers: List[nn.Module] = []
 
         # building first layer
         firstconv_output_channels = inverted_residual_setting[0].input_channels
@@ -279,7 +278,7 @@ class EfficientNet(nn.Module):
         total_stage_blocks = sum(cnf.num_layers for cnf in inverted_residual_setting)
         stage_block_id = 0
         for cnf in inverted_residual_setting:
-            stage: list[nn.Module] = []
+            stage: List[nn.Module] = []
             for _ in range(cnf.num_layers):
                 # copy to avoid modifications. shallow copy is enough
                 block_cnf = copy.copy(cnf)
@@ -366,7 +365,7 @@ def _efficientnet(
 def _efficientnet_conf(
     arch: str,
     **kwargs: Any,
-) -> tuple[Sequence[Union[MBConvConfig, FusedMBConvConfig]], Optional[int]]:
+) -> Tuple[Sequence[Union[MBConvConfig, FusedMBConvConfig]], Optional[int]]:
     inverted_residual_setting: Sequence[Union[MBConvConfig, FusedMBConvConfig]]
     if arch.startswith("efficientnet_b"):
         bneck_conf = partial(MBConvConfig, width_mult=kwargs.pop("width_mult"), depth_mult=kwargs.pop("depth_mult"))
@@ -418,7 +417,7 @@ def _efficientnet_conf(
     return inverted_residual_setting, last_channel
 
 
-_COMMON_META: dict[str, Any] = {
+_COMMON_META: Dict[str, Any] = {
     "categories": _IMAGENET_CATEGORIES,
 }
 

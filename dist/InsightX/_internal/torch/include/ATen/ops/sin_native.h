@@ -6,7 +6,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
+#include <c10/util/Optional.h>
 #include <c10/core/QScheme.h>
 #include <ATen/core/Reduction.h>
 #include <ATen/core/Tensor.h>
@@ -19,7 +19,7 @@ namespace native {
 struct TORCH_API structured_sin_out : public at::meta::structured_sin {
 void impl(const at::Tensor & self, const at::Tensor & out);
 };
-TORCH_API at::Tensor NestedTensor_sin(const at::Tensor & self);
+TORCH_API at::Tensor sin_nested(const at::Tensor & self);
 TORCH_API at::Tensor sin_sparse(const at::Tensor & self);
 TORCH_API at::Tensor & sin_sparse_out(const at::Tensor & self, at::Tensor & out);
 TORCH_API at::Tensor & sin_sparse_(at::Tensor & self);

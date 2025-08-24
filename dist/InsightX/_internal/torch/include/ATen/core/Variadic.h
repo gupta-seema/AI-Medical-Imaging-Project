@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <tuple>
+#include <type_traits>
 #include <utility>
 
 #include <c10/util/ArrayRef.h>

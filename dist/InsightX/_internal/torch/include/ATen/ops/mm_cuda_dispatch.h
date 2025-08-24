@@ -20,9 +20,6 @@ namespace cuda {
 TORCH_API at::Tensor mm(const at::Tensor & self, const at::Tensor & mat2);
 TORCH_API at::Tensor & mm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2);
 TORCH_API at::Tensor & mm_outf(const at::Tensor & self, const at::Tensor & mat2, at::Tensor & out);
-TORCH_API at::Tensor mm(const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype);
-TORCH_API at::Tensor & mm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype);
-TORCH_API at::Tensor & mm_outf(const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype, at::Tensor & out);
 
 } // namespace cuda
 } // namespace at

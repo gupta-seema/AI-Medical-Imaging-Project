@@ -1,29 +1,19 @@
-# mypy: allow-untyped-defs
+from typing import List, Tuple, Union, Dict, Any, Set, Mapping, Optional
 import collections
-import operator
-from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Any, Optional, Union
 
 import torch
 import torch.fx
-from torch.fx._compatibility import compatibility
 from torch.fx.node import _get_qualified_name
+from torch.fx._compatibility import compatibility
 
+__all__ = ['get_acc_ops_name', 'get_node_target', 'is_node_output_tensor', 'FxNetAccFusionsFinder', 'legalize_graph']
 
-__all__ = [
-    "get_acc_ops_name",
-    "get_node_target",
-    "is_node_output_tensor",
-    "FxNetAccFusionsFinder",
-    "legalize_graph",
-]
-
-Tensors = Union[tuple[torch.Tensor], list[torch.Tensor]]
+Tensors = Union[Tuple[torch.Tensor], List[torch.Tensor]]
 TensorOrTensors = Union[torch.Tensor, Tensors]
-NodeList = list[torch.fx.Node]
-NodeSet = set[torch.fx.Node]
-Names = list[str]
+NodeList = List[torch.fx.Node]
+NodeSet = Set[torch.fx.Node]
+Names = List[str]
 CALLABLE_NODE_OPS = {"call_module", "call_function", "call_method"}
 
 
@@ -34,16 +24,12 @@ def get_acc_ops_name(k):
     elif k.__module__ and "acc_ops" in k.__module__:
         return f"acc_ops.{k.__name__}"
     else:
-        module = k.__module__.replace(
-            "torch._ops", "torch.ops"
-        )  # WAR for bug in how torch.ops assigns module
+        module = k.__module__.replace('torch._ops', 'torch.ops')  # WAR for bug in how torch.ops assigns module
         return f"{module if module else ''}.{k.__name__}"
 
 
 @compatibility(is_backward_compatible=False)
-def get_node_target(
-    submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node
-) -> str:
+def get_node_target(submodules: Mapping[str, torch.nn.Module], node: torch.fx.Node) -> str:
     """
     Given a `node` returns its target typename.
 
@@ -78,7 +64,6 @@ def get_node_target(
         assert isinstance(node.target, str)
         return node.target
 
-
 @compatibility(is_backward_compatible=False)
 def is_node_output_tensor(node: torch.fx.Node) -> bool:
     """Checks if the node output produces a Tensor or not.
@@ -89,7 +74,6 @@ def is_node_output_tensor(node: torch.fx.Node) -> bool:
     """
     type_ = node.meta.get("type", None)
     return type_ is not None and issubclass(type_, torch.Tensor)
-
 
 @compatibility(is_backward_compatible=False)
 class FxNetAccFusionsFinder:
@@ -173,8 +157,8 @@ class FxNetAccFusionsFinder:
 
         return False
 
-    def __call__(self) -> dict[torch.fx.Node, NodeSet]:
-        result: dict[torch.fx.Node, NodeSet] = {}
+    def __call__(self) -> Dict[torch.fx.Node, NodeSet]:
+        result: Dict[torch.fx.Node, NodeSet] = {}
         acc_nodes = list(self.acc_nodes)
 
         for node in acc_nodes:
@@ -259,31 +243,6 @@ def legalize_graph(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     Returns:
         The graph module in-place sorted
     """
-
-    # These operators are used for making runtime assertions before any
-    # data-dependent operators occur. We want to prioritize sorting these to
-    # ensure that these assertions appear before any data-dependent operations
-    # in the graph.
-    PRIORITIZED_OPS = [
-        operator.add,
-        operator.mul,
-        operator.sub,
-        operator.floordiv,
-        operator.truediv,
-        operator.mod,
-        operator.le,
-        operator.lt,
-        operator.ge,
-        operator.gt,
-        operator.eq,
-        operator.ne,
-        torch.ops.aten.sym_constrain_range.default,
-        torch.ops.aten.sym_constrain_range_for_size.default,
-        torch.ops.aten._assert_async.msg,
-        torch.ops.aten.scalar_tensor.default,
-        torch.ops.aten._assert_scalar.default,
-    ]
-
     indeg = dict.fromkeys(gm.graph.nodes, 0)
     new_graph = torch.fx.Graph()
     # Track how many unfulfilled dependencies each node has
@@ -295,7 +254,7 @@ def legalize_graph(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
     for node in gm.graph.nodes:
         if indeg[node] == 0:
             queue.append(node)
-    env: dict[torch.fx.Node, torch.fx.Node] = {}
+    env: Dict[torch.fx.Node, torch.fx.Node] = {}
     # Pop nodes from the queue, and add nodes that have had all their
     # dependencies fulfilled
     while len(queue) > 0:
@@ -304,16 +263,11 @@ def legalize_graph(gm: torch.fx.GraphModule) -> torch.fx.GraphModule:
         for user in cur.users:
             indeg[user] -= 1
             if indeg[user] == 0:
-                if user.op == "call_function" and user.target in PRIORITIZED_OPS:
-                    queue.appendleft(user)
-                else:
-                    queue.append(user)
+                queue.append(user)
     # If the new graph's size is not as large as the old one, then there must be
     # a cycle (i.e. some node's dependencies were not satisfied.)
     if len(new_graph.nodes) < len(gm.graph.nodes):
-        raise RuntimeError(
-            f"Input graph has cycles, unable to add {[node for node in indeg if indeg[node] != 0]}"
-        )
+        raise RuntimeError(f"Input graph has cycles, unable to add {[node for node in indeg if indeg[node] != 0]}")
     new_graph._codegen = gm.graph._codegen
     gm.graph = new_graph
     return gm

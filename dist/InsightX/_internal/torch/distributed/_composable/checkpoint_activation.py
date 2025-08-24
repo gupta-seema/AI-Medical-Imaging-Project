@@ -1,7 +1,5 @@
-# mypy: allow-untyped-defs
-from collections.abc import Generator
-from contextlib import AbstractContextManager, contextmanager, nullcontext
-from typing import Any, Optional
+from contextlib import contextmanager, nullcontext
+from typing import Any, Tuple
 
 import torch
 import torch.nn as nn
@@ -10,32 +8,25 @@ from torch.utils.checkpoint import (
     _DEFAULT_DETERMINISM_MODE,
 )
 
-from .contract import _State, contract
+from .contract import contract
 
 
 @contextmanager
-def _no_hook(module: nn.Module, user_ctx: Optional[AbstractContextManager] = None):
+def _no_hook(module: nn.Module):
     r"""
     Disable hooks installed by checkpoint to avoid unintentional recursion
     during backward recomputation.
     """
-
-    with user_ctx if user_ctx else nullcontext():
-        orig_enable_hook = checkpoint.state(module).enable_hook
-        checkpoint.state(module).enable_hook = False
-        try:
-            yield
-        finally:
-            checkpoint.state(module).enable_hook = orig_enable_hook
+    orig_enable_hook = checkpoint.state(module).enable_hook
+    checkpoint.state(module).enable_hook = False
+    try:
+        yield
+    finally:
+        checkpoint.state(module).enable_hook = orig_enable_hook
 
 
-class _CheckpointState(_State):
-    enable_hook: bool = False
-    _ac_generator: Optional[Generator[None, None, None]]
-
-
-@contract(_CheckpointState)
-def checkpoint(module: nn.Module, **kwargs) -> nn.Module:
+@contract()
+def checkpoint(module: nn.Module) -> nn.Module:
     r"""
     This is a composable activation checkpointing API. Unlike functional
     activation checkpointing APIs, this one does not require changing model
@@ -54,7 +45,7 @@ def checkpoint(module: nn.Module, **kwargs) -> nn.Module:
         >>> import torch.nn as nn
         >>>
         >>> class MyModel(nn.Module):
-        >>>     def __init__(self) -> None:
+        >>>     def __init__(self):
         >>>         super().__init__()
         >>>         self.l1 = nn.Linear(10, 10)
         >>>         self.l2 = nn.Linear(10, 10)
@@ -69,52 +60,23 @@ def checkpoint(module: nn.Module, **kwargs) -> nn.Module:
     """
     torch._C._log_api_usage_once("torch.distributed.checkpoint")
 
-    use_reentrant = kwargs.pop("use_reentrant", False)
-    if use_reentrant:
-        raise NotImplementedError(
-            "use_reentrant=True is not supported in composable checkpoint. "
-            "Please use torch.utils.checkpoint.checkpoint instead."
-        )
-    preserve_rng_state = kwargs.pop("preserve_rng_state", True)
-    user_context_fns = kwargs.pop("context_fn", None)
-    determinism_check = kwargs.pop("determinism_check", _DEFAULT_DETERMINISM_MODE)
-    debug = kwargs.pop("debug", False)
-
-    if kwargs:
-        raise ValueError(
-            "Unexpected keyword arguments: " + ",".join(arg for arg in kwargs)
-        )
-
-    def forward_pre_hook(
-        module: nn.Module, args: tuple[Any, ...], kwargs: dict[str, Any]
-    ) -> None:
+    def forward_pre_hook(module: nn.Module, inputs: Tuple[Any, ...]) -> None:
         if checkpoint.state(module).enable_hook:
 
             def context_fns():
-                if user_context_fns is not None:
-                    ctx1, ctx2 = user_context_fns()
-                    return ctx1, _no_hook(module, ctx2)
-                else:
-                    return nullcontext(), _no_hook(module)
+                return nullcontext(), _no_hook(module)
 
-            gen = _checkpoint_without_reentrant_generator(
-                module,
-                preserve_rng_state,
-                context_fns,
-                determinism_check,
-                debug,
-                *args,
-                **kwargs,
+            checkpoint.state(
+                module
+            )._ac_generator = _checkpoint_without_reentrant_generator(
+                module, True, context_fns, _DEFAULT_DETERMINISM_MODE, False, *inputs
             )
-            checkpoint.state(module)._ac_generator = gen
-            next(gen)
+            next(checkpoint.state(module)._ac_generator)
 
-    def forward_hook(module: nn.Module, inputs: tuple[Any, ...], output: Any) -> Any:
+    def forward_hook(module: nn.Module, inputs: Tuple[Any, ...], output: Any) -> Any:
         if checkpoint.state(module).enable_hook:
             try:
-                gen = checkpoint.state(module)._ac_generator
-                assert gen is not None
-                next(gen)
+                next(checkpoint.state(module)._ac_generator)
             except StopIteration:
                 pass
             else:
@@ -127,6 +89,6 @@ def checkpoint(module: nn.Module, **kwargs) -> nn.Module:
         checkpoint.state(module)._ac_generator = None
 
     checkpoint.state(module).enable_hook = True
-    module.register_forward_pre_hook(forward_pre_hook, with_kwargs=True)
+    module.register_forward_pre_hook(forward_pre_hook)
     module.register_forward_hook(forward_hook, prepend=True, always_call=True)
     return module

@@ -4,9 +4,10 @@
 #include <torch/csrc/python_headers.h>
 #include <torch/csrc/utils/pybind.h>
 
-namespace torch::distributed::rpc {
+namespace torch {
+namespace distributed {
+namespace rpc {
 
-// NOLINTNEXTLINE(performance-enum-size)
 enum RRefProxyType { RPC_SYNC, RPC_ASYNC, REMOTE };
 
 // Python wrapper of an RRef shared_ptr that supports Python
@@ -74,8 +75,10 @@ class PYBIND11_EXPORT PyRRef {
 
  private:
   c10::intrusive_ptr<RRef> rref_;
-  std::optional<c10::intrusive_ptr<JitFuture>> profilingFuture_;
-  std::optional<py::object> type_;
+  c10::optional<c10::intrusive_ptr<JitFuture>> profilingFuture_;
+  c10::optional<py::object> type_;
 };
 
-} // namespace torch::distributed::rpc
+} // namespace rpc
+} // namespace distributed
+} // namespace torch

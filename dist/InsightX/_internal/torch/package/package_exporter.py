@@ -1,23 +1,32 @@
-# mypy: allow-untyped-defs
 import collections
 import importlib.machinery
 import io
 import linecache
-import os
 import pickletools
 import platform
 import types
 from collections import defaultdict, OrderedDict
-from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import Enum
 from importlib.machinery import SourceFileLoader
 from pathlib import Path
-from typing import Any, Callable, cast, IO, Optional, Union
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    cast,
+    DefaultDict,
+    Dict,
+    List,
+    Optional,
+    Sequence,
+    Set,
+    Union,
+)
 
 import torch
 from torch.serialization import location_tag, normalize_storage_type
-from torch.types import FileLike, Storage
+from torch.types import Storage
 from torch.utils.hooks import RemovableHandle
 
 from ._digraph import DiGraph
@@ -28,7 +37,6 @@ from ._stdlib import is_stdlib_module
 from .find_file_dependencies import find_files_source_depends_on
 from .glob_group import GlobGroup, GlobPattern
 from .importer import Importer, OrderedImporter, sys_importer
-
 
 __all__ = [
     "PackagingErrorReason",
@@ -114,6 +122,8 @@ class EmptyMatchError(Exception):
     ``allow_empty=False``, and is not matched with any module during packaging.
     """
 
+    pass
+
 
 class PackagingError(Exception):
     """This exception is raised when there is an issue with exporting a package.
@@ -123,7 +133,7 @@ class PackagingError(Exception):
 
     def __init__(self, dependency_graph: DiGraph, debug=False):
         # Group errors by reason.
-        broken: dict[PackagingErrorReason, list[str]] = defaultdict(list)
+        broken: Dict[PackagingErrorReason, List[str]] = defaultdict(list)
         for module_name, attrs in dependency_graph.nodes.items():
             error = attrs.get("error")
             if error is None:
@@ -156,7 +166,7 @@ class PackagingError(Exception):
                 if debug:
                     module_path = dependency_graph.first_path(module_name)
                     message.write(
-                        f"      A path to {module_name}: {' -> '.join(module_path)}\n"
+                        f"      A path to {module_name}: {' -> '.join(module_path)}"
                     )
         if not debug:
             message.write("\n")
@@ -202,10 +212,10 @@ class PackageExporter:
 
     def __init__(
         self,
-        f: FileLike,
+        f: Union[str, Path, BinaryIO],
         importer: Union[Importer, Sequence[Importer]] = sys_importer,
         debug: bool = False,
-    ) -> None:
+    ):
         """
         Create an exporter.
 
@@ -218,17 +228,17 @@ class PackageExporter:
         """
         torch._C._log_api_usage_once("torch.package.PackageExporter")
         self.debug = debug
-        if isinstance(f, (str, os.PathLike)):
-            f = os.fspath(f)
-            self.buffer: Optional[IO[bytes]] = None
+        if isinstance(f, (Path, str)):
+            f = str(f)
+            self.buffer: Optional[BinaryIO] = None
         else:  # is a byte buffer
             self.buffer = f
 
         self.zip_file = torch._C.PyTorchFileWriter(f)
         self.zip_file.set_min_version(6)
-        self._written_files: set[str] = set()
+        self._written_files: Set[str] = set()
 
-        self.serialized_reduces: dict[int, Any] = {}
+        self.serialized_reduces: Dict[int, Any] = {}
 
         # A graph tracking all the modules and pickle objects added to this
         # package and the dependencies between them.
@@ -256,7 +266,7 @@ class PackageExporter:
                 )
             self.importer = OrderedImporter(*importer)
 
-        self.patterns: dict[GlobGroup, _PatternInfo] = {}
+        self.patterns: Dict[GlobGroup, _PatternInfo] = {}
         self._unique_id = 0
 
     def save_source_file(
@@ -321,7 +331,7 @@ class PackageExporter:
 
     def _get_dependencies(
         self, src: str, module_name: str, is_package: bool
-    ) -> list[str]:
+    ) -> List[str]:
         """Return all modules that this source code depends on.
 
         Dependencies are found by scanning the source code for import-like statements.
@@ -417,7 +427,7 @@ class PackageExporter:
     def _import_module(self, module_name: str):
         try:
             return self.importer.import_module(module_name)
-        except ModuleNotFoundError:
+        except ModuleNotFoundError as e:
             if not is_mangled(module_name):
                 raise
             msg = (
@@ -649,10 +659,10 @@ class PackageExporter:
             all_dependencies = []
             module = None
             field = None
-            memo: defaultdict[int, str] = defaultdict(None)
+            memo: DefaultDict[int, str] = defaultdict(None)
             memo_count = 0
             # pickletools.dis(data_value)
-            for opcode, arg, _pos in pickletools.genops(data_value):
+            for opcode, arg, pos in pickletools.genops(data_value):
                 if pickle_protocol == 4:
                     if (
                         opcode.name == "SHORT_BINUNICODE"
@@ -675,7 +685,7 @@ class PackageExporter:
                         memo_count += 1
                     elif opcode.name == "STACK_GLOBAL":
                         if module is None:
-                            # If not module was passed on in the entries preceding this one, continue.
+                            # If not module was passed on in the entries preceeding this one, continue.
                             continue
                         assert isinstance(module, str)
                         if module not in all_dependencies:
@@ -695,9 +705,9 @@ class PackageExporter:
                 """ If an object happens to come from a mocked module, then we collect these errors and spit them
                     out with the other errors found by package exporter.
                 """
-                if module_name in mocked_modules:
-                    assert isinstance(module_name, str)
-                    fields = mocked_modules[module_name]
+                if module in mocked_modules:
+                    assert isinstance(module, str)
+                    fields = mocked_modules[module]
                     self.dependency_graph.add_node(
                         module_name,
                         action=_ModuleProviderAction.MOCK,
@@ -939,7 +949,7 @@ class PackageExporter:
             if _gate_torchscript_serialization and isinstance(
                 obj, torch.jit.RecursiveScriptModule
             ):
-                raise Exception(  # noqa: TRY002
+                raise Exception(
                     "Serializing ScriptModules directly into a package is a beta feature. "
                     "To use, set global "
                     "`torch.package.package_exporter._gate_torchscript_serialization` to `False`."
@@ -1105,7 +1115,7 @@ class PackageExporter:
 
     def _nodes_with_action_type(
         self, action: Optional[_ModuleProviderAction]
-    ) -> list[str]:
+    ) -> List[str]:
         result = []
         for name, node_dict in self.dependency_graph.nodes.items():
             node_action = node_dict.get("action", None)
@@ -1114,7 +1124,7 @@ class PackageExporter:
         result.sort()
         return result
 
-    def externed_modules(self) -> list[str]:
+    def externed_modules(self) -> List[str]:
         """Return all modules that are currently externed.
 
         Returns:
@@ -1123,7 +1133,7 @@ class PackageExporter:
         """
         return self._nodes_with_action_type(_ModuleProviderAction.EXTERN)
 
-    def interned_modules(self) -> list[str]:
+    def interned_modules(self) -> List[str]:
         """Return all modules that are currently interned.
 
         Returns:
@@ -1132,7 +1142,7 @@ class PackageExporter:
         """
         return self._nodes_with_action_type(_ModuleProviderAction.INTERN)
 
-    def mocked_modules(self) -> list[str]:
+    def mocked_modules(self) -> List[str]:
         """Return all modules that are currently mocked.
 
         Returns:
@@ -1141,7 +1151,7 @@ class PackageExporter:
         """
         return self._nodes_with_action_type(_ModuleProviderAction.MOCK)
 
-    def denied_modules(self) -> list[str]:
+    def denied_modules(self) -> List[str]:
         """Return all modules that are currently denied.
 
         Returns:
@@ -1150,7 +1160,7 @@ class PackageExporter:
         """
         return self._nodes_with_action_type(_ModuleProviderAction.DENY)
 
-    def get_rdeps(self, module_name: str) -> list[str]:
+    def get_rdeps(self, module_name: str) -> List[str]:
         """Return a list of all modules which depend on the module ``module_name``.
 
         Returns:

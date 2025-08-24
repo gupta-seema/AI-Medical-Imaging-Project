@@ -1,4 +1,4 @@
-# mypy: allow-untyped-defs
+"""isort:skip_file"""
 from pickle import (  # type: ignore[attr-defined]
     _compat_pickle,
     _extension_registry,
@@ -8,6 +8,7 @@ from pickle import (  # type: ignore[attr-defined]
     EXT2,
     EXT4,
     GLOBAL,
+    Pickler,
     PicklingError,
     STACK_GLOBAL,
 )
@@ -17,18 +18,7 @@ from types import FunctionType
 from .importer import Importer, ObjMismatchError, ObjNotFoundError, sys_importer
 
 
-class _PyTorchLegacyPickler(_Pickler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._persistent_id = None
-
-    def persistent_id(self, obj):
-        if self._persistent_id is None:
-            return super().persistent_id(obj)
-        return self._persistent_id(obj)
-
-
-class PackagePickler(_PyTorchLegacyPickler):
+class PackagePickler(_Pickler):
     """Package-aware pickler.
 
     This behaves the same as a normal pickler, except it uses an `Importer`
@@ -49,7 +39,6 @@ class PackagePickler(_PyTorchLegacyPickler):
         self.dispatch[FunctionType] = PackagePickler.save_global  # type: ignore[assignment]
 
     def save_global(self, obj, name=None):
-        # ruff: noqa: F841
         # unfortunately the pickler code is factored in a way that
         # forces us to copy/paste this function. The only change is marked
         # CHANGED below.
@@ -60,7 +49,7 @@ class PackagePickler(_PyTorchLegacyPickler):
         try:
             module_name, name = self.importer.get_name(obj, name)
         except (ObjNotFoundError, ObjMismatchError) as err:
-            raise PicklingError(f"Can't pickle {obj}: {str(err)}") from err
+            raise PicklingError(f"Can't pickle {obj}: {str(err)}") from None
 
         module = self.importer.import_module(module_name)
         _, parent = _getattribute(module, name)
@@ -111,11 +100,11 @@ class PackagePickler(_PyTorchLegacyPickler):
                     + bytes(name, "ascii")
                     + b"\n"
                 )
-            except UnicodeEncodeError as exc:
+            except UnicodeEncodeError:
                 raise PicklingError(
-                    f"can't pickle global identifier '{module}.{name}' using "
-                    f"pickle protocol {self.proto:d}"  # type: ignore[attr-defined]
-                ) from exc
+                    "can't pickle global identifier '%s.%s' using "
+                    "pickle protocol %i" % (module, name, self.proto)  # type: ignore[attr-defined]
+                ) from None
 
         self.memoize(obj)  # type: ignore[attr-defined]
 
@@ -124,6 +113,6 @@ def create_pickler(data_buf, importer, protocol=4):
     if importer is sys_importer:
         # if we are using the normal import library system, then
         # we can use the C implementation of pickle which is faster
-        return _PyTorchLegacyPickler(data_buf, protocol=protocol)
+        return Pickler(data_buf, protocol=protocol)
     else:
         return PackagePickler(importer, data_buf, protocol=protocol)

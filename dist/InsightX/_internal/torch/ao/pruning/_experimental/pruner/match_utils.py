@@ -1,21 +1,16 @@
 """
 Contains utility functions to check if a pattern is in the graph and return the matching nodes
 """
-
-from typing import Any, Optional, Union
-
 import torch
 from torch import nn
-from torch.ao.quantization.utils import MatchAllNode
+from torch.ao.quantization.utils import (
+    MatchAllNode,
+)
 from torch.fx import Node
 from torch.nn.utils import parametrize
+from typing import Any, Dict, List, Optional, Tuple, Union
 
-
-def _match(
-    modules: dict[str, nn.ModuleDict],
-    node: Node,
-    current: Union[nn.Module, Any],
-) -> bool:
+def _match(modules: Dict[str, nn.ModuleDict], node: Node, current: Union[nn.Module, Any]) -> bool:
     r"""
     checks to see if a single node of a pattern matches
     """
@@ -26,7 +21,7 @@ def _match(
     if isinstance(current, type) and issubclass(current, torch.nn.Module):
         return (
             node.op == "call_module"
-            and parametrize.type_before_parametrizations(modules[node.target])  # type: ignore[index]
+            and parametrize.type_before_parametrizations(modules[node.target])
             == current
         )
     elif callable(current):
@@ -35,13 +30,12 @@ def _match(
         return node.target == current
     return False
 
-
 def apply_match(
-    modules: dict[str, nn.ModuleDict],
-    pattern: Union[tuple[Any], Any],
+    modules: Dict[str, nn.ModuleDict],
+    pattern: Union[Tuple[Any], Any],
     node: Node,
-    matched_node_pattern: list[Node],
-) -> Optional[list[Node]]:
+    matched_node_pattern: List[Node],
+) -> Optional[List[Node]]:
     r"""
     This function will return the matched nodes if the pattern matches the node given
     If there is no match, it will return None

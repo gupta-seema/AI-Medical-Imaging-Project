@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# mypy: allow-untyped-defs
 
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
@@ -17,14 +16,13 @@ import tempfile
 import time
 from typing import Optional, TextIO, Union
 
-
 try:
     import etcd  # type: ignore[import]
 except ModuleNotFoundError:
     pass
 
 
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 
 def find_free_port():
@@ -66,12 +64,12 @@ def find_free_port():
 
 def stop_etcd(subprocess, data_dir: Optional[str] = None):
     if subprocess and subprocess.poll() is None:
-        logger.info("stopping etcd server")
+        log.info("stopping etcd server")
         subprocess.terminate()
         subprocess.wait()
 
     if data_dir:
-        logger.info("deleting etcd data dir: %s", data_dir)
+        log.info("deleting etcd data dir: %s", data_dir)
         shutil.rmtree(data_dir, ignore_errors=True)
 
 
@@ -176,7 +174,7 @@ class EtcdServer:
             except Exception as e:
                 curr_retries += 1
                 stop_etcd(self._etcd_proc)
-                logger.warning(
+                log.warning(
                     "Failed to start etcd server, got error: %s, retrying", str(e)
                 )
                 if curr_retries >= num_retries:
@@ -209,7 +207,7 @@ class EtcdServer:
             )
         )
 
-        logger.info("Starting etcd server: [%s]", etcd_cmd)
+        log.info("Starting etcd server: [%s]", etcd_cmd)
 
         sock.close()
         sock_peer.close()
@@ -236,7 +234,7 @@ class EtcdServer:
                     f"Etcd server process exited with the code: {exitcode}"
                 )
             try:
-                logger.info("etcd server ready. version: %s", client.version)
+                log.info("etcd server ready. version: %s", client.version)
                 return
             except Exception:
                 time.sleep(1)
@@ -244,5 +242,5 @@ class EtcdServer:
 
     def stop(self) -> None:
         """Stop the server and cleans up auto generated resources (e.g. data dir)."""
-        logger.info("EtcdServer stop method called")
+        log.info("EtcdServer stop method called")
         stop_etcd(self._etcd_proc, self._base_data_dir)

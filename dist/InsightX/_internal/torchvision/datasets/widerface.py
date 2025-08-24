@@ -2,7 +2,7 @@ import os
 from os.path import abspath, expanduser
 from pathlib import Path
 
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 import torch
 from PIL import Image
@@ -75,13 +75,13 @@ class WIDERFace(VisionDataset):
         if not self._check_integrity():
             raise RuntimeError("Dataset not found or corrupted. You can use download=True to download and prepare it")
 
-        self.img_info: list[dict[str, Union[str, dict[str, torch.Tensor]]]] = []
+        self.img_info: List[Dict[str, Union[str, Dict[str, torch.Tensor]]]] = []
         if self.split in ("train", "val"):
             self.parse_train_val_annotations_file()
         else:
             self.parse_test_annotations_file()
 
-    def __getitem__(self, index: int) -> tuple[Any, Any]:
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
         Args:
             index (int): Index
@@ -92,7 +92,7 @@ class WIDERFace(VisionDataset):
         """
 
         # stay consistent with other datasets and return a PIL Image
-        img = Image.open(self.img_info[index]["img_path"])  # type: ignore[arg-type]
+        img = Image.open(self.img_info[index]["img_path"])
 
         if self.transform is not None:
             img = self.transform(img)
@@ -173,7 +173,7 @@ class WIDERFace(VisionDataset):
         # Allow original archive to be deleted (zip). Only need the extracted images
         all_files = self.FILE_LIST.copy()
         all_files.append(self.ANNOTATIONS_FILE)
-        for _, md5, filename in all_files:
+        for (_, md5, filename) in all_files:
             file, ext = os.path.splitext(filename)
             extracted_dir = os.path.join(self.root, file)
             if not os.path.exists(extracted_dir):
@@ -182,10 +182,11 @@ class WIDERFace(VisionDataset):
 
     def download(self) -> None:
         if self._check_integrity():
+            print("Files already downloaded and verified")
             return
 
         # download and extract image data
-        for file_id, md5, filename in self.FILE_LIST:
+        for (file_id, md5, filename) in self.FILE_LIST:
             download_file_from_google_drive(file_id, self.root, filename, md5)
             filepath = os.path.join(self.root, filename)
             extract_archive(filepath)

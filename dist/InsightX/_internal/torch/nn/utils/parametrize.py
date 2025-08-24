@@ -1,32 +1,19 @@
-# mypy: allow-untyped-decorators
-# mypy: allow-untyped-defs
+import torch
+from torch.nn.modules.container import ModuleList, ModuleDict, Module
+from torch.nn.parameter import Parameter
+from torch import Tensor
+
 import collections
 import copyreg
-from collections.abc import Sequence
-from contextlib import contextmanager
 from copy import deepcopy
-from typing import Optional, Union
+from contextlib import contextmanager
+from typing import Union, Optional, Dict, Tuple, Sequence
 
-import torch
-from torch import Tensor
-from torch.__future__ import get_swap_module_params_on_conversion
-from torch.nn.modules.container import Module, ModuleDict, ModuleList
-from torch.nn.parameter import Parameter
-from torch.utils._python_dispatch import is_traceable_wrapper_subclass
-
-
-__all__ = [
-    "cached",
-    "ParametrizationList",
-    "register_parametrization",
-    "is_parametrized",
-    "remove_parametrizations",
-    "type_before_parametrizations",
-    "transfer_parametrizations_and_params",
-]
+__all__ = ['cached', 'ParametrizationList', 'register_parametrization', 'is_parametrized', 'remove_parametrizations',
+           'type_before_parametrizations', 'transfer_parametrizations_and_params']
 
 _cache_enabled = 0
-_cache: dict[tuple[int, str], Optional[Tensor]] = {}
+_cache: Dict[Tuple[int, str], Optional[Tensor]] = {}
 
 
 @contextmanager
@@ -46,7 +33,6 @@ def cached():
     .. code-block:: python
 
         import torch.nn.utils.parametrize as P
-
         ...
         with P.cached():
             output = model(inputs)
@@ -79,18 +65,6 @@ def _register_parameter_or_buffer(module, name, X):
         module.register_buffer(name, X)
 
 
-def _maybe_set(dest: Tensor, src: Tensor) -> None:
-    should_swap = (
-        get_swap_module_params_on_conversion() or is_traceable_wrapper_subclass(dest)
-    )
-    if should_swap:
-        if isinstance(dest, Parameter) and not isinstance(src, Parameter):
-            src = Parameter(src, requires_grad=dest.requires_grad)
-        torch.utils.swap_tensors(dest, src)
-    else:
-        dest.set_(src)  # type: ignore[call-overload]
-
-
 class ParametrizationList(ModuleList):
     r"""A sequential container that holds and manages the original parameters or buffers of a parametrized :class:`torch.nn.Module`.
 
@@ -120,10 +94,7 @@ class ParametrizationList(ModuleList):
     unsafe: bool
 
     def __init__(
-        self,
-        modules: Sequence[Module],
-        original: Union[Tensor, Parameter],
-        unsafe: bool = False,
+        self, modules: Sequence[Module], original: Union[Tensor, Parameter], unsafe: bool = False
     ) -> None:
         # We require this because we need to treat differently the first parametrization
         # This should never throw, unless this class is used from the outside
@@ -162,16 +133,14 @@ class ParametrizationList(ModuleList):
             for module in reversed(self):  # type: ignore[call-overload]
                 if hasattr(module, "right_inverse"):
                     try:
-                        new = module.right_inverse(new)  # type: ignore[operator]
+                        new = module.right_inverse(new)
                     except NotImplementedError:
                         pass
                 # else, or if it throws, we assume that right_inverse is the identity
 
-        if not isinstance(new, Tensor) and not isinstance(new, Sequence):
-            raise ValueError(
-                "'right_inverse' must return a Tensor or a Sequence of tensors (list, tuple...). "
-                f"Got {type(new).__name__}"
-            )
+        if not isinstance(new, Tensor) and not isinstance(new, collections.abc.Sequence):
+            raise ValueError("'right_inverse' must return a Tensor or a Sequence of tensors (list, tuple...). "
+                             f"Got {type(new).__name__}")
 
         # Set the number of original tensors
         self.is_tensor = isinstance(new, Tensor)
@@ -188,22 +157,20 @@ class ParametrizationList(ModuleList):
             # Set the original to original so that the user does not need to re-register the parameter
             # manually in the optimiser
             with torch.no_grad():
-                _maybe_set(original, new)
+                original.set_(new)  # type: ignore[call-overload]
             _register_parameter_or_buffer(self, "original", original)
         else:
             for i, originali in enumerate(new):
                 if not isinstance(originali, Tensor):
-                    raise ValueError(
-                        "'right_inverse' must return a Tensor or a Sequence of tensors "
-                        "(list, tuple...). "
-                        f"Got element {i} of the sequence with type {type(originali).__name__}."
-                    )
+                    raise ValueError("'right_inverse' must return a Tensor or a Sequence of tensors "
+                                     "(list, tuple...). "
+                                     f"Got element {i} of the sequence with type {type(originali).__name__}.")
 
                 # If the original tensor was a Parameter that required grad, we expect the user to
                 # add the new parameters to the optimizer after registering the parametrization
                 # (this is documented)
                 if isinstance(original, Parameter):
-                    originali = Parameter(originali, original.requires_grad)
+                    originali = Parameter(originali)
                 originali.requires_grad_(original.requires_grad)
                 _register_parameter_or_buffer(self, f"original{i}", originali)
 
@@ -247,12 +214,10 @@ class ParametrizationList(ModuleList):
             # See https://github.com/pytorch/pytorch/issues/53103
             for module in reversed(self):  # type: ignore[call-overload]
                 if hasattr(module, "right_inverse"):
-                    value = module.right_inverse(value)  # type: ignore[operator]
+                    value = module.right_inverse(value)
                 else:
-                    raise RuntimeError(
-                        f"parametrization {type(module).__name__} does not implement "
-                        "right_inverse."
-                    )
+                    raise RuntimeError(f"parametrization {type(module).__name__} does not implement "
+                                       "right_inverse.")
             if self.is_tensor:
                 # These exceptions should only throw when a right_inverse function does not
                 # return the same dtype for every input, which should most likely be caused by a bug
@@ -266,7 +231,7 @@ class ParametrizationList(ModuleList):
                         f"while `original` has dtype {self.original.dtype}"
                     )
                 # We know that the result is going to have the same dtype
-                _maybe_set(self.original, value)
+                self.original.set_(value)  # type: ignore[call-overload]
             else:
                 if not isinstance(value, collections.abc.Sequence):
                     raise ValueError(
@@ -290,11 +255,11 @@ class ParametrizationList(ModuleList):
                             f"Tensor {i} returned by `right_inverse` has dtype {tensor.dtype} "
                             f"while `original{i}` has dtype {original_i.dtype}"
                         )
-                    _maybe_set(original_i, tensor)
+                    original_i.set_(tensor)
 
     def forward(self) -> Tensor:
         if torch.jit.is_scripting():
-            raise RuntimeError("Parametrization is not working with scripting.")
+            raise RuntimeError('Parametrization is not working with scripting.')
         # Unpack the originals for the first parametrization
         if self.is_tensor:
             x = self[0](self.original)
@@ -386,20 +351,16 @@ def _inject_property(module: Module, tensor_name: str) -> None:
 
     def get_parametrized(self) -> Tensor:
         if torch.jit.is_scripting():
-            raise RuntimeError("Parametrization is not working with scripting.")
+            raise RuntimeError('Parametrization is not working with scripting.')
         parametrization = self.parametrizations[tensor_name]
         if _cache_enabled:
             if torch.jit.is_scripting():
                 # Scripting
-                raise RuntimeError(
-                    "Caching is not implemented for scripting. "
-                    "Either disable caching or avoid scripting."
-                )
+                raise RuntimeError('Caching is not implemented for scripting. '
+                                   'Either disable caching or avoid scripting.')
             elif torch._C._get_tracing_state() is not None:
                 # Tracing
-                raise RuntimeError(
-                    "Cannot trace a model while caching parametrizations."
-                )
+                raise RuntimeError('Cannot trace a model while caching parametrizations.')
             else:
                 return get_cached_parametrization(parametrization)
         else:
@@ -408,18 +369,13 @@ def _inject_property(module: Module, tensor_name: str) -> None:
 
     def set_original(self, value: Tensor) -> None:
         if torch.jit.is_scripting():
-            raise RuntimeError("Parametrization is not working with scripting.")
+            raise RuntimeError('Parametrization is not working with scripting.')
         self.parametrizations[tensor_name].right_inverse(value)
 
     setattr(module.__class__, tensor_name, property(get_parametrized, set_original))
 
-
 def register_parametrization(
-    module: Module,
-    tensor_name: str,
-    parametrization: Module,
-    *,
-    unsafe: bool = False,
+    module: Module, tensor_name: str, parametrization: Module, *, unsafe: bool = False,
 ) -> Module:
     r"""Register a parametrization to a tensor in a module.
 
@@ -520,26 +476,24 @@ def register_parametrization(
         >>> print(torch.allclose(m.weight, m.weight.T))  # m.weight is now symmetric
         True
         >>> A = torch.rand(5, 5)
-        >>> A = A + A.T  # A is now symmetric
+        >>> A = A + A.T   # A is now symmetric
         >>> m.weight = A  # Initialize the weight to be the symmetric matrix A
         >>> print(torch.allclose(m.weight, A))
         True
 
         >>> class RankOne(nn.Module):
         >>>     def forward(self, x, y):
-        >>> # Form a rank 1 matrix multiplying two vectors
+        >>>         # Form a rank 1 matrix multiplying two vectors
         >>>         return x.unsqueeze(-1) @ y.unsqueeze(-2)
         >>>
         >>>     def right_inverse(self, Z):
-        >>> # Project Z onto the rank 1 matrices
+        >>>         # Project Z onto the rank 1 matrices
         >>>         U, S, Vh = torch.linalg.svd(Z, full_matrices=False)
-        >>> # Return rescaled singular vectors
+        >>>         # Return rescaled singular vectors
         >>>         s0_sqrt = S[0].sqrt().unsqueeze(-1)
         >>>         return U[..., :, 0] * s0_sqrt, Vh[..., 0, :] * s0_sqrt
         >>>
-        >>> linear_rank_one = P.register_parametrization(
-        ...     nn.Linear(4, 4), "weight", RankOne()
-        ... )
+        >>> linear_rank_one = P.register_parametrization(nn.Linear(4, 4), "weight", RankOne())
         >>> print(torch.linalg.matrix_rank(linear_rank_one.weight).item())
         1
 
@@ -597,17 +551,15 @@ def register_parametrization(
 
         # add the new parametrization to the parametrization list
         assert isinstance(module.parametrizations, ModuleDict)  # Make mypy happy
-        module.parametrizations[tensor_name].append(parametrization)  # type: ignore[operator]
+        module.parametrizations[tensor_name].append(parametrization)
         # If unsafe was True in previous parametrization, keep it enabled
-        module.parametrizations[tensor_name].unsafe |= unsafe  # type: ignore[index, union-attr, operator]
+        module.parametrizations[tensor_name].unsafe |= unsafe  # type: ignore[index, union-attr]
     elif tensor_name in module._buffers or tensor_name in module._parameters:
         # Set the parametrization mechanism
         # Fetch the original buffer or parameter
         original = getattr(module, tensor_name)
         # We create this early to check for possible errors
-        parametrizations = ParametrizationList(
-            [parametrization], original, unsafe=unsafe
-        )
+        parametrizations = ParametrizationList([parametrization], original, unsafe=unsafe)
         # Delete the previous parameter or buffer
         delattr(module, tensor_name)
         # If this is the first parametrization registered on the module,
@@ -651,11 +603,8 @@ def is_parametrized(module: Module, tensor_name: Optional[str] = None) -> bool:
     else:
         return tensor_name in parametrizations
 
-
 def remove_parametrizations(
-    module: Module,
-    tensor_name: str,
-    leave_parametrized: bool = True,
+    module: Module, tensor_name: str, leave_parametrized: bool = True
 ) -> Module:
     r"""Remove the parametrizations on a tensor in a module.
 
@@ -680,16 +629,13 @@ def remove_parametrizations(
         ValueError: if ``leave_parametrized=False`` and the parametrization depends on several tensors
     """
     if not is_parametrized(module, tensor_name):
-        raise ValueError(
-            f"Module {module} does not have a parametrization on {tensor_name}"
-        )
+        raise ValueError(f"Module {module} does not have a parametrization on {tensor_name}")
 
     # Fetch the original tensor
     assert isinstance(module.parametrizations, ModuleDict)  # Make mypy happy
     parametrizations = module.parametrizations[tensor_name]
     if parametrizations.is_tensor:
         original = parametrizations.original
-        assert isinstance(original, torch.Tensor), "is_tensor promised us a Tensor"
         if leave_parametrized:
             with torch.no_grad():
                 t = getattr(module, tensor_name)
@@ -699,22 +645,18 @@ def remove_parametrizations(
             # This way the user does not need to update the optimizer
             with torch.no_grad():
                 if type(original) is torch.Tensor:
-                    _maybe_set(original, t)
+                    original.set_(t)
                 else:
                     try:
-                        _maybe_set(original, t)
+                        original.set_(t)
                     except RuntimeError as e:
                         # TODO: Fix this for tensor subclasses that are parameters:
                         # RuntimeError: set_storage is not allowed on a Tensor created from .data or .detach().
-                        raise RuntimeError(
-                            "Calling remove_parametrizations() with leave_parametrized=True "
-                            "for a parameter that is an instance of a tensor subclass requires "
-                            "set_() to be implemented correctly for the tensor subclass."
-                            "Alternatively, one can opt into the swap_tensors path"
-                            "Either set leave_parametrized=False or provide a working implementation"
-                            "for set_() in the tensor subclass or set "
-                            "torch.__future__.set_swap_module_params_on_conversion(True)."
-                        ) from e
+                        raise RuntimeError("Calling remove_parametrizations() with leave_parametrized=True "
+                                           "for a parameter that is an instance of a tensor subclass requires "
+                                           "set_() to be implemented correctly for the tensor subclass. Either "
+                                           "set leave_parametrized=False or provide a working implementation for "
+                                           "set_() in the tensor subclass.") from e
     else:
         if leave_parametrized:
             # We cannot use no_grad because we need to know whether one or more
@@ -723,10 +665,8 @@ def remove_parametrizations(
             # We'll have to trust the user to add it to the optimizer
             original = Parameter(t) if t.requires_grad else t
         else:
-            raise ValueError(
-                "Cannot leave unparametrized (`leave_parametrized=False`) a tensor "
-                "that is parametrized in terms of a sequence of tensors."
-            )
+            raise ValueError("Cannot leave unparametrized (`leave_parametrized=False`) a tensor "
+                             "that is parametrized in terms of a sequence of tensors.")
 
     # Delete the property that manages the parametrization
     delattr(module.__class__, tensor_name)
@@ -745,7 +685,6 @@ def remove_parametrizations(
         module.__class__ = orig_cls
     return module
 
-
 def type_before_parametrizations(module: Module) -> type:
     r"""Return the module type before parametrizations were applied and if not, then it returns the module type.
 
@@ -757,11 +696,8 @@ def type_before_parametrizations(module: Module) -> type:
     else:
         return type(module)
 
-
 def transfer_parametrizations_and_params(
-    from_module: Module,
-    to_module: Module,
-    tensor_name: Optional[str] = None,
+    from_module: Module, to_module: Module, tensor_name: Optional[str] = None
 ) -> Module:
     r"""Transfer parametrizations and the parameters they parametrize from :attr:`from_module` to :attr:`to_module`.
 
@@ -787,6 +723,7 @@ def transfer_parametrizations_and_params(
 
         assert hasattr(parameters_to_transfer, "__iter__")  # for mypy
         for parameter_name in parameters_to_transfer:
+
             # initialize the to-be-transferred param in to_module if it doesn't exist already
             if not hasattr(to_module, parameter_name):
                 setattr(
@@ -796,18 +733,15 @@ def transfer_parametrizations_and_params(
                 )
 
             # apply the params's parametrizations to to_module
-            for param_func in from_module.parametrizations[  # type: ignore[attr-defined]
-                parameter_name
-            ]:
+            for param_func in from_module.parametrizations[parameter_name]:
                 register_parametrization(to_module, parameter_name, param_func)
             assert isinstance(to_module.parametrizations, ModuleDict)  # for mypy
 
             # make values match, original values can be stored in either original or
             # original0, original1..., need to check both cases
             if hasattr(from_module.parametrizations[parameter_name], "original"):
-                to_module.parametrizations[
-                    parameter_name
-                ].original = from_module.parametrizations[parameter_name].original
+                to_module.parametrizations[parameter_name].original = \
+                    from_module.parametrizations[parameter_name].original
             else:
                 num = 0
                 orig_num = "original" + str(num)

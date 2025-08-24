@@ -1,16 +1,12 @@
 # pyre-strict
-from collections.abc import Iterable, Iterator
-from typing import Generic, TypeVar, Union
+from typing import Union
 
 import torch
 
 
-_T = TypeVar("_T")
-
-
-class ProxyValue(Generic[_T]):
+class ProxyValue:
     # pyre-ignore
-    def __init__(self, data: Iterable[_T], proxy: Union[torch.fx.Proxy, torch.fx.Node]):
+    def __init__(self, data, proxy: Union[torch.fx.Proxy, torch.fx.Node]):
         # pyre-ignore
         self.data = data
         self.proxy_or_node = proxy
@@ -38,7 +34,7 @@ class ProxyValue(Generic[_T]):
         return isinstance(self.data, torch.Tensor)
 
     # pyre-ignore
-    def __iter__(self) -> Iterator[_T]:
+    def __iter__(self):
         yield from self.data
 
     def __bool__(self) -> bool:

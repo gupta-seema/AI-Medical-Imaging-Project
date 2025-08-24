@@ -119,8 +119,8 @@ class TORCH_API CppFunction final {
       : func_(c10::KernelFunction::makeFromUnboxedRuntimeFunction(f)),
         cpp_signature_(c10::impl::CppSignature::make<Func>()),
         schema_(
-            c10::detail::inferFunctionSchemaFromFunctor<std::decay_t<Func>>())
-        {}
+            c10::detail::inferFunctionSchemaFromFunctor<std::decay_t<Func>>()),
+        debug_() {}
 
   /// This overload accepts compile time function pointers, e.g.,
   /// `CppFunction(TORCH_FN(add_impl))`
@@ -134,8 +134,8 @@ class TORCH_API CppFunction final {
         cpp_signature_(
             c10::impl::CppSignature::make<typename FuncPtr::FuncType>()),
         schema_(c10::detail::inferFunctionSchemaFromFunctor<
-                typename FuncPtr::FuncType>())
-        {}
+                typename FuncPtr::FuncType>()),
+        debug_() {}
 
   /// This overload accepts lambdas, e.g., `CppFunction([](const Tensor& self) {
   /// ... })`
@@ -149,8 +149,8 @@ class TORCH_API CppFunction final {
             std::forward<Lambda>(f))),
         cpp_signature_(c10::impl::CppSignature::make<Lambda>()),
         schema_(c10::detail::inferFunctionSchemaFromFunctor<
-                std::decay_t<Lambda>>())
-        {}
+                std::decay_t<Lambda>>()),
+        debug_() {}
 
 #if defined C10_MOBILE
   /// This overload accepts function pointers, e.g., `CppFunction(&add_impl,
@@ -206,9 +206,6 @@ class TORCH_API CppFunction final {
 
   ~CppFunction();
 
-  CppFunction(const CppFunction&) = delete;
-  CppFunction& operator=(const CppFunction&) = delete;
-
   CppFunction(CppFunction&&) noexcept = default;
 
   CppFunction& operator=(CppFunction&&) = default;
@@ -218,7 +215,7 @@ class TORCH_API CppFunction final {
   static CppFunction makeFromBoxedKernel(c10::BoxedKernel kernel) {
     return CppFunction(
         c10::KernelFunction::makeFromBoxedKernel(std::move(kernel)),
-        /* cpp_signature */ std::nullopt, // not known for boxed functions
+        /* cpp_signature */ c10::nullopt, // not known for boxed functions
         /* schema */ nullptr);
   }
 
@@ -302,9 +299,9 @@ class TORCH_API CppFunction final {
   }
 
  private:
-  std::optional<c10::DispatchKey> dispatch_key_;
+  c10::optional<c10::DispatchKey> dispatch_key_;
   c10::KernelFunction func_;
-  std::optional<c10::impl::CppSignature> cpp_signature_;
+  c10::optional<c10::impl::CppSignature> cpp_signature_;
   std::unique_ptr<c10::FunctionSchema> schema_;
   std::string debug_;
 
@@ -319,7 +316,7 @@ class TORCH_API CppFunction final {
 
   CppFunction(
       c10::KernelFunction func,
-      std::optional<c10::impl::CppSignature> cpp_signature,
+      c10::optional<c10::impl::CppSignature> cpp_signature,
       std::unique_ptr<c10::FunctionSchema> schema);
 };
 
@@ -340,7 +337,7 @@ template <typename Func>
 inline CppFunction dispatch(c10::DispatchKey k, Func&& raw_f) {
   CppFunction f(std::forward<Func>(raw_f));
   if (k == c10::DispatchKey::CatchAll) {
-    f.dispatch_key_ = std::nullopt;
+    f.dispatch_key_ = c10::nullopt;
   } else {
     f.dispatch_key_ = k;
   }
@@ -373,8 +370,8 @@ inline CppFunction dispatch(c10::DeviceType type, Func&& raw_f) {
         return c10::DispatchKey::Meta;
       case c10::DeviceType::HIP:
         return c10::DispatchKey::HIP;
-      case c10::DeviceType::MAIA:
-        return c10::DispatchKey::MAIA;
+      case c10::DeviceType::ORT:
+        return c10::DispatchKey::ORT;
       case c10::DeviceType::HPU:
         return c10::DispatchKey::HPU;
       case c10::DeviceType::MTIA:
@@ -409,8 +406,8 @@ inline CppFunction dispatch(c10::DeviceType type, Func&& raw_f) {
 /// ```
 ///
 /// \ingroup torch-schema-overloads
-inline c10::FunctionSchema schema(const char* str, c10::AliasAnalysisKind k, bool allow_typevars=false) {
-  c10::FunctionSchema s = torch::jit::parseSchema(str, /*allow_typevars*/allow_typevars);
+inline c10::FunctionSchema schema(const char* str, c10::AliasAnalysisKind k) {
+  c10::FunctionSchema s = torch::jit::parseSchema(str);
   s.setAliasAnalysis(k);
   return s;
 }
@@ -418,8 +415,8 @@ inline c10::FunctionSchema schema(const char* str, c10::AliasAnalysisKind k, boo
 /// Function schemas can be directly constructed from string literals.
 ///
 /// \ingroup torch-schema-overloads
-inline c10::FunctionSchema schema(const char* s, bool allow_typevars=false) {
-  return schema(s, c10::AliasAnalysisKind::FROM_SCHEMA, allow_typevars);
+inline c10::FunctionSchema schema(const char* s) {
+  return schema(s, c10::AliasAnalysisKind::FROM_SCHEMA);
 }
 
 /// \private
@@ -558,7 +555,7 @@ class TORCH_API Library final {
   Library(
       Kind kind,
       std::string ns,
-      std::optional<c10::DispatchKey> k,
+      c10::optional<c10::DispatchKey> k,
       const char* file,
       uint32_t line);
 
@@ -566,7 +563,6 @@ class TORCH_API Library final {
   Library& operator=(const Library&) = delete;
   Library(Library&&) = default;
   Library& operator=(Library&&) = default;
-  ~Library() = default;
 
   // Some notes about the API design here.  We had the following constraints:
   //
@@ -605,36 +601,26 @@ class TORCH_API Library final {
   /// }
   /// ```
 
+  template <typename Schema>
   Library& def(
-      c10::FunctionSchema&& s,
+      Schema&& raw_schema,
       const std::vector<at::Tag>& tags = {},
       _RegisterOrVerify rv = _RegisterOrVerify::REGISTER) & {
+    c10::FunctionSchema s = schema(std::forward<Schema>(raw_schema));
     return _def(std::move(s), nullptr, tags, rv);
   }
 
-  Library& def(
-      const char* raw_schema,
-      const std::vector<at::Tag>& tags = {},
-      _RegisterOrVerify rv = _RegisterOrVerify::REGISTER) & {
-    return _def(schema(raw_schema), nullptr, tags, rv);
-  }
-
   /// Declares that for all operators that are subsequently def'ed, their
-  /// fake impls may be found in the given Python module (pymodule).
-  /// This registers some help text that is used if the fake impl
+  /// abstract impls may be found in the given Python module (pymodule).
+  /// This registers some help text that is used if the abstract impl
   /// cannot be found.
   ///
   /// Args:
   /// - pymodule: the python module
   /// - context: We may include this in the error message.
-  Library& set_python_module(const char* pymodule, const char* context = "") {
-    python_module_ = {pymodule, context};
-    return *this;
-  }
-
-  /// Deprecated; use set_python_module instead
   Library& impl_abstract_pystub(const char* pymodule, const char* context = "") {
-    return set_python_module(pymodule, context);
+    impl_abstract_pystub_ = {pymodule, context};
+    return *this;
   }
 
   /// Define an operator for a schema and then register an implementation for
@@ -746,14 +732,14 @@ class TORCH_API Library final {
   // These overloads cover cases when a SelectiveStr (see Note [Selective
   // build]) has been disabled at compile time.  In that case, don't generate
   // any code referencing the passed in functions at all.
-  Library& def(detail::SelectiveStr<false>, const std::vector<at::Tag>& tags [[maybe_unused]] = {}) & {
+  Library& def(detail::SelectiveStr<false>, const std::vector<at::Tag>& tags = {}) & {
     return *this;
   }
   Library& def(detail::SelectiveStr<true> raw_schema, const std::vector<at::Tag>& tags = {}) & {
     return def(raw_schema.operator const char*(), tags);
   }
   template <typename Func>
-  Library& def(detail::SelectiveStr<false>, Func&& /*raw_f*/, const std::vector<at::Tag>& tags [[maybe_unused]] = {}) & {
+  Library& def(detail::SelectiveStr<false>, Func&& /*raw_f*/, const std::vector<at::Tag>& tags = {}) & {
     return *this;
   }
   template <typename Func>
@@ -763,16 +749,13 @@ class TORCH_API Library final {
   }
 
   template <typename Func>
-  // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
   Library& impl(detail::SelectiveStr<false>, Func&& /*raw_f*/) & {
     return *this;
   }
   template <typename Dispatch, typename Func>
   Library& impl(
       detail::SelectiveStr<false>,
-      // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
       Dispatch&& /*key*/,
-      // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)
       Func&& /*raw_f*/) & {
     return *this;
   }
@@ -859,9 +842,9 @@ class TORCH_API Library final {
 
  private:
   Kind kind_;
-  std::optional<std::string> ns_;
-  std::optional<c10::DispatchKey> dispatch_key_;
-  std::optional<std::pair<const char*, const char*>> python_module_;
+  c10::optional<std::string> ns_;
+  c10::optional<c10::DispatchKey> dispatch_key_;
+  c10::optional<std::pair<const char*, const char*>> impl_abstract_pystub_;
   const char* file_;
   uint32_t line_;
 
@@ -889,48 +872,8 @@ class TORCH_API Library final {
   at::OperatorName _parseNameForLib(const char* name_str) const;
 };
 
-#if defined(TORCH_LIBRARY_THREAD_UNSAFE_LAZY_INIT) && defined(C10_MOBILE)
-void initialize_torch_libraries();
-#endif
-
 namespace detail {
 
-#if defined(TORCH_LIBRARY_THREAD_UNSAFE_LAZY_INIT) && defined(C10_MOBILE)
-// This is an experimental feature to defer TorchLibraryInit cost to run either
-// at model load time, or when a client application explicitly calls
-// torch::initialize_torch_libraries().
-//
-// This is not thread safe, the client is required to ensure that libraries
-// containing TORCH_LIBRARY initializers are loaded in a thread safe manner.
-extern std::vector<TorchLibraryInit*> torch_library_initializers;
-class TorchLibraryInit final {
-    private:
-      using InitFn = void(Library&);
-      Library::Kind kind;
-      InitFn* init_function;
-      const char* ns;
-      std::optional<c10::DispatchKey> key;
-      const char* file;
-      uint32_t line;
-      std::unique_ptr<Library> lib = nullptr;
-
-    public:
-      TorchLibraryInit(
-            Library::Kind kind,
-            InitFn* fn,
-            const char* ns,
-            std::optional<c10::DispatchKey> k,
-            const char* file,
-            uint32_t line) : kind(kind), init_function(fn), ns(ns), key(k), file(file), line(line) {
-              torch_library_initializers.push_back(this);
-            }
-
-      void initialize() {
-        lib = std::unique_ptr<Library>(new Library(kind, ns, key, file, line));
-        init_function(*lib);
-      }
-};
-#else
 class TorchLibraryInit final {
  private:
   using InitFn = void(Library&);
@@ -941,14 +884,13 @@ class TorchLibraryInit final {
       Library::Kind kind,
       InitFn* fn,
       const char* ns,
-      std::optional<c10::DispatchKey> k,
+      c10::optional<c10::DispatchKey> k,
       const char* file,
       uint32_t line)
       : lib_(kind, ns, k, file, line) {
     fn(lib_);
   }
 };
-#endif
 
 } // namespace detail
 
@@ -983,7 +925,7 @@ class TorchLibraryInit final {
       torch::Library::DEF,                                                     \
       &TORCH_LIBRARY_init_##ns,                                                \
       #ns,                                                                     \
-      std::nullopt,                                                            \
+      c10::nullopt,                                                            \
       __FILE__,                                                                \
       __LINE__);                                                               \
   void TORCH_LIBRARY_init_##ns(torch::Library& m)
@@ -1013,7 +955,7 @@ class TorchLibraryInit final {
       torch::Library::FRAGMENT,                                   \
       &C10_CONCATENATE(TORCH_LIBRARY_FRAGMENT_init_##ns##_, uid), \
       #ns,                                                        \
-      std::nullopt,                                               \
+      c10::nullopt,                                               \
       __FILE__,                                                   \
       __LINE__);                                                  \
   void C10_CONCATENATE(                                           \
@@ -1073,9 +1015,11 @@ class TorchLibraryInit final {
   static const torch::detail::TorchLibraryInit C10_CONCATENATE(           \
       TORCH_LIBRARY_IMPL_static_init_##ns##_##k##_, uid)(                 \
       torch::Library::IMPL,                                               \
-      &C10_CONCATENATE(TORCH_LIBRARY_IMPL_init_##ns##_##k##_, uid),       \
+      (c10::impl::dispatch_key_allowlist_check(c10::DispatchKey::k)       \
+           ? &C10_CONCATENATE(TORCH_LIBRARY_IMPL_init_##ns##_##k##_, uid) \
+           : [](torch::Library&) -> void {}),                             \
       #ns,                                                                \
-      std::make_optional(c10::DispatchKey::k),                            \
+      c10::make_optional(c10::DispatchKey::k),                            \
       __FILE__,                                                           \
       __LINE__);                                                          \
   void C10_CONCATENATE(                                                   \
@@ -1090,13 +1034,13 @@ class TorchLibraryInit final {
 
 /// \private
 #define MAKE_TORCH_LIBRARY(ns) \
-  torch::Library(torch::Library::DEF, #ns, std::nullopt, __FILE__, __LINE__)
+  torch::Library(torch::Library::DEF, #ns, c10::nullopt, __FILE__, __LINE__)
 /// \private
 #define MAKE_TORCH_LIBRARY_IMPL(ns, k)         \
   torch::Library(                              \
       torch::Library::IMPL,                    \
       #ns,                                     \
-      std::make_optional(c10::DispatchKey::k), \
+      c10::make_optional(c10::DispatchKey::k), \
       __FILE__,                                \
       __LINE__)
 

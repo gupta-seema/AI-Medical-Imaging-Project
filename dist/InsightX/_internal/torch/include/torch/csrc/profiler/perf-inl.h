@@ -13,9 +13,10 @@
 
 #include <torch/csrc/profiler/perf.h>
 
-#include <limits>
-
-namespace torch::profiler::impl::linux_perf {
+namespace torch {
+namespace profiler {
+namespace impl {
+namespace linux_perf {
 
 /*
  * PerfEvent
@@ -65,4 +66,7 @@ inline void PerfProfiler::StopCounting() const {
   }
 }
 
-} // namespace torch::profiler::impl::linux_perf
+} // namespace linux_perf
+} // namespace impl
+} // namespace profiler
+} // namespace torch

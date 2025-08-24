@@ -30,10 +30,10 @@
   const enumtype::k##name k##name; \
   }
 
-#define TORCH_ENUM_PRETTY_PRINT(name)                                         \
-  std::string operator()(const enumtype::k##name& v [[maybe_unused]]) const { \
-    std::string k("k");                                                       \
-    return k + #name;                                                         \
+#define TORCH_ENUM_PRETTY_PRINT(name)                        \
+  std::string operator()(const enumtype::k##name& v) const { \
+    std::string k("k");                                      \
+    return k + #name;                                        \
   }
 
 // NOTE: Backstory on why we need the following two macros:
@@ -140,7 +140,8 @@ TORCH_ENUM_DECLARE(GRU)
 TORCH_ENUM_DECLARE(Valid)
 TORCH_ENUM_DECLARE(Same)
 
-namespace torch::enumtype {
+namespace torch {
+namespace enumtype {
 
 struct _compute_enum_name {
   TORCH_ENUM_PRETTY_PRINT(Linear)
@@ -207,4 +208,5 @@ at::Reduction::Reduction reduction_get_enum(V variant_enum) {
   }
 }
 
-} // namespace torch::enumtype
+} // namespace enumtype
+} // namespace torch

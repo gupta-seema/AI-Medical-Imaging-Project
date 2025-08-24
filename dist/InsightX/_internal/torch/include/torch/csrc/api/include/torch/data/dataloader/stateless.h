@@ -10,12 +10,13 @@
 #include <thread>
 #include <utility>
 
-namespace torch::data {
+namespace torch {
+namespace data {
 
 /// A dataloader for stateless datasets.
 ///
 /// This dataloader follows the traditional PyTorch dataloader design, whereby a
-/// (possibly) stateful sampler produces *batch requests* for a stateless
+/// (posssibly) stateful sampler produces *batch requests* for a stateless
 /// dataset, which acts as a simple batch request to batch mapping. The batch
 /// request will often be an array of indices, and if the dataset is a simple
 /// image dataset, the dataset would produce the images at those indices.
@@ -37,7 +38,7 @@ class StatelessDataLoader : public DataLoaderBase<
       Dataset dataset,
       Sampler sampler,
       DataLoaderOptions options)
-      : super(options), sampler_(std::move(sampler)) {
+      : super(std::move(options)), sampler_(std::move(sampler)) {
     for (const auto w : c10::irange(this->options_.workers)) {
       // Here we copy the dataset into the worker thread closure. Each worker
       // has its own copy of the dataset. This means the dataset must be
@@ -63,12 +64,12 @@ class StatelessDataLoader : public DataLoaderBase<
 
   /// Queries the sampler for the next batch request (possibly progressing its
   /// internal state).
-  std::optional<BatchRequestType> get_batch_request() override {
+  optional<BatchRequestType> get_batch_request() override {
     auto indices = sampler_.next(this->options_.batch_size);
     if (!indices ||
         (indices->size() < this->options_.batch_size &&
          this->options_.drop_last)) {
-      return std::nullopt;
+      return nullopt;
     }
     AT_ASSERT(indices->size() > 0);
     return indices;
@@ -77,4 +78,5 @@ class StatelessDataLoader : public DataLoaderBase<
   /// The `Sampler` used to produce batch requests.
   Sampler sampler_;
 };
-} // namespace torch::data
+} // namespace data
+} // namespace torch

@@ -1,11 +1,9 @@
-# mypy: allow-untyped-defs
 import logging
 
 import torch
 import torch.distributed as dist
 
 from . import default_hooks as default
-
 
 logger = logging.getLogger(__name__)
 
@@ -63,8 +61,9 @@ class PostLocalSGDState:
             self.iter += 1
 
         if self.iter == self.start_localSGD_iter:
-            logger.info("Start to apply local SGD after %s iterations.", self.iter)
-
+            logger.info(
+                "Start to apply local SGD after %s iterations.", self.iter
+            )
 
 def post_localSGD_hook(
     state: PostLocalSGDState, bucket: dist.GradBucket
@@ -105,7 +104,7 @@ def post_localSGD_hook(
     # Run allreduce using `global_group_to_use` in the first `start_localSGD_iter` iterations.
     if state.iter < state.start_localSGD_iter:
         state.maybe_increase_iter(bucket)
-        return default._allreduce_fut(global_group_to_use, input_tensor)  # type: ignore[arg-type]
+        return default._allreduce_fut(global_group_to_use, input_tensor)
 
     # If `post_local_gradient_allreduce` is not set,
     # then no gradient synchronization after the first `start_localSGD_iter` iterations.

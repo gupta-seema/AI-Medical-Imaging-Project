@@ -5,7 +5,8 @@
 #endif
 #include <torch/custom_class.h>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 constexpr static auto kBackendUtilsNamespace = "backendutils";
 constexpr static auto kBackendDebugInfoClass = "BackendDebugInfo";
@@ -26,7 +27,7 @@ class TORCH_API PyTorchBackendDebugInfo : public torch::CustomClassHolder {
  public:
   PyTorchBackendDebugInfo() = default;
 
-  std::optional<BackendDebugInfoMapType>& getDebugInfoMap() {
+  c10::optional<BackendDebugInfoMapType>& getDebugInfoMap() {
     return debug_info_map_;
   }
 
@@ -35,7 +36,7 @@ class TORCH_API PyTorchBackendDebugInfo : public torch::CustomClassHolder {
   }
 
  private:
-  std::optional<BackendDebugInfoMapType> debug_info_map_;
+  c10::optional<BackendDebugInfoMapType> debug_info_map_;
 };
 
 #else
@@ -60,4 +61,5 @@ class PyTorchBackendDebugInfoDummy : public torch::CustomClassHolder {
   PyTorchBackendDebugInfoDummy() = default;
 };
 #endif
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

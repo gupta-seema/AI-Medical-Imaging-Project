@@ -1,6 +1,10 @@
 #pragma once
 
+#include <cstddef>
+#include <sstream>
 #include <type_traits>
+#include <typeinfo>
+#include <vector>
 
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/typeid.h>
@@ -22,7 +26,7 @@ class TORCH_API Blob final : public c10::intrusive_ptr_target {
   /**
    * Initializes an empty Blob.
    */
-  Blob() noexcept = default;
+  Blob() noexcept : meta_(), pointer_(nullptr), has_ownership_(false) {}
   ~Blob() override {
     Reset();
   }
@@ -54,7 +58,7 @@ class TORCH_API Blob final : public c10::intrusive_ptr_target {
   /**
    * Returns a printable typename of the blob.
    */
-  std::string_view TypeName() const noexcept {
+  c10::string_view TypeName() const noexcept {
     return meta_.name();
   }
 
@@ -95,7 +99,7 @@ class TORCH_API Blob final : public c10::intrusive_ptr_target {
   template <class T>
   T* GetMutable() {
     static_assert(
-        std::is_default_constructible_v<T>,
+        std::is_default_constructible<T>::value,
         "GetMutable can't be called with non-default-constructible types. "
         "Try using specialized methods");
     if (IsType<T>()) {
@@ -144,11 +148,11 @@ class TORCH_API Blob final : public c10::intrusive_ptr_target {
    * call is made or the blob is destructed.
    */
   template <class T>
-  std::remove_const_t<T>* ShareExternal(
-      std::remove_const_t<T>* allocated) {
+  typename std::remove_const<T>::type* ShareExternal(
+      typename std::remove_const<T>::type* allocated) {
     return static_cast<T*>(ShareExternal(
         static_cast<void*>(allocated),
-        TypeMeta::Make<std::remove_const_t<T>>()));
+        TypeMeta::Make<typename std::remove_const<T>::type>()));
   }
 
   void* ShareExternal(void* allocated, const TypeMeta meta) {
@@ -172,7 +176,7 @@ class TORCH_API Blob final : public c10::intrusive_ptr_target {
   /**
    * @brief Swaps the underlying storage of two blobs.
    */
-  void swap(Blob& rhs)  noexcept {
+  void swap(Blob& rhs) {
     using std::swap;
     swap(meta_, rhs.meta_);
     swap(pointer_, rhs.pointer_);
@@ -187,13 +191,13 @@ class TORCH_API Blob final : public c10::intrusive_ptr_target {
   }
 
   TypeMeta meta_;
-  void* pointer_{nullptr};
-  bool has_ownership_{false};
+  void* pointer_;
+  bool has_ownership_;
 
   C10_DISABLE_COPY_AND_ASSIGN(Blob);
 };
 
-inline void swap(Blob& lhs, Blob& rhs)  noexcept {
+inline void swap(Blob& lhs, Blob& rhs) {
   lhs.swap(rhs);
 }
 

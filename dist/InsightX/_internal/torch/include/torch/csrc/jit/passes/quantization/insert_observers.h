@@ -14,10 +14,11 @@ struct hash<torch::jit::Module> {
 
 } // namespace std
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 using QConfig = std::tuple<Module, Module>;
-using QConfigDict = std::unordered_map<std::string, std::optional<QConfig>>;
+using QConfigDict = std::unordered_map<std::string, c10::optional<QConfig>>;
 
 /** \brief Insert observer module and observer function call for
  *  the Tensors that needs to be observed.
@@ -63,4 +64,5 @@ TORCH_API Module InsertObserversForOnDevicePTQ(
     bool inplace,
     QuantType quant_type = QuantType::STATIC);
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

@@ -6,6 +6,7 @@
 
 #include <ATen/OpMathType.h>
 #include <ATen/TensorIterator.h>
+#include <ATen/core/Array.h>
 #include <ATen/cuda/CUDAContext.h>
 #include <ATen/cuda/detail/OffsetCalculator.cuh>
 #include <ATen/native/cuda/jit_utils.h>
@@ -18,28 +19,28 @@
 #include <c10/core/ScalarType.h>
 #include <c10/util/SmallBuffer.h>
 
-#include <array>
 #include <initializer_list>
 #include <type_traits>
 #include <tuple>
 #include <mutex>
 
-namespace at::native {
+namespace at {
+namespace native {
 
 template <typename Tuple, std::size_t... I>
-// warning : unused parameter when tuple is empty.
-constexpr auto tuple_to_array_helper(const Tuple& t [[maybe_unused]], std::index_sequence<I...> seq) {
+constexpr auto tuple_to_array_helper(Tuple& t, std::index_sequence<I...> seq) {
     constexpr auto size = seq.size();
-    return std::array<const void*, size>{static_cast<const void*>(&std::get<I>(t))...};
+    (void)t; // warning : unused parameter when tuple is empty.
+    return std::array<void*, size>{static_cast<void*>(&std::get<I>(t))...};
 }
 
-// Helper function convert tuple to std::array<const void*, N>
+// Helper function convert tuple to std::array<void*, N>
 // for passing the arguments to CUDA Kernel
 // NOTE: We capture tuple by reference,
 // so the pointers in returned array are only valid
 // till tuple is alive.
 template <typename ...Args>
-constexpr auto tuple_to_array(const std::tuple<Args...>& extra_args) {
+constexpr auto tuple_to_array(std::tuple<Args...>& extra_args) {
     constexpr auto tuple_size = sizeof...(Args);
     return tuple_to_array_helper(extra_args, std::make_index_sequence<tuple_size>{});
 }
@@ -49,11 +50,6 @@ struct JittedVecKernelCache {
   at::cuda::jit::NvrtcFunction vec1;
   at::cuda::jit::NvrtcFunction vec2;
   at::cuda::jit::NvrtcFunction vec4;
-  at::cuda::jit::NvrtcFunction vec8;
-#ifdef USE_ROCM
-  at::cuda::jit::NvrtcFunction vec16;
-#endif
-
 };
 
 struct JittedKernelVariantCache {
@@ -63,10 +59,10 @@ struct JittedKernelVariantCache {
   at::cuda::jit::NvrtcFunction dynamic_noncontiguous;
 };
 
-inline c10::SmallBuffer<const void*, 64> pack_kernel_args(
-    std::initializer_list<const void*> args,
-    c10::ArrayRef<const void*> extra_args) {
-  c10::SmallBuffer<const void*, 64> ret(args.size() + extra_args.size());
+inline c10::SmallBuffer<void*, 64> pack_kernel_args(
+    std::initializer_list<void*> args,
+    c10::ArrayRef<void*> extra_args) {
+  c10::SmallBuffer<void*, 64> ret(args.size() + extra_args.size());
   std::copy(args.begin(), args.end(), ret.data());
   std::copy(extra_args.begin(), extra_args.end(), ret.data() + args.size());
   return ret;
@@ -89,15 +85,12 @@ void launch_jitted_unrolled_kernel(
     storer_t s,
     bool contiguous,
     at::cuda::jit::BinaryFuncVariant scalar_pos,
-    const void* scalar_val,
-    c10::ArrayRef<const void*> extra_args) {
+    void* scalar_val,
+    c10::ArrayRef<void*> extra_args) {
 
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
-
-  int tws = at::cuda::jit::calc_thread_work_size(desc.nInputs, desc.nOutputs, desc.f_inputs_type, desc.result_type);
-  int bws = tws * num_threads();
   //casting result to int is always safe, intermediate is int64 and won't overflow
-  const uint32_t grid = (N + bws - 1) / bws;
+  const uint32_t grid = (N + block_work_size() - 1) / block_work_size();
 
   if (!fn_cache.function) {
     const std::lock_guard<std::mutex> lock{jiterator_mutex};
@@ -105,7 +98,7 @@ void launch_jitted_unrolled_kernel(
       constexpr bool dynamic_casting = !std::is_same<decltype(l), memory::LoadWithoutCast>() ||
                                        !std::is_same<decltype(s), memory::StoreWithoutCast>();
       auto code = at::cuda::jit::generate_code(
-          desc, contiguous, dynamic_casting, scalar_pos, tws);
+          desc, contiguous, dynamic_casting, scalar_pos);
       fn_cache = at::cuda::jit::jit_pwise_function(code, desc.name);
     }
   }
@@ -120,41 +113,17 @@ void launch_jitted_vectorized_kernel(
     std::mutex &jiterator_mutex, JittedVecKernelCache &fn_cache,
     const at::cuda::jit::KernelDescriptor &desc, int64_t N, array_t data,
     at::cuda::jit::BinaryFuncVariant scalar_pos,
-    const void *scalar_val, c10::ArrayRef<const void*> extra_args) {
+    void *scalar_val, c10::ArrayRef<void*> extra_args) {
   TORCH_INTERNAL_ASSERT(N > 0 && N <= std::numeric_limits<int32_t>::max());
-
-  int tws = at::cuda::jit::calc_thread_work_size(desc.nInputs, desc.nOutputs, desc.f_inputs_type, desc.result_type);
-  int bws = tws * num_threads();
   // N is still int64_t for the computation, but it's always safe to cast result to int
-  const uint32_t grid = (N + bws - 1) / bws;
-
-  int vec_size = at::cuda::jit::can_vectorize_up_to(
-      desc, c10::ArrayRef<char*>(data.data(), data.size()));
-
-#ifndef USE_ROCM
-  const auto input_size = c10::scalarTypeToTypeMeta(desc.f_inputs_type).itemsize();
-  const int optimal_vec_size = 16 / static_cast<int>(input_size);
-  vec_size = std::min<int>(optimal_vec_size, vec_size);
-  // Here we purposely omit vec8 for 1-byte data because of a bug in NVCC
-  // that causes some numerical mismatches with uint8 on sm80 and sm90.
-  // TODO: Revisit this after CUDA 12.8 update.
-  if (input_size < 2) {
-    vec_size = std::min<int>(vec_size, 4);
-  }
-#endif
+  const uint32_t grid = (N + block_work_size() - 1) / block_work_size();
+  const int vec_size = at::cuda::jit::can_vectorize_up_to(
+      desc, c10::ArrayRef<char*>(data.data, data.size()));
 
   // Different kernels are compiled depending on what we're vectorizing up to (1, 2 or 4 elements)
   //   fn_ptr is set to the appropriate function based on the vec size and GPU used
-  at::cuda::jit::NvrtcFunction* fn_ptr = nullptr;
-
-#ifdef USE_ROCM
-  if (vec_size == 16) {
-    fn_ptr = &fn_cache.vec16;
-  } else
-#endif
-  if (vec_size == 8) {
-    fn_ptr = &fn_cache.vec8;
-  } else if (vec_size == 4) {
+  at::cuda::jit::NvrtcFunction* fn_ptr;
+  if (vec_size == 4) {
     fn_ptr = &fn_cache.vec4;
   } else if (vec_size == 2) {
     fn_ptr = &fn_cache.vec2;
@@ -173,7 +142,7 @@ void launch_jitted_vectorized_kernel(
       // Generates program
       auto code = at::cuda::jit::generate_code(
           desc, /*contiguous=*/true, /*dynamic_casting=*/false,
-          scalar_pos, tws, vectorized, vec_size);
+          scalar_pos, vectorized, vec_size);
       std::string kernel_name = vectorized ? desc.name + "_vectorized" + std::to_string(vec_size) : desc.name;
 
       // Acquires the program
@@ -209,16 +178,16 @@ void jitted_gpu_kernel_generic(
     JittedKernelVariantCache &cache,
     const at::cuda::jit::KernelDescriptor &desc,
     at::cuda::jit::BinaryFuncVariant scalar_pos,
-    c10::ArrayRef<const void*> extra_args,
+    c10::ArrayRef<void*> extra_args,
     TensorIteratorBase& iter,
     const bool dynamic_casting,
-    const void *scalar_val) {
+    void *scalar_val) {
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
   TORCH_INTERNAL_ASSERT(iter.ninputs() == arity);
   TORCH_INTERNAL_ASSERT(iter.noutputs() == 1);
 
   constexpr int ntensors = arity + 1;
-  std::array<char*, ntensors> data;
+  at::detail::Array<char*, ntensors> data;
   for (auto i : c10::irange(ntensors)) {
     data[i] = (char*)iter.data_ptr(i);
   }
@@ -296,7 +265,7 @@ static void jitted_gpu_kernel_impl(
     const std::string &f,
     const bool dynamic_casting,
     at::opmath_type<f_inputs_type> scalar_val,
-    const std::tuple<ExtraArgs...>& extra_args) {
+    std::tuple<ExtraArgs...> extra_args) {
 
   // TODO: Memory use can probably be optimized by re-using kernels across GPUs with
   //   the same compute capability
@@ -322,6 +291,6 @@ static void jitted_gpu_kernel_impl(
     );
 }
 
-}  // at::native
+}}  // at::native
 
 #endif // AT_USE_JITERATOR()

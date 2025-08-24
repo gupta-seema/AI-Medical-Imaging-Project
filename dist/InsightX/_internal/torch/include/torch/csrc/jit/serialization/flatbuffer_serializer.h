@@ -16,7 +16,8 @@
  * types, to avoid leaking those details to PyTorch clients.
  */
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 /// Maps file names to file contents.
 using ExtraFilesMap = std::unordered_map<std::string, std::string>;
@@ -32,15 +33,15 @@ class TORCH_API DetachedBuffer final {
       : data_(data), size_(size), data_owner_(internal_data_owner) {}
 
   /// Returns a pointer to the data.
-  [[nodiscard]] void* data() {
+  C10_NODISCARD void* data() {
     return data_;
   }
   /// Returns a pointer to the data.
-  [[nodiscard]] const void* data() const {
+  C10_NODISCARD const void* data() const {
     return data_;
   }
   /// Returns the size of the data, in bytes.
-  [[nodiscard]] size_t size() const {
+  C10_NODISCARD size_t size() const {
     return size_;
   }
 
@@ -89,4 +90,5 @@ TORCH_API void save_mobile_module_to_func(
 // TODO(qihan): delete
 TORCH_API bool register_flatbuffer_serializer();
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

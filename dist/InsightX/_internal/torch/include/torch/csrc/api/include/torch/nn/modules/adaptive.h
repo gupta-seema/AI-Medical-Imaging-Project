@@ -8,9 +8,8 @@
 #include <torch/nn/modules/linear.h>
 #include <torch/nn/options/adaptive.h>
 
-#include <utility>
-
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 /// The output of a single invocation of an AdaptiveLogSoftmaxWithLoss
 /// module's `forward()` method.
@@ -31,7 +30,7 @@ struct TORCH_API ASMoutput {
 /// `Efficient softmax approximation for GPUs`_ by Edouard Grave, Armand Joulin,
 /// Moustapha Cissé, David Grangier, and Hervé Jégou.
 /// See
-/// https://pytorch.org/docs/main/nn.html#torch.nn.AdaptiveLogSoftmaxWithLoss
+/// https://pytorch.org/docs/master/nn.html#torch.nn.AdaptiveLogSoftmaxWithLoss
 /// to learn about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::AdaptiveLogSoftmaxWithLossOptions`
@@ -52,7 +51,7 @@ class TORCH_API AdaptiveLogSoftmaxWithLossImpl
       : AdaptiveLogSoftmaxWithLossImpl(AdaptiveLogSoftmaxWithLossOptions(
             in_features,
             n_classes,
-            std::move(cutoffs))) {}
+            cutoffs)) {}
 
   explicit AdaptiveLogSoftmaxWithLossImpl(
       AdaptiveLogSoftmaxWithLossOptions options_);
@@ -106,4 +105,5 @@ class TORCH_API AdaptiveLogSoftmaxWithLossImpl
 /// `ModuleHolder` to learn about PyTorch's module storage semantics.
 TORCH_MODULE(AdaptiveLogSoftmaxWithLoss);
 
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

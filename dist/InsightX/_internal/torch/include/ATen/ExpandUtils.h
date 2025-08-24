@@ -14,6 +14,7 @@
 #include <c10/util/irange.h>
 
 #include <functional>
+#include <sstream>
 #include <tuple>
 #include <utility>
 
@@ -78,7 +79,7 @@ inline void check_defined(
     const char* api_name) {
   for (auto& t : tensors) {
     if (!t.get().defined()) {
-      TORCH_CHECK(false, api_name, "(...) called with an undefined Tensor");
+      AT_ERROR(api_name, "(...) called with an undefined Tensor");
     }
   }
 }
@@ -420,15 +421,15 @@ inline c10::MaybeOwned<Tensor> expand_size(
 inline std::vector<Tensor> expand_outplace(TensorList to_expand) {
   // expands a list of Tensors; ignores undefined (null) tensors
   bool first = true;
-  SymDimVector sizes;
+  DimVector sizes;
   for (const auto i : c10::irange(to_expand.size())) {
     if (!to_expand[i].defined()) {
       continue;
     } else if (first) {
-      sizes = to_expand[i].sym_sizes();
+      sizes = to_expand[i].sizes();
       first = false;
     } else {
-      sizes = infer_size_symdimvector(sizes, to_expand[i].sym_sizes());
+      sizes = infer_size_dimvector(sizes, to_expand[i].sizes());
     }
   }
 
@@ -436,10 +437,10 @@ inline std::vector<Tensor> expand_outplace(TensorList to_expand) {
   for (const auto i : c10::irange(to_expand.size())) {
     if (!to_expand[i].defined()) {
       continue;
-    } else if (to_expand[i].sym_sizes().equals(sizes)) {
+    } else if (to_expand[i].sizes().equals(sizes)) {
       result[i] = to_expand[i];
     } else {
-      result[i] = to_expand[i].expand_symint(sizes);
+      result[i] = to_expand[i].expand(sizes);
     }
   }
   return result;
@@ -461,17 +462,8 @@ inline Tensor _sum_to(
     reduce_dims.push_back(i);
   }
   for (int64_t i = leading_dims; i < static_cast<int64_t>(sizes.size()); ++i) {
-    if (TORCH_GUARD_OR_FALSE(sym_eq(shape[i - leading_dims], 1)) &&
-        TORCH_GUARD_OR_TRUE(sym_ne(sizes[i], 1))) {
+    if (shape[i - leading_dims] == 1 && sizes[i] != 1) {
       reduce_dims.push_back(i);
-    } else {
-      // if we assume no reduction due to unbacked we ensure that at runtime.
-      TORCH_MAYBE_SYM_CHECK(
-          sym_eq(shape[i - leading_dims], sizes[i]),
-          "non-reduction path was assumed due to unabcked symbols expected those two sizes to be the same:",
-          shape[i - leading_dims],
-          ", ",
-          sizes[i])
     }
   }
 
@@ -506,7 +498,7 @@ inline Tensor sum_to(
   return _sum_to(std::move(tensor), shape, always_return_non_view);
 }
 
-inline bool is_expandable_to(
+static inline bool is_expandable_to(
     SymIntArrayRef shape,
     c10::SymIntArrayRef desired) {
   size_t ndim = shape.size();
@@ -524,7 +516,7 @@ inline bool is_expandable_to(
   return true;
 }
 
-inline bool is_expandable_to(IntArrayRef shape, IntArrayRef desired) {
+static inline bool is_expandable_to(IntArrayRef shape, IntArrayRef desired) {
   auto sym_shape = c10::SymIntArrayRef(
       reinterpret_cast<const c10::SymInt*>(shape.data()), shape.size());
   auto sym_desired = c10::SymIntArrayRef(

@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -23,25 +22,25 @@
 namespace at {
 
 
-// aten::_assert_tensor_metadata(Tensor a, SymInt[]? size=None, SymInt[]? stride=None, ScalarType? dtype=None, *, Device? device=None, Layout? layout=None) -> ()
-inline void _assert_tensor_metadata(const at::Tensor & a, at::OptionalIntArrayRef size=::std::nullopt, at::OptionalIntArrayRef stride=::std::nullopt, ::std::optional<at::ScalarType> dtype=::std::nullopt, ::std::optional<at::Device> device=::std::nullopt, ::std::optional<at::Layout> layout=::std::nullopt) {
-    return at::_ops::_assert_tensor_metadata::call(a, size.has_value() ? ::std::make_optional(c10::fromIntArrayRefSlow(*size)) : ::std::nullopt, stride.has_value() ? ::std::make_optional(c10::fromIntArrayRefSlow(*stride)) : ::std::nullopt, dtype, device, layout);
+// aten::_assert_tensor_metadata(Tensor a, SymInt[]? size=None, SymInt[]? stride=None, ScalarType? dtype=None) -> ()
+inline void _assert_tensor_metadata(const at::Tensor & a, at::OptionalIntArrayRef size=c10::nullopt, at::OptionalIntArrayRef stride=c10::nullopt, c10::optional<at::ScalarType> dtype=c10::nullopt) {
+    return at::_ops::_assert_tensor_metadata::call(a, size.has_value() ? c10::make_optional(c10::fromIntArrayRefSlow(*size)) : c10::nullopt, stride.has_value() ? c10::make_optional(c10::fromIntArrayRefSlow(*stride)) : c10::nullopt, dtype);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  void _assert_tensor_metadata(const at::Tensor & a, at::OptionalIntArrayRef size=::std::nullopt, at::OptionalIntArrayRef stride=::std::nullopt, ::std::optional<at::ScalarType> dtype=::std::nullopt, ::std::optional<at::Device> device=::std::nullopt, ::std::optional<at::Layout> layout=::std::nullopt) {
-    return at::_ops::_assert_tensor_metadata::call(a, size.has_value() ? ::std::make_optional(c10::fromIntArrayRefSlow(*size)) : ::std::nullopt, stride.has_value() ? ::std::make_optional(c10::fromIntArrayRefSlow(*stride)) : ::std::nullopt, dtype, device, layout);
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
+  void _assert_tensor_metadata(const at::Tensor & a, at::OptionalIntArrayRef size=c10::nullopt, at::OptionalIntArrayRef stride=c10::nullopt, c10::optional<at::ScalarType> dtype=c10::nullopt) {
+    return at::_ops::_assert_tensor_metadata::call(a, size.has_value() ? c10::make_optional(c10::fromIntArrayRefSlow(*size)) : c10::nullopt, stride.has_value() ? c10::make_optional(c10::fromIntArrayRefSlow(*stride)) : c10::nullopt, dtype);
   }
 }
 
-// aten::_assert_tensor_metadata(Tensor a, SymInt[]? size=None, SymInt[]? stride=None, ScalarType? dtype=None, *, Device? device=None, Layout? layout=None) -> ()
-inline void _assert_tensor_metadata_symint(const at::Tensor & a, at::OptionalSymIntArrayRef size=::std::nullopt, at::OptionalSymIntArrayRef stride=::std::nullopt, ::std::optional<at::ScalarType> dtype=::std::nullopt, ::std::optional<at::Device> device=::std::nullopt, ::std::optional<at::Layout> layout=::std::nullopt) {
-    return at::_ops::_assert_tensor_metadata::call(a, size, stride, dtype, device, layout);
+// aten::_assert_tensor_metadata(Tensor a, SymInt[]? size=None, SymInt[]? stride=None, ScalarType? dtype=None) -> ()
+inline void _assert_tensor_metadata_symint(const at::Tensor & a, at::OptionalSymIntArrayRef size=c10::nullopt, at::OptionalSymIntArrayRef stride=c10::nullopt, c10::optional<at::ScalarType> dtype=c10::nullopt) {
+    return at::_ops::_assert_tensor_metadata::call(a, size, stride, dtype);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  void _assert_tensor_metadata(const at::Tensor & a, at::OptionalSymIntArrayRef size=::std::nullopt, at::OptionalSymIntArrayRef stride=::std::nullopt, ::std::optional<at::ScalarType> dtype=::std::nullopt, ::std::optional<at::Device> device=::std::nullopt, ::std::optional<at::Layout> layout=::std::nullopt) {
-    return at::_ops::_assert_tensor_metadata::call(a, size, stride, dtype, device, layout);
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
+  void _assert_tensor_metadata(const at::Tensor & a, at::OptionalSymIntArrayRef size=c10::nullopt, at::OptionalSymIntArrayRef stride=c10::nullopt, c10::optional<at::ScalarType> dtype=c10::nullopt) {
+    return at::_ops::_assert_tensor_metadata::call(a, size, stride, dtype);
   }
 }
 

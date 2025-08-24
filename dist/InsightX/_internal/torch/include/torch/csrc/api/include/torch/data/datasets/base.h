@@ -11,19 +11,25 @@
 #include <utility>
 #include <vector>
 
-namespace torch::data::datasets {
+namespace torch {
+namespace data {
+namespace datasets {
 template <typename S, typename T>
 class MapDataset;
 template <typename D, typename T>
 MapDataset<D, T> map(D, T); // NOLINT
-} // namespace torch::data::datasets
+} // namespace datasets
+} // namespace data
+} // namespace torch
 
-namespace torch::data::datasets {
+namespace torch {
+namespace data {
+namespace datasets {
 namespace detail {
 template <typename T>
 struct is_optional : std::false_type {};
 template <typename T>
-struct is_optional<std::optional<T>> : std::true_type {};
+struct is_optional<optional<T>> : std::true_type {};
 } // namespace detail
 
 /// A dataset that can yield data only in batches.
@@ -43,9 +49,8 @@ class BatchDataset {
   /// Returns a batch of data given an index.
   virtual Batch get_batch(BatchRequest request) = 0;
 
-  /// Returns the size of the dataset, or an empty std::optional if it is
-  /// unsized.
-  virtual std::optional<size_t> size() const = 0;
+  /// Returns the size of the dataset, or an empty optional if it is unsized.
+  virtual optional<size_t> size() const = 0;
 
   /// Creates a `MapDataset` that applies the given `transform` to this dataset.
   template <typename TransformType>
@@ -93,4 +98,6 @@ class Dataset : public BatchDataset<Self, std::vector<SingleExample>> {
 /// yields that many elements from the stream.
 template <typename Self, typename Batch = std::vector<Example<>>>
 using StreamDataset = BatchDataset<Self, Batch, /*BatchRequest=*/size_t>;
-} // namespace torch::data::datasets
+} // namespace datasets
+} // namespace data
+} // namespace torch

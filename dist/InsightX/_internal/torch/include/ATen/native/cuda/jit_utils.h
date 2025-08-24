@@ -1,12 +1,15 @@
 #pragma once
 
 #include <string>
+#include <sstream>
+#include <unordered_map>
+#include <vector>
 
 #include <c10/util/irange.h>
 #include <ATen/jit_macros.h>
 #include <ATen/cuda/detail/LazyNVRTC.h>
 
-namespace at::cuda::jit {
+namespace at { namespace cuda { namespace jit {
 
 enum class BinaryFuncVariant {NoScalar, RhsScalar, LhsScalar};
 
@@ -53,18 +56,6 @@ KernelDescriptor make_kernel_descriptor(
 
 inline int can_vectorize_up_to(size_t default_alignment, void *pointer) {
   auto ip = reinterpret_cast<uintptr_t>(pointer);
-#ifdef USE_ROCM
-  if ((default_alignment == 1) && (ip % (16 * default_alignment) == 0)) {
-    return 16;
-  }
-  if ((default_alignment <= 2) && (ip % (8 * default_alignment) == 0)) {
-    return 8;
-  }
-#else
-  if (ip % (8 * default_alignment) == 0) {
-    return 8;
-  }
-#endif
   if (ip % (4 * default_alignment) == 0) {
     return 4;
   }
@@ -80,7 +71,7 @@ inline int can_vectorize_up_to(const KernelDescriptor &desc, c10::ArrayRef<char*
 
   // Deals with output
   auto result_size = c10::scalarTypeToTypeMeta(desc.result_type).itemsize();
-  auto result = can_vectorize_up_to(result_size, pointers[0]);
+  int result = can_vectorize_up_to(result_size, pointers[0]);
 
   // Incorporates input(s)
   auto input_size = c10::scalarTypeToTypeMeta(desc.f_inputs_type).itemsize();
@@ -91,38 +82,18 @@ inline int can_vectorize_up_to(const KernelDescriptor &desc, c10::ArrayRef<char*
   return result;
 }
 
-//FIXME - this are defined in Loops.cuh, but including Loops.cuh here would lead to circular includes Loops.cuh -> CUDALoops.cuh -> jit_utils.h -> Loops.cuh
-#ifdef USE_ROCM
-#define JIT_THREAD_WORK_SIZE 4
-#else
-#define JIT_THREAD_WORK_SIZE 8
-#endif
-
-int calc_io_size(
-    const int nInputs,
-    const int nOutputs,
-    const c10::ScalarType& inputs_type,
-    const c10::ScalarType& result_type);
-
-int calc_thread_work_size(
-    const int nInputs,
-    const int nOutputs,
-    const c10::ScalarType& inputs_type,
-    const c10::ScalarType& result_type);
-
 std::string generate_code(
     int nInputs,
     int nOutputs,
     const std::string& func,
     const std::string& name,
-    const std::string& f_inputs_type,
+    const std::string& f_input_type,
     const std::string& compute_type,
     const std::string& result_type,
     bool contiguous,
     bool dynamic_casting,
     BinaryFuncVariant scalar_pos,
     c10::SmallVector<std::string>& extra_args_typenames,
-    int thread_work_size=JIT_THREAD_WORK_SIZE,
     bool vectorized=false,
     int vec_size=0,
     bool return_by_ref=false);
@@ -132,7 +103,6 @@ std::string generate_code(
     bool contiguous,
     bool dynamic_casting,
     BinaryFuncVariant scalar_pos,
-    int thread_work_size=JIT_THREAD_WORK_SIZE,
     bool vectorized=false,
     int vec_size=0,
     bool return_by_ref=false);
@@ -164,7 +134,7 @@ NvrtcFunction jit_pwise_function(
 
 void launch_jitted_pwise_function(
     NvrtcFunction function,
-    const void* args[],
+    void* args[],
     const dim3 nBlocks,
     const dim3 kBlockSize,
     const int smem=0);
@@ -228,10 +198,6 @@ template <> inline std::string typeName<at::Float8_e5m2fnuz>() {
 template <> inline std::string typeName<at::Float8_e4m3fnuz>() {
     return "at::Float8_e4m3fnuz";
 }
-template <> inline std::string typeName<at::Float8_e8m0fnu>() {
-    // TODO(#146647): Can the code here be made generic for any scalartype?
-    return "at::Float8_e8m0fnu";
-}
 
 #define TYPE_NAME_CASE(ctype, scalartype)                    \
   case ScalarType::scalartype:  return typeName<ctype>();
@@ -246,4 +212,4 @@ inline std::string typeName(ScalarType t) {
 
 TORCH_CUDA_CPP_API void initializeCudaContext();
 
-} // namespace at::cuda::jit
+}}}  // namespace at::cuda::jit

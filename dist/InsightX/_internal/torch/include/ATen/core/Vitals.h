@@ -1,17 +1,21 @@
 #pragma once
+#include <cstring>
+#include <map>
+#include <memory>
 #include <ostream>
 #include <sstream>
 #include <unordered_map>
 
 #include <c10/core/impl/LocalDispatchKeySet.h>
 
-namespace at::vitals {
+namespace at {
+namespace vitals {
 
 TORCH_API bool torchVitalEnabled();
 
 struct TORCH_API TorchVitalAttr {
   // always initialized to empty
-  std::string value;
+  std::string value = "";
   template <typename T>
   TorchVitalAttr& operator<<(const T& t) {
     if (torchVitalEnabled()) {
@@ -39,8 +43,6 @@ struct TORCH_API TorchVital {
   explicit TorchVital(std::string n) : name(std::move(n)) {}
   TorchVital(const TorchVital&) = default;
   TorchVital(TorchVital&&) = default;
-  TorchVital& operator=(const TorchVital&) = default;
-  TorchVital& operator=(TorchVital&&) = default;
   TorchVital() = delete;
 
   TorchVitalAttr& create(const std::string& attr);
@@ -73,7 +75,6 @@ class TORCH_API APIVitals {
   APIVitals(APIVitals&& other) = delete;
   APIVitals& operator=(const APIVitals&) = delete;
   APIVitals& operator=(APIVitals&&) = delete;
-  ~APIVitals() = default;
 
  private:
   std::unordered_map<std::string, TorchVital> name_map_;
@@ -81,7 +82,8 @@ class TORCH_API APIVitals {
 
 extern TORCH_API APIVitals VitalsAPI;
 
-} // namespace at::vitals
+} // namespace vitals
+} // namespace at
 
 #define TORCH_VITAL_DECLARE(name) \
   TORCH_API at::vitals::TorchVital TorchVital_##name;

@@ -1,12 +1,8 @@
-# mypy: allow-untyped-defs
-from typing import Optional
-
 import torch
-from torch import nan, Tensor
+from torch import nan
 from torch.distributions import constraints
 from torch.distributions.distribution import Distribution
 from torch.distributions.utils import lazy_property, logits_to_probs, probs_to_logits
-
 
 __all__ = ["Categorical"]
 
@@ -49,16 +45,10 @@ class Categorical(Distribution):
         probs (Tensor): event probabilities
         logits (Tensor): event log probabilities (unnormalized)
     """
-
     arg_constraints = {"probs": constraints.simplex, "logits": constraints.real_vector}
     has_enumerate_support = True
 
-    def __init__(
-        self,
-        probs: Optional[Tensor] = None,
-        logits: Optional[Tensor] = None,
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, probs=None, logits=None, validate_args=None):
         if (probs is None) == (logits is None):
             raise ValueError(
                 "Either `probs` or `logits` must be specified, but not both."
@@ -68,7 +58,6 @@ class Categorical(Distribution):
                 raise ValueError("`probs` parameter must be at least one-dimensional.")
             self.probs = probs / probs.sum(-1, keepdim=True)
         else:
-            assert logits is not None  # helps mypy
             if logits.dim() < 1:
                 raise ValueError("`logits` parameter must be at least one-dimensional.")
             # Normalize
@@ -103,19 +92,19 @@ class Categorical(Distribution):
         return constraints.integer_interval(0, self._num_events - 1)
 
     @lazy_property
-    def logits(self) -> Tensor:
+    def logits(self):
         return probs_to_logits(self.probs)
 
     @lazy_property
-    def probs(self) -> Tensor:
+    def probs(self):
         return logits_to_probs(self.logits)
 
     @property
-    def param_shape(self) -> torch.Size:
+    def param_shape(self):
         return self._param.size()
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return torch.full(
             self._extended_shape(),
             nan,
@@ -124,11 +113,11 @@ class Categorical(Distribution):
         )
 
     @property
-    def mode(self) -> Tensor:
-        return self.probs.argmax(dim=-1)
+    def mode(self):
+        return self.probs.argmax(axis=-1)
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return torch.full(
             self._extended_shape(),
             nan,

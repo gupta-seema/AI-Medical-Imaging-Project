@@ -79,6 +79,7 @@ if(0)
   # If Caffe2 was compiled with the libraries below, they must
   # be found again when including the Caffe2 target.
   set(CAFFE2_USE_CUDA 0)
+  set(CAFFE2_USE_TENSORRT OFF)
 
   # Add current directory to module path so we pick up FindCUDAToolkit.cmake
   set(old_CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}")
@@ -92,6 +93,12 @@ if(0)
       "libraries. Please set the proper CUDA prefixes and / or install "
       "CUDA.")
   endif()
+  if( AND NOT CAFFE2_USE_TENSORRT)
+    message(FATAL_ERROR
+      "Your installed Caffe2 version uses TensorRT but I cannot find the TensorRT "
+      "libraries. Please set the proper TensorRT prefixes and / or install "
+      "TensorRT.")
+  endif()
 endif()
 
 if(OFF)
@@ -100,13 +107,6 @@ if(OFF)
   list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}")
   include("${CMAKE_CURRENT_LIST_DIR}/public/xpu.cmake")
   set(CMAKE_MODULE_PATH "${old_CMAKE_MODULE_PATH}")
-
-  if(OFF AND NOT PYTORCH_FOUND_XPU)
-    message(FATAL_ERROR
-      "Your installed Caffe2 version uses XPU but I cannot find the XPU runtime"
-      "libraries. Please set the proper oneAPI paths and / or install "
-      "oneAPI.")
-  endif()
 endif()
 
 if(ON)

@@ -1,5 +1,5 @@
-# mypy: allow-untyped-defs
 import contextlib
+from typing import List, Tuple
 
 import torch
 
@@ -65,7 +65,7 @@ def fuser(name):
         torch._C._jit_set_nvfuser_enabled(False)
         torch._C._jit_set_llga_enabled(False)
     else:
-        raise Exception(f"unrecognized fuser option (name: {name})")  # noqa: TRY002
+        raise Exception(f"unrecognized fuser option (name: {name})")
     try:
         yield
     finally:
@@ -105,7 +105,7 @@ def _script_method_graph_for(self, parent, *args, **kwargs):
 
         # graph_executor_states for differentiable node
         fw_states = eps[0].code.differentiable_op_executor_states()
-        diff_nodes: list[torch._C.Node] = []
+        diff_nodes: List[torch._C.Node] = []
         for n in graph.nodes():
             _get_differentiable_graph_node(n, diff_nodes)
 
@@ -127,7 +127,7 @@ def _script_method_graph_for(self, parent, *args, **kwargs):
         return last_executed_optimized_graph()
 
 
-def set_fusion_strategy(strategy: list[tuple[str, int]]):
+def set_fusion_strategy(strategy: List[Tuple[str, int]]):
     """Set the type and number of specializations that can occur during fusion.
 
     Usage: provide a list of pairs (type, depth) where type is one of "STATIC" or "DYNAMIC"

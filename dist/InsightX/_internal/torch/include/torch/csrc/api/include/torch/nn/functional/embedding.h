@@ -2,7 +2,9 @@
 
 #include <torch/nn/options/embedding.h>
 
-namespace torch::nn::functional {
+namespace torch {
+namespace nn {
+namespace functional {
 
 inline Tensor one_hot(const Tensor& tensor, int64_t num_classes = -1) {
   return torch::one_hot(tensor, num_classes);
@@ -22,14 +24,14 @@ inline void _no_grad_embedding_renorm_(
 inline Tensor embedding(
     const Tensor& input,
     const Tensor& weight,
-    std::optional<int64_t> padding_idx,
-    std::optional<double> max_norm,
+    c10::optional<int64_t> padding_idx,
+    c10::optional<double> max_norm,
     double norm_type,
     bool scale_grad_by_freq,
     bool sparse) {
   auto input_ = input;
 
-  if (padding_idx != std::nullopt) {
+  if (padding_idx != c10::nullopt) {
     if (*padding_idx > 0) {
       TORCH_CHECK(
           *padding_idx < weight.size(0),
@@ -44,7 +46,7 @@ inline Tensor embedding(
     padding_idx = -1;
   }
 
-  if (max_norm != std::nullopt) {
+  if (max_norm != c10::nullopt) {
     input_ = input_.contiguous();
     // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
     _no_grad_embedding_renorm_(weight, input_, *max_norm, norm_type);
@@ -56,7 +58,7 @@ inline Tensor embedding(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.embedding
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.embedding
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::EmbeddingFuncOptions`
@@ -88,14 +90,14 @@ inline Tensor embedding_bag(
     const Tensor& input,
     const Tensor& weight,
     const Tensor& offsets,
-    std::optional<double> max_norm,
+    c10::optional<double> max_norm,
     double norm_type,
     bool scale_grad_by_freq,
     EmbeddingBagMode mode,
     bool sparse,
     const Tensor& per_sample_weights,
     bool include_last_offset,
-    std::optional<int64_t> padding_idx) {
+    c10::optional<int64_t> padding_idx) {
   auto input_ = input;
   auto offsets_ = offsets;
   auto per_sample_weights_ = per_sample_weights;
@@ -131,7 +133,8 @@ inline Tensor embedding_bag(
         input_.dim());
   }
 
-  int mode_enum = 0;
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+  int mode_enum;
   if (std::holds_alternative<enumtype::kSum>(mode)) {
     mode_enum = 0;
   } else if (std::holds_alternative<enumtype::kMean>(mode)) {
@@ -146,7 +149,7 @@ inline Tensor embedding_bag(
     TORCH_CHECK(false, "mode has to be one of sum, mean or max");
   }
 
-  if (max_norm != std::nullopt) {
+  if (max_norm != c10::nullopt) {
     // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
     _no_grad_embedding_renorm_(weight, input_, *max_norm, norm_type);
   }
@@ -173,7 +176,7 @@ inline Tensor embedding_bag(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.embedding_bag
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.embedding_bag
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::EmbeddingBagFuncOptions`
@@ -203,4 +206,6 @@ inline Tensor embedding_bag(
       options.padding_idx());
 }
 
-} // namespace torch::nn::functional
+} // namespace functional
+} // namespace nn
+} // namespace torch

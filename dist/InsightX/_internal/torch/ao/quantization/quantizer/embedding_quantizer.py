@@ -1,7 +1,7 @@
-# mypy: allow-untyped-defs
 from __future__ import annotations
 
 import copy
+from typing import List, Set
 
 import torch
 import torch.nn.functional as F
@@ -17,7 +17,6 @@ from torch.ao.quantization.quantizer.xnnpack_quantizer_utils import (
     QuantizationConfig,
 )
 
-
 __all__ = [
     "get_embedding_operators_config",
     "EmbeddingQuantizer",
@@ -32,7 +31,7 @@ def get_embedding_operators_config() -> OperatorConfig:
         observer_or_fake_quant_ctr=PerChannelMinMaxObserver.with_args(eps=2**-12),
     )
     quantization_config = QuantizationConfig(None, None, weight_quantization_spec, None)
-    ops: list[OperatorPatternType] = [[torch.nn.Embedding]]
+    ops: List[OperatorPatternType] = [[torch.nn.Embedding]]
     ops.append([F.embedding])
     supported_config_and_operators = OperatorConfig(
         config=quantization_config, operators=ops
@@ -41,20 +40,20 @@ def get_embedding_operators_config() -> OperatorConfig:
 
 
 class EmbeddingQuantizer(Quantizer):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__()
 
     @classmethod
-    def get_supported_quantization_configs(cls) -> list[QuantizationConfig]:
-        op_configs: set[QuantizationConfig] = {
-            spec for spec, _ in cls.get_supported_operators()
-        }
+    def get_supported_quantization_configs(cls) -> List[QuantizationConfig]:
+        op_configs: Set[QuantizationConfig] = set({})
+        for spec, _ in cls.get_supported_operators():
+            op_configs.add(spec)
         return list(op_configs)
 
     @classmethod
     def get_supported_operator_for_quantization_config(
         cls, quantization_config: QuantizationConfig
-    ) -> list[OperatorPatternType]:
+    ) -> List[OperatorPatternType]:
         for config, ops in cls.get_supported_operators():
             # note: this assumes each entry in cls.supported_spec_and_operators
             # corresponds to one spec, e.g. we don't have
@@ -93,5 +92,5 @@ class EmbeddingQuantizer(Quantizer):
         pass
 
     @classmethod
-    def get_supported_operators(cls) -> list[OperatorConfig]:
+    def get_supported_operators(cls) -> List[OperatorConfig]:
         return [get_embedding_operators_config()]

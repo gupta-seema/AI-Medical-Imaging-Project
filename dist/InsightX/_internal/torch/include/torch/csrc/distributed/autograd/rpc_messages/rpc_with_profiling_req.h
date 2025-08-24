@@ -6,7 +6,9 @@
 #include <torch/csrc/distributed/rpc/rpc_command_base.h>
 #include <torch/csrc/distributed/rpc/types.h>
 
-namespace torch::distributed::autograd {
+namespace torch {
+namespace distributed {
+namespace autograd {
 
 class TORCH_API RpcWithProfilingReq : public rpc::RpcCommandBase {
  public:
@@ -46,16 +48,15 @@ class TORCH_API RpcWithProfilingReq : public rpc::RpcCommandBase {
 
  private:
   // message type
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const rpc::MessageType messageType_;
   // wrapped message
   c10::intrusive_ptr<rpc::Message> wrappedMessage_;
   std::unique_ptr<RpcCommandBase> wrappedRpc_;
   rpc::MessageType wrappedMessageType_;
   std::vector<torch::Tensor> tensors_;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const torch::autograd::profiler::ProfilerConfig profilerConfig_;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const rpc::ProfilingId profilingKeyId_;
 };
-} // namespace torch::distributed::autograd
+} // namespace autograd
+} // namespace distributed
+} // namespace torch

@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import array
 import enum
 import functools
@@ -6,7 +5,7 @@ import logging
 import operator
 import struct
 import sys
-from typing import NamedTuple, Optional
+from typing import List, NamedTuple, Optional, Tuple
 
 import torch
 
@@ -210,7 +209,7 @@ class Operand(NamedTuple):
     # This is always the PyTorch shape, which is NCHW for feature maps.
     # The actual NNAPI operand might have a transposed shape.
     # we use 0 for load time dynamic shapes & -1 for runtime dynamic shapes
-    shape: tuple[int, ...]
+    shape: Tuple[int, ...]
 
     # Specifies how the shape of the operand that we define in NNAPI
     # relates to the shape we track above.
@@ -229,7 +228,7 @@ class Operand(NamedTuple):
             return True
         if self.dim_order is DimOrder.CHANNELS_LAST:
             return False
-        raise Exception("Unknown dim order")  # noqa: TRY002
+        raise Exception("Unknown dim order")
 
 
 def broadcast_shapes(shape1, shape2):
@@ -242,14 +241,10 @@ def broadcast_shapes(shape1, shape2):
     # don't match between PT and NNAPI, even though semantics match.
     if len(s1) > len(s2):
         # s2 = [1] * (len(s1) - len(s2)) + s2
-        raise Exception(  # noqa: TRY002
-            "Non-equal-rank broadcast is not supported yet."
-        )  # noqa: TRY002
+        raise Exception("Non-equal-rank broadcast is not supported yet.")
     if len(s2) > len(s1):
         # s3 = [1] * (len(s2) - len(s1)) + s1
-        raise Exception(  # noqa: TRY002
-            "Non-equal-rank broadcast is not supported yet."
-        )  # noqa: TRY002
+        raise Exception("Non-equal-rank broadcast is not supported yet.")
     ret = []
     for d1, d2 in zip(s1, s2):
         if d1 == 1:
@@ -259,18 +254,16 @@ def broadcast_shapes(shape1, shape2):
         elif d1 == d2:
             ret.append(d1)
         else:
-            raise Exception(  # noqa: TRY002
-                f"Cannot broadcast shapes: {shape1} and {shape2}"
-            )  # noqa: TRY002
+            raise Exception(f"Cannot broadcast shapes: {shape1} and {shape2}")
     return tuple(ret)
 
 
 def get_conv_pool_shape(image_shape, args, out_ch, transpose):
-    batch, _in_c, in_h, in_w = image_shape
+    batch, in_c, in_h, in_w = image_shape
 
     # TODO: Handle dilation
     if args.dilation_h != 1 or args.dilation_w != 1:
-        raise Exception("Dilation not supported yet.")  # noqa: TRY002
+        raise Exception("Dilation not supported yet.")
 
     if transpose:
         out_h = (in_h - 1) * args.stride_h + args.kernel_h - args.pad_t - args.pad_b
@@ -303,7 +296,7 @@ def fix_shape(shape, dim_order):
     if dim_order is DimOrder.UNKNOWN_CONSTANT:
         # XXX think this through
         return shape
-    raise Exception(f"Bad dim_order: {dim_order!r}.")  # noqa: TRY002
+    raise Exception(f"Bad dim_order: {dim_order!r}.")
 
 
 def reverse_map_dim(dim_order, d):
@@ -355,7 +348,7 @@ class _NnapiSerializer:
     def add_tensor_operand(self, jitval, oper):
         assert isinstance(oper, Operand)
         if jitval in self.jitval_operand_map:
-            raise Exception(f"Duplicate tensor: {jitval!r}")  # noqa: TRY002
+            raise Exception(f"Duplicate tensor: {jitval!r}")
 
         operand_id = self.get_next_operand_id()
         self.operands.append(oper)
@@ -400,18 +393,16 @@ class _NnapiSerializer:
                     scale = tensor.nnapi_scale
                     zero_point = tensor.nnapi_zero_point
                 else:
-                    raise Exception(  # noqa: TRY002
+                    raise Exception(
                         f"`nnapi_type` needs to be one of {op_codes} for `int16`"
                     )
             else:
-                raise Exception(  # noqa: TRY002
+                raise Exception(
                     "`int16` isn't supported. If you're trying to represent NNAPI"
                     " qint16 with Pytorch int16, set `use_int16_for_qint16 = True`"
                 )
         else:
-            raise Exception(  # noqa: TRY002
-                f"Can't handle input with dtype '{tensor.dtype}'"
-            )  # noqa: TRY002
+            raise Exception(f"Can't handle input with dtype '{tensor.dtype}'")
         return Operand(
             shape=tuple(tensor.shape),
             op_type=op_type,
@@ -443,6 +434,7 @@ class _NnapiSerializer:
         operand_id = len(self.operands)
         self.operands.append(toper)
         tsize = tensor_size(toper.op_type, toper.shape)
+        psize = ((tsize - 1) | 0x3) + 1
         self.values.append((operand_id, OperandValueSourceType.NUMBERED_BUFFER))
         buf_num = len(self.used_weights)
         offset = 0
@@ -499,9 +491,7 @@ class _NnapiSerializer:
             if s == 0:
                 # TODO: Improve this error message, possibly after converting
                 # many callsites to support flexible size.
-                raise Exception(  # noqa: TRY002
-                    "Flexible size is not supported for this operand."
-                )  # noqa: TRY002
+                raise Exception("Flexible size is not supported for this operand.")
             if s < 0:
                 # runtime flex
                 LOG.warning("Operand %s has runtime flex shape", oper)
@@ -536,12 +526,10 @@ class _NnapiSerializer:
     def get_constant_value(self, jitval, typekind=None):
         record = self.constants.get(jitval)
         if record is None:
-            raise Exception(  # noqa: TRY002
-                f"Could not find constant value for '{jitval!r}'."
-            )  # noqa: TRY002
+            raise Exception(f"Could not find constant value for '{jitval!r}'.")
         ctype, _ = record
         if typekind is not None and ctype.kind() != typekind:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 f"Expected constant value of type {typekind}, but got {ctype.kind()} for value '{jitval!r}'"
             )
         return record
@@ -565,9 +553,7 @@ class _NnapiSerializer:
                 # Runtime flexible shape
                 shape_parts.append("0")
             else:
-                raise Exception(  # noqa: TRY002
-                    "Unknown dim value, dimensions should be >= -1"
-                )  # noqa: TRY002
+                raise Exception("Unknown dim value, dimensions should be >= -1")
             shape_parts.append(",")
         shape_parts.append(")")
         shape_code = "".join(shape_parts)
@@ -588,14 +574,12 @@ class _NnapiSerializer:
             if self.use_int16_for_qint16:
                 return f"torch.zeros({shape_code}, dtype=torch.int16)"
             else:
-                raise Exception(  # noqa: TRY002
+                raise Exception(
                     "`int16` isn't supported. If you're trying to represent NNAPI"
                     " qint16 with Pytorch int16, set `use_int16_for_qint16 = True`"
                 )
 
-        raise Exception(  # noqa: TRY002
-            f"Unsupported output operand type: {oper.op_type}"
-        )  # noqa: TRY002
+        raise Exception(f"Unsupported output operand type: {oper.op_type}")
 
     def forward_operand_shape(self, out_op_id, out_dim, in_op_id, in_dim):
         self.compute_operand_shape(out_op_id, out_dim, flex_name(in_op_id, in_dim))
@@ -607,9 +591,7 @@ class _NnapiSerializer:
 
     def transpose_to_nhwc(self, in_id, oper):
         if oper.shape[2:] != (1, 1):
-            raise Exception(  # noqa: TRY002
-                "Automatic transpose only supported for H,W == 1,1"
-            )  # noqa: TRY002
+            raise Exception("Automatic transpose only supported for H,W == 1,1")
 
         out_oper = oper._replace(dim_order=DimOrder.CHANNELS_LAST)
 
@@ -636,7 +618,7 @@ class _NnapiSerializer:
         if orders == (DimOrder.CHANNELS_LAST, DimOrder.PRESUMED_CONTIGUOUS):
             return (in0_id, in0_oper) + self.transpose_to_nhwc(in1_id, in1_oper)
 
-        raise Exception(  # noqa: TRY002
+        raise Exception(
             f"Automatic transpose not supported for dim_orders: {in0_oper.dim_order!r}, {in1_oper.dim_order!r}"
         )
 
@@ -645,9 +627,7 @@ class _NnapiSerializer:
         if ctype.kind() == "ListType":
             assert ctype.getElementType().kind() == "IntType"
             return value
-        raise Exception(  # noqa: TRY002
-            f"Can't handle size arg of type '{ctype!r}' for '{jitval!r}'"
-        )  # noqa: TRY002
+        raise Exception(f"Can't handle size arg of type '{ctype!r}' for '{jitval!r}'")
 
     def get_conv_pool_args_2d_from_pack(self, kernel_size, packed_config):
         pc = [i.item() for i in packed_config]
@@ -734,9 +714,7 @@ class _NnapiSerializer:
             return_values = self.tensor_sequences[retn_input]
             retval_count = len(return_values)
         else:
-            raise Exception(  # noqa: TRY002
-                f"Unsupported return type: {retn_input.type()}"
-            )  # noqa: TRY002
+            raise Exception(f"Unsupported return type: {retn_input.type()}")
 
         if return_shapes is not None:
             assert len(return_shapes) == len(return_values)
@@ -910,13 +888,11 @@ class _NnapiSerializer:
     def add_node(self, node):
         adder = self.ADDER_MAP.get(node.kind())
         if not adder:
-            raise Exception(  # noqa: TRY002
-                f"Unsupported node kind ({node.kind()!r}) in node {node!r}"
-            )  # noqa: TRY002
+            raise Exception(f"Unsupported node kind ({node.kind()!r}) in node {node!r}")
         adder(self, node)
 
     def _identity(self, node):
-        in_id, _in_oper = self.get_tensor_operand_by_jitval(node.inputsAt(0))
+        in_id, in_oper = self.get_tensor_operand_by_jitval(node.inputsAt(0))
         jitval = node.outputsAt(0)
         self.jitval_operand_map[jitval] = in_id
 
@@ -943,8 +919,8 @@ class _NnapiSerializer:
         assert node.outputsSize() == 1
         output = node.outputsAt(0)
         ctype = output.type()
-        const_vals: Optional[list] = []
-        tensors: Optional[list] = []
+        const_vals: Optional[List] = []
+        tensors: Optional[List] = []
         for inp in node.inputs():
             if const_vals is not None and inp in self.constants:
                 _, val = self.get_constant_value(inp)
@@ -963,7 +939,7 @@ class _NnapiSerializer:
         if tensors is not None:
             self.add_tensor_sequence(output, tensors)
         if const_vals is None and tensors is None:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 f"Unable to handle ListConstruct node.  Neither all constants nor all tensors. {node!r}"
             )
 
@@ -1013,7 +989,7 @@ class _NnapiSerializer:
         is_trivial_reshape = len(shape) == 2 and shape[1] == -1
 
         if in_oper.dim_order != DimOrder.PRESUMED_CONTIGUOUS and not is_trivial_reshape:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "Currently, reshape is only supported on NHWC tensors if the target size is [X, -1]."
             )
 
@@ -1038,15 +1014,15 @@ class _NnapiSerializer:
 
         in_id, in_oper = self.get_tensor_operand_by_jitval(node.inputsAt(0))
 
-        _start_ctype, start_dim = self.get_constant_value(node.inputsAt(1), "IntType")
-        _end_ctype, end_dim = self.get_constant_value(node.inputsAt(2), "IntType")
+        start_ctype, start_dim = self.get_constant_value(node.inputsAt(1), "IntType")
+        end_ctype, end_dim = self.get_constant_value(node.inputsAt(2), "IntType")
 
         # channels last with channels == 1 or (height & width both 1)
         is_trivial_flatten = len(in_oper.shape) == 4 and (
             in_oper.shape[1] == 1 or (in_oper.shape[2] == 1 and in_oper.shape[3] == 1)
         )
         if in_oper.dim_order != DimOrder.PRESUMED_CONTIGUOUS and not is_trivial_flatten:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "Currently, flatten is not supported on NHWC tensors unless C=1 or H=W=1"
             )
 
@@ -1062,12 +1038,10 @@ class _NnapiSerializer:
         )
 
         if any(dim == 0 for dim in in_oper.shape[start_dim : end_dim + 1]):
-            raise Exception(  # noqa: TRY002
-                "Flattening flexible dims is not supported yet"
-            )  # noqa: TRY002
+            raise Exception("Flattening flexible dims is not supported yet")
         non_flattened_dims = in_oper.shape[:start_dim] + in_oper.shape[end_dim + 1 :]
         if non_flattened_dims.count(0) > 1:
-            raise Exception("Only 1 dim can be flexible")  # noqa: TRY002
+            raise Exception("Only 1 dim can be flexible")
 
         out_oper = in_oper._replace(
             shape=out_shape, dim_order=DimOrder.PRESUMED_CONTIGUOUS
@@ -1113,7 +1087,7 @@ class _NnapiSerializer:
             return
 
         if in_oper.shape[dim_value] == 0:
-            raise Exception("Unable to slice with flexible shape")  # noqa: TRY002
+            raise Exception("Unable to slice with flexible shape")
 
         if stop_value < 0:
             stop_value += in_oper.shape[dim_value]
@@ -1121,9 +1095,7 @@ class _NnapiSerializer:
             stop_value = in_oper.shape[dim_value]
 
         if start_value >= stop_value:
-            raise Exception(  # noqa: TRY002
-                "Slice start value should be less than stop value"
-            )  # noqa: TRY002
+            raise Exception("Slice start value should be less than stop value")
 
         out_len = (stop_value - start_value) // step_value
         out_shape = tuple(
@@ -1281,7 +1253,7 @@ class _NnapiSerializer:
 
         in_id, in_oper = self.get_tensor_operand_by_jitval_fixed_size(node.inputsAt(0))
         if in_oper.dim_order != DimOrder.CHANNELS_LAST:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "Most hardware backends prefer NHWC quantized tensors.  "
                 "Try setting `t.nnapi_nhwc = True` on your tensor inputs.  "
             )
@@ -1289,7 +1261,7 @@ class _NnapiSerializer:
         _, zero_point = self.get_constant_value(node.inputsAt(2), "IntType")
         _, scalar_type = self.get_constant_value(node.inputsAt(3), "IntType")
         if scalar_type != TorchScalarTypes.QUINT8.value:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "PyTorch NNAPI export only supports quantized tensors "
                 "with the quint8 dtype."
             )
@@ -1374,9 +1346,7 @@ class _NnapiSerializer:
                 node.inputsAt(0), in1_oper.dim_order
             )
         else:
-            raise Exception(  # noqa: TRY002
-                f"Can't do a NNAPI binary op: {opcode} on two constants"
-            )  # noqa: TRY002
+            raise Exception(f"Can't do a NNAPI binary op: {opcode} on two constants")
 
         assert in0_oper.op_type == in1_oper.op_type
         in0_id, in0_oper, in1_id, in1_oper = self.transpose_for_broadcast(
@@ -1420,9 +1390,7 @@ class _NnapiSerializer:
 
         _, alpha = self.get_constant_value(node.inputsAt(2), "IntType")
         if alpha != 1:
-            raise Exception(  # noqa: TRY002
-                "NNAPI does not support add/sub with alpha."
-            )  # noqa: TRY002
+            raise Exception("NNAPI does not support add/sub with alpha.")
 
         self._do_add_binary(node, opcode, fuse_code)
 
@@ -1472,9 +1440,7 @@ class _NnapiSerializer:
 
         opcode = op_map.get((min_val, max_val))
         if opcode is None:
-            raise Exception(  # noqa: TRY002
-                "NNAPI only supports hardtanh with args (-1, 1) or (0, 6)."
-            )  # noqa: TRY002
+            raise Exception("NNAPI only supports hardtanh with args (-1, 1) or (0, 6).")
 
         inputs = [None] * 1
         inputs[0] = in_id
@@ -1498,7 +1464,7 @@ class _NnapiSerializer:
         if w_oper.shape[0] > 1:
             if in_oper.use_nchw():
                 # TODO: Support this by adding trailing 1 dims.
-                raise Exception(  # noqa: TRY002
+                raise Exception(
                     "Per-channel PReLU only supports channels_last right now."
                 )
 
@@ -1507,9 +1473,7 @@ class _NnapiSerializer:
             if size > 0:
                 pass
             elif dim <= 1:
-                raise Exception(  # noqa: TRY002
-                    "PReLU requires fixed size for dim 0 and dim 1."
-                )  # noqa: TRY002
+                raise Exception("PReLU requires fixed size for dim 0 and dim 1.")
             else:
                 self.forward_operand_shape(out_id, dim, in_id, dim)
 
@@ -1525,7 +1489,7 @@ class _NnapiSerializer:
     def add_pool2d_node(self, node, opcode):
         assert node.inputsSize() == 6
         assert node.outputsSize() == 1
-        image, kernel, stride, padding, dilation, _ceil_mode = node.inputs()
+        image, kernel, stride, padding, dilation, ceil_mode = node.inputs()
 
         stride = stride or kernel
 
@@ -1535,7 +1499,7 @@ class _NnapiSerializer:
             self.get_size_arg(kernel), stride, padding, dilation
         )
         if args.dilation_h != 1 or args.dilation_w != 1:
-            raise Exception("NNAPI does not support dilated pooling.")  # noqa: TRY002
+            raise Exception("NNAPI does not support dilated pooling.")
 
         image_id, image_oper = self.get_tensor_operand_by_jitval_fixed_size(image)
         assert len(image_oper.shape) == 4
@@ -1573,7 +1537,7 @@ class _NnapiSerializer:
             kernel,
             stride,
             padding,
-            _ceil_mode,
+            ceil_mode,
             count_include_pad,
             divisor_override,
         ) = node.inputs()
@@ -1581,7 +1545,7 @@ class _NnapiSerializer:
         _, count_include_pad_value = self.get_constant_value(count_include_pad)
         _, divisor_override_value = self.get_constant_value(divisor_override)
         if not count_include_pad_value or divisor_override_value:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "NNAPI doesn't support count_include_pad=False or divisor_override"
             )
 
@@ -1632,7 +1596,7 @@ class _NnapiSerializer:
         assert size_ctype.kind() == "ListType"
         assert size_ctype.getElementType().kind() == "IntType"
         if size_arg != [1, 1]:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "NNAPI only supports adaptive_avg_pool2d with output size (1, 1)."
             )
 
@@ -1672,7 +1636,7 @@ class _NnapiSerializer:
             scale_ctype, scale_arg = self.get_constant_value(scale_jit)  # type: ignore[possibly-undefined]
         else:
             scale_h_ctype, scale_h_arg = self.get_constant_value(scale_h_jit)  # type: ignore[possibly-undefined]
-            scale_w_ctype, _scale_w_arg = self.get_constant_value(scale_w_jit)  # type: ignore[possibly-undefined]
+            scale_w_ctype, scale_w_arg = self.get_constant_value(scale_w_jit)  # type: ignore[possibly-undefined]
 
             # The only way for the 4-argument overload of upsample_nearest2d to
             # have been added to the graph without error is if the scale_h and
@@ -1687,7 +1651,7 @@ class _NnapiSerializer:
         assert len(image_oper.shape) == 4
 
         if size_ctype.kind() != "NoneType" and scale_ctype.kind() != "NoneType":
-            raise Exception("Size and scale cannot both be non-None.")  # noqa: TRY002
+            raise Exception("Size and scale cannot both be non-None.")
         elif size_ctype.kind() != "NoneType":
             assert size_ctype.kind() == "ListType"
             assert size_ctype.getElementType().kind() == "IntType"
@@ -1719,7 +1683,7 @@ class _NnapiSerializer:
             arg_h = self.add_immediate_float_scalar(scale_arg[0])
             arg_w = self.add_immediate_float_scalar(scale_arg[1])
         else:
-            raise Exception("Size and scale cannot both be None.")  # noqa: TRY002
+            raise Exception("Size and scale cannot both be None.")
 
         out_shape = (image_oper.shape[0], image_oper.shape[1], out_h, out_w)
         use_nchw = image_oper.use_nchw()
@@ -1728,7 +1692,7 @@ class _NnapiSerializer:
         )
 
         if image_oper.shape[0] == 0 or image_oper.shape[1] == 0:
-            raise Exception("Flexible batch or channels not supported")  # noqa: TRY002
+            raise Exception("Flexible batch or channels not supported")
 
         # Handle variable input size
         for dim in (2, 3):  # h, w indices
@@ -1742,9 +1706,7 @@ class _NnapiSerializer:
                         f"int({scale_arg[dim - 2]} * {flex_name(image_id, dim)})",
                     )
                 else:
-                    raise Exception(  # noqa: TRY002
-                        "Size and scale cannot both be None."
-                    )  # noqa: TRY002
+                    raise Exception("Size and scale cannot both be None.")
 
         inputs = [None] * 4
         inputs[0] = image_id
@@ -1766,7 +1728,7 @@ class _NnapiSerializer:
             scale_ctype, scale_value = self.get_constant_value(jitval)
             assert scale_ctype.kind() in ("IntType", "FloatType")
             if scale_value != 1:
-                raise Exception(  # noqa: TRY002
+                raise Exception(
                     "NNAPI Fully-Connected does not support alpha and beta."
                 )
 
@@ -1861,7 +1823,7 @@ class _NnapiSerializer:
         multiplier = input_oper.scale * weight_scale / out_scale
         assert multiplier > 0
         if multiplier >= 1:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "Quantized convolution multiplier is greater than 1.  "
                 "This is supported by NNAPI, but not by most hardware backends.  "
                 "Try training a model without quantization-aware training.  "
@@ -1891,7 +1853,7 @@ class _NnapiSerializer:
         self.add_operation(NNAPI_OperationCode.FULLY_CONNECTED, inputs, outputs)
 
     def get_optional_bias(self, jit_bias, weight_tensor, transpose=False):
-        ctype, _value = self.get_constant_value(jit_bias)
+        ctype, value = self.get_constant_value(jit_bias)
         if ctype.kind() == "NoneType":
             bias_idx = 1 if transpose else 0
             nnapi_bias_tensor = torch.zeros(
@@ -1918,7 +1880,7 @@ class _NnapiSerializer:
         ) = node.inputs()
 
         _, weight_tensor = self.get_constant_value(jit_weight, "TensorType")
-        bias_id, _bias_oper = self.get_optional_bias(jit_bias, weight_tensor)
+        bias_id, bias_oper = self.get_optional_bias(jit_bias, weight_tensor)
         args = self.get_conv_pool_args_2d_from_jit(
             weight_tensor.shape[2:4], jit_stride, jit_pad, jit_dilation, jit_groups
         )
@@ -1957,7 +1919,7 @@ class _NnapiSerializer:
 
         _, weight_tensor = self.get_constant_value(jit_weight, "TensorType")
         _, transpose = self.get_constant_value(jit_transpose)
-        bias_id, _bias_oper = self.get_optional_bias(jit_bias, weight_tensor, transpose)
+        bias_id, bias_oper = self.get_optional_bias(jit_bias, weight_tensor, transpose)
         args = self.get_conv_pool_args_2d_from_jit(
             weight_tensor.shape[2:4], jit_stride, jit_pad, jit_dilation, jit_groups
         )
@@ -1978,7 +1940,7 @@ class _NnapiSerializer:
         assert node.inputsSize() == 3
         assert node.outputsSize() == 1
 
-        jit_input, jit_dim, _jit_half_to_float = node.inputs()
+        (jit_input, jit_dim, jit_half_to_float) = node.inputs()
         input_id, input_oper = self.get_tensor_operand_by_jitval_fixed_size(jit_input)
         _, dim = self.get_constant_value(jit_dim, "IntType")
 
@@ -2043,7 +2005,7 @@ class _NnapiSerializer:
         multiplier = image_oper.scale * weight_scale / out_scale
         assert multiplier > 0
         if multiplier >= 1:
-            raise Exception(  # noqa: TRY002
+            raise Exception(
                 "Quantized convolution multiplier is greater than 1.  "
                 "This is supported by NNAPI, but not by most hardware backends.  "
                 "Try training a model without quantization-aware training.  "
@@ -2088,7 +2050,7 @@ class _NnapiSerializer:
             depthwise = True
             weight_permutation = (1, 2, 3, 0)
         else:
-            raise Exception("Group convolution not supported yet.")  # noqa: TRY002
+            raise Exception("Group convolution not supported yet.")
 
         # TODO: Transform at load time to share weights with CPU model.
         nnapi_weight_tensor = weight_tensor.permute(*weight_permutation).contiguous()
@@ -2106,9 +2068,7 @@ class _NnapiSerializer:
             assert approx_equal(image_oper.scale * weight_oper.scale, bias_oper.scale)
             assert bias_oper.zero_point == 0
         else:
-            raise Exception(  # noqa: TRY002
-                f"Unsupported input type for conv2d: {image_oper.op_type}"
-            )  # noqa: TRY002
+            raise Exception(f"Unsupported input type for conv2d: {image_oper.op_type}")
 
         assert len(image_oper.shape) == 4
         assert len(weight_oper.shape) == 4
@@ -2116,7 +2076,7 @@ class _NnapiSerializer:
 
         if depthwise:
             # Depthwise convolution
-            one, _kern_h, _kern_w, out_c = weight_oper.shape
+            one, kern_h, kern_w, out_c = weight_oper.shape
             assert one == 1
             assert out_c % in_c == 0
             channel_multiplier = out_c // in_c
@@ -2124,7 +2084,7 @@ class _NnapiSerializer:
             assert out_c == in_c
         else:
             # Full convolution
-            out_c, _kern_h, _kern_w, kern_d = weight_oper.shape
+            out_c, kern_h, kern_w, kern_d = weight_oper.shape
             assert kern_d == in_c
 
         assert out_c == bias_oper.shape[0]
@@ -2179,7 +2139,7 @@ class _NnapiSerializer:
         if batch == 0:
             self.forward_operand_shape(out_id, 0, image_id, 0)
         if in_ch == 0:
-            raise Exception("Input channels can't be flexible")  # noqa: TRY002
+            raise Exception("Input channels can't be flexible")
         # H & W
         if transpose:
             if in_h == 0:

@@ -5,8 +5,10 @@
 #include <torch/csrc/jit/backends/backend_interface.h>
 #include <torch/custom_class.h>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 namespace {
+// NOLINTNEXTLINE(clang-diagnostic-unneeded-internal-declaration)
 inline c10::FunctionSchema getIsAvailableSchema() {
   c10::Argument self("self", c10::AnyType::get());
   c10::Argument available("available", c10::BoolType::get());
@@ -20,6 +22,7 @@ inline c10::FunctionSchema getIsAvailableSchema() {
 
 constexpr static auto kBackendsNamespace = "__backends__";
 
+// NOLINTNEXTLINE(clang-diagnostic-unneeded-internal-declaration)
 inline c10::FunctionSchema getCompileSchema() {
   c10::Argument self("self", c10::AnyType::get());
   c10::Argument mod("processed", c10::AnyType::get());
@@ -36,6 +39,7 @@ inline c10::FunctionSchema getCompileSchema() {
   return compile_schema;
 }
 
+// NOLINTNEXTLINE(clang-diagnostic-unneeded-internal-declaration)
 inline c10::FunctionSchema getExecuteSchema() {
   auto any_list_ty = c10::ListType::create(c10::AnyType::get());
   c10::Argument self("self", c10::AnyType::get());
@@ -86,7 +90,7 @@ std::function<void(Stack&)> getExecuteFunc() {
 template <class TBackendInterface>
 class backend {
   static_assert(
-      std::is_base_of_v<PyTorchBackendInterface, TBackendInterface>,
+      std::is_base_of<PyTorchBackendInterface, TBackendInterface>::value,
       "torch::jit::backend<T> requires T to inherit from PyTorchBackendInterface");
   std::string backend_name_;
 
@@ -111,4 +115,5 @@ class backend {
   }
 };
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

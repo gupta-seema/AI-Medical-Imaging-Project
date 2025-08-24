@@ -1,13 +1,9 @@
-# mypy: allow-untyped-defs
-from typing import Optional, Union
+from numbers import Number
 
 import torch
-from torch import Tensor
 from torch.distributions import constraints
 from torch.distributions.exp_family import ExponentialFamily
 from torch.distributions.utils import broadcast_all
-from torch.types import _Number, _size
-
 
 __all__ = ["Exponential"]
 
@@ -26,35 +22,30 @@ class Exponential(ExponentialFamily):
     Args:
         rate (float or Tensor): rate = 1 / scale of the distribution
     """
-
     arg_constraints = {"rate": constraints.positive}
     support = constraints.nonnegative
     has_rsample = True
     _mean_carrier_measure = 0
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return self.rate.reciprocal()
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return torch.zeros_like(self.rate)
 
     @property
-    def stddev(self) -> Tensor:
+    def stddev(self):
         return self.rate.reciprocal()
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return self.rate.pow(-2)
 
-    def __init__(
-        self,
-        rate: Union[Tensor, float],
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, rate, validate_args=None):
         (self.rate,) = broadcast_all(rate)
-        batch_shape = torch.Size() if isinstance(rate, _Number) else self.rate.size()
+        batch_shape = torch.Size() if isinstance(rate, Number) else self.rate.size()
         super().__init__(batch_shape, validate_args=validate_args)
 
     def expand(self, batch_shape, _instance=None):
@@ -65,7 +56,7 @@ class Exponential(ExponentialFamily):
         new._validate_args = self._validate_args
         return new
 
-    def rsample(self, sample_shape: _size = torch.Size()) -> Tensor:
+    def rsample(self, sample_shape=torch.Size()):
         shape = self._extended_shape(sample_shape)
         return self.rate.new(shape).exponential_() / self.rate
 
@@ -86,7 +77,7 @@ class Exponential(ExponentialFamily):
         return 1.0 - torch.log(self.rate)
 
     @property
-    def _natural_params(self) -> tuple[Tensor]:
+    def _natural_params(self):
         return (-self.rate,)
 
     def _log_normalizer(self, x):

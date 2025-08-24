@@ -1,8 +1,7 @@
 import math
 import numbers
 import warnings
-from collections.abc import Sequence
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Sequence, Tuple, Union
 
 import PIL.Image
 import torch
@@ -48,7 +47,7 @@ class RandomErasing(_RandomApplyTransform):
 
     _v1_transform_cls = _transforms.RandomErasing
 
-    def _extract_params_for_v1_transform(self) -> dict[str, Any]:
+    def _extract_params_for_v1_transform(self) -> Dict[str, Any]:
         return dict(
             super()._extract_params_for_v1_transform(),
             value="random" if self.value is None else self.value,
@@ -57,8 +56,8 @@ class RandomErasing(_RandomApplyTransform):
     def __init__(
         self,
         p: float = 0.5,
-        scale: Sequence[float] = (0.02, 0.33),
-        ratio: Sequence[float] = (0.3, 3.3),
+        scale: Tuple[float, float] = (0.02, 0.33),
+        ratio: Tuple[float, float] = (0.3, 3.3),
         value: float = 0.0,
         inplace: bool = False,
     ):
@@ -67,9 +66,9 @@ class RandomErasing(_RandomApplyTransform):
             raise TypeError("Argument value should be either a number or str or a sequence")
         if isinstance(value, str) and value != "random":
             raise ValueError("If value is str, it should be 'random'")
-        if not isinstance(scale, Sequence):
+        if not isinstance(scale, (tuple, list)):
             raise TypeError("Scale should be a sequence")
-        if not isinstance(ratio, Sequence):
+        if not isinstance(ratio, (tuple, list)):
             raise TypeError("Ratio should be a sequence")
         if (scale[0] > scale[1]) or (ratio[0] > ratio[1]):
             warnings.warn("Scale and ratio should be of kind (min, max)")
@@ -90,17 +89,17 @@ class RandomErasing(_RandomApplyTransform):
         self._log_ratio = torch.log(torch.tensor(self.ratio))
 
     def _call_kernel(self, functional: Callable, inpt: Any, *args: Any, **kwargs: Any) -> Any:
-        if isinstance(inpt, (tv_tensors.BoundingBoxes, tv_tensors.KeyPoints, tv_tensors.Mask)):
+        if isinstance(inpt, (tv_tensors.BoundingBoxes, tv_tensors.Mask)):
             warnings.warn(
                 f"{type(self).__name__}() is currently passing through inputs of type "
                 f"tv_tensors.{type(inpt).__name__}. This will likely change in the future."
             )
         return super()._call_kernel(functional, inpt, *args, **kwargs)
 
-    def make_params(self, flat_inputs: list[Any]) -> dict[str, Any]:
+    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         img_c, img_h, img_w = query_chw(flat_inputs)
 
-        if self.value is not None and len(self.value) not in (1, img_c):
+        if self.value is not None and not (len(self.value) in (1, img_c)):
             raise ValueError(
                 f"If value is a sequence, it should have either a single value or {img_c} (number of inpt channels)"
             )
@@ -135,7 +134,7 @@ class RandomErasing(_RandomApplyTransform):
 
         return dict(i=i, j=j, h=h, w=w, v=v)
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         if params["v"] is not None:
             inpt = self._call_kernel(F.erase, inpt, **params, inplace=self.inplace)
 
@@ -143,7 +142,7 @@ class RandomErasing(_RandomApplyTransform):
 
 
 class _BaseMixUpCutMix(Transform):
-    def __init__(self, *, alpha: float = 1.0, num_classes: Optional[int] = None, labels_getter="default") -> None:
+    def __init__(self, *, alpha: float = 1.0, num_classes: int, labels_getter="default") -> None:
         super().__init__()
         self.alpha = float(alpha)
         self._dist = torch.distributions.Beta(torch.tensor([alpha]), torch.tensor([alpha]))
@@ -157,34 +156,21 @@ class _BaseMixUpCutMix(Transform):
         flat_inputs, spec = tree_flatten(inputs)
         needs_transform_list = self._needs_transform_list(flat_inputs)
 
-        if has_any(flat_inputs, PIL.Image.Image, tv_tensors.BoundingBoxes, tv_tensors.Mask, tv_tensors.KeyPoints):
-            raise ValueError(
-                f"{type(self).__name__}() does not support PIL images, bounding boxes, keypoints and masks."
-            )
+        if has_any(flat_inputs, PIL.Image.Image, tv_tensors.BoundingBoxes, tv_tensors.Mask):
+            raise ValueError(f"{type(self).__name__}() does not support PIL images, bounding boxes and masks.")
 
         labels = self._labels_getter(inputs)
         if not isinstance(labels, torch.Tensor):
             raise ValueError(f"The labels must be a tensor, but got {type(labels)} instead.")
-        if labels.ndim not in (1, 2):
+        elif labels.ndim != 1:
             raise ValueError(
-                f"labels should be index based with shape (batch_size,) "
-                f"or probability based with shape (batch_size, num_classes), "
-                f"but got a tensor of shape {labels.shape} instead."
+                f"labels tensor should be of shape (batch_size,) " f"but got shape {labels.shape} instead."
             )
-        if labels.ndim == 2 and self.num_classes is not None and labels.shape[-1] != self.num_classes:
-            raise ValueError(
-                f"When passing 2D labels, "
-                f"the number of elements in last dimension must match num_classes: "
-                f"{labels.shape[-1]} != {self.num_classes}. "
-                f"You can Leave num_classes to None."
-            )
-        if labels.ndim == 1 and self.num_classes is None:
-            raise ValueError("num_classes must be passed if the labels are index-based (1D)")
 
         params = {
             "labels": labels,
             "batch_size": labels.shape[0],
-            **self.make_params(
+            **self._get_params(
                 [inpt for (inpt, needs_transform) in zip(flat_inputs, needs_transform_list) if needs_transform]
             ),
         }
@@ -193,7 +179,7 @@ class _BaseMixUpCutMix(Transform):
         # after an image or video. However, we need to handle them in _transform, so we make sure to set them to True
         needs_transform_list[next(idx for idx, inpt in enumerate(flat_inputs) if inpt is labels)] = True
         flat_outputs = [
-            self.transform(inpt, params) if needs_transform else inpt
+            self._transform(inpt, params) if needs_transform else inpt
             for (inpt, needs_transform) in zip(flat_inputs, needs_transform_list)
         ]
 
@@ -212,8 +198,7 @@ class _BaseMixUpCutMix(Transform):
             )
 
     def _mixup_label(self, label: torch.Tensor, *, lam: float) -> torch.Tensor:
-        if label.ndim == 1:
-            label = one_hot(label, num_classes=self.num_classes)  # type: ignore[arg-type]
+        label = one_hot(label, num_classes=self.num_classes)
         if not label.dtype.is_floating_point:
             label = label.float()
         return label.roll(1, 0).mul_(1.0 - lam).add_(label.mul(lam))
@@ -238,18 +223,17 @@ class MixUp(_BaseMixUpCutMix):
 
     Args:
         alpha (float, optional): hyperparameter of the Beta distribution used for mixup. Default is 1.
-        num_classes (int, optional): number of classes in the batch. Used for one-hot-encoding.
-            Can be None only if the labels are already one-hot-encoded.
+        num_classes (int): number of classes in the batch. Used for one-hot-encoding.
         labels_getter (callable or "default", optional): indicates how to identify the labels in the input.
             By default, this will pick the second parameter as the labels if it's a tensor. This covers the most
             common scenario where this transform is called as ``MixUp()(imgs_batch, labels_batch)``.
             It can also be a callable that takes the same input as the transform, and returns the labels.
     """
 
-    def make_params(self, flat_inputs: list[Any]) -> dict[str, Any]:
+    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         return dict(lam=float(self._dist.sample(())))  # type: ignore[arg-type]
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         lam = params["lam"]
 
         if inpt is params["labels"]:
@@ -287,15 +271,14 @@ class CutMix(_BaseMixUpCutMix):
 
     Args:
         alpha (float, optional): hyperparameter of the Beta distribution used for mixup. Default is 1.
-        num_classes (int, optional): number of classes in the batch. Used for one-hot-encoding.
-            Can be None only if the labels are already one-hot-encoded.
+        num_classes (int): number of classes in the batch. Used for one-hot-encoding.
         labels_getter (callable or "default", optional): indicates how to identify the labels in the input.
             By default, this will pick the second parameter as the labels if it's a tensor. This covers the most
             common scenario where this transform is called as ``CutMix()(imgs_batch, labels_batch)``.
             It can also be a callable that takes the same input as the transform, and returns the labels.
     """
 
-    def make_params(self, flat_inputs: list[Any]) -> dict[str, Any]:
+    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         lam = float(self._dist.sample(()))  # type: ignore[arg-type]
 
         H, W = query_size(flat_inputs)
@@ -317,7 +300,7 @@ class CutMix(_BaseMixUpCutMix):
 
         return dict(box=box, lam_adjusted=lam_adjusted)
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         if inpt is params["labels"]:
             return self._mixup_label(inpt, lam=params["lam_adjusted"])
         elif isinstance(inpt, (tv_tensors.Image, tv_tensors.Video)) or is_pure_tensor(inpt):
@@ -355,8 +338,6 @@ class JPEG(Transform):
     def __init__(self, quality: Union[int, Sequence[int]]):
         super().__init__()
         if isinstance(quality, int):
-            if isinstance(quality, bool):
-                raise TypeError("quality can't be bool")
             quality = [quality, quality]
         else:
             _check_sequence_input(quality, "quality", req_sizes=(2,))
@@ -366,9 +347,9 @@ class JPEG(Transform):
 
         self.quality = quality
 
-    def make_params(self, flat_inputs: list[Any]) -> dict[str, Any]:
+    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         quality = torch.randint(self.quality[0], self.quality[1] + 1, ()).item()
         return dict(quality=quality)
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         return self._call_kernel(F.jpeg, inpt, quality=params["quality"])

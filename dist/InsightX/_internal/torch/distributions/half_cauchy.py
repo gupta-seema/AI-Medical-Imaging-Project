@@ -1,14 +1,11 @@
-# mypy: allow-untyped-defs
 import math
-from typing import Optional, Union
 
 import torch
-from torch import inf, Tensor
+from torch import inf
 from torch.distributions import constraints
 from torch.distributions.cauchy import Cauchy
 from torch.distributions.transformed_distribution import TransformedDistribution
 from torch.distributions.transforms import AbsTransform
-
 
 __all__ = ["HalfCauchy"]
 
@@ -30,17 +27,11 @@ class HalfCauchy(TransformedDistribution):
     Args:
         scale (float or Tensor): scale of the full Cauchy distribution
     """
-
     arg_constraints = {"scale": constraints.positive}
     support = constraints.nonnegative
     has_rsample = True
-    base_dist: Cauchy
 
-    def __init__(
-        self,
-        scale: Union[Tensor, float],
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, scale, validate_args=None):
         base_dist = Cauchy(0, scale, validate_args=False)
         super().__init__(base_dist, AbsTransform(), validate_args=validate_args)
 
@@ -49,11 +40,11 @@ class HalfCauchy(TransformedDistribution):
         return super().expand(batch_shape, _instance=new)
 
     @property
-    def scale(self) -> Tensor:
+    def scale(self):
         return self.base_dist.scale
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return torch.full(
             self._extended_shape(),
             math.inf,
@@ -62,11 +53,11 @@ class HalfCauchy(TransformedDistribution):
         )
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return torch.zeros_like(self.scale)
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return self.base_dist.variance
 
     def log_prob(self, value):

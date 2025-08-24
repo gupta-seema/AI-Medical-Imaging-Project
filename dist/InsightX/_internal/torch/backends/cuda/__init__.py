@@ -1,10 +1,9 @@
-# mypy: allow-untyped-defs
 import contextlib
+import warnings
+
 from typing import Union
-from typing_extensions import deprecated
 
 import torch
-
 
 __all__ = [
     "is_built",
@@ -13,10 +12,9 @@ __all__ = [
     "cuFFTPlanCacheManager",
     "cuBLASModule",
     "preferred_linalg_library",
-    "preferred_blas_library",
-    "preferred_rocm_fa_library",
     "cufft_plan_cache",
     "matmul",
+    "SDPBackend",
     "SDPAParams",
     "enable_cudnn_sdp",
     "cudnn_sdp_enabled",
@@ -26,12 +24,8 @@ __all__ = [
     "mem_efficient_sdp_enabled",
     "math_sdp_enabled",
     "enable_math_sdp",
-    "allow_fp16_bf16_reduction_math_sdp",
-    "fp16_bf16_reduction_math_sdp_allowed",
-    "is_flash_attention_available",
     "can_use_flash_attention",
     "can_use_efficient_attention",
-    "can_use_cudnn_attention",
     "sdp_kernel",
 ]
 
@@ -133,8 +127,6 @@ class cuBLASModule:
             return torch._C._get_cublas_allow_fp16_reduced_precision_reduction()
         elif name == "allow_bf16_reduced_precision_reduction":
             return torch._C._get_cublas_allow_bf16_reduced_precision_reduction()
-        elif name == "allow_fp16_accumulation":
-            return torch._C._get_cublas_allow_fp16_accumulation()
         raise AttributeError("Unknown attribute " + name)
 
     def __setattr__(self, name, value):
@@ -144,8 +136,6 @@ class cuBLASModule:
             return torch._C._set_cublas_allow_fp16_reduced_precision_reduction(value)
         elif name == "allow_bf16_reduced_precision_reduction":
             return torch._C._set_cublas_allow_bf16_reduced_precision_reduction(value)
-        elif name == "allow_fp16_accumulation":
-            return torch._C._set_cublas_allow_fp16_accumulation(value)
         raise AttributeError("Unknown attribute " + name)
 
 
@@ -217,111 +207,7 @@ def preferred_linalg_library(
     return torch._C._get_linalg_preferred_backend()
 
 
-_BlasBackends = {
-    "default": torch._C._BlasBackend.Default,
-    "cublas": torch._C._BlasBackend.Cublas,
-    "hipblas": torch._C._BlasBackend.Cublas,  # alias
-    "cublaslt": torch._C._BlasBackend.Cublaslt,
-    "hipblaslt": torch._C._BlasBackend.Cublaslt,  # alias
-    "ck": torch._C._BlasBackend.Ck,
-}
-_BlasBackends_str = ", ".join(_BlasBackends.keys())
-
-
-def preferred_blas_library(
-    backend: Union[None, str, torch._C._BlasBackend] = None
-) -> torch._C._BlasBackend:
-    r"""
-    Override the library PyTorch uses for BLAS operations. Choose between cuBLAS, cuBLASLt, and CK [ROCm-only].
-
-    .. warning:: This flag is experimental and subject to change.
-
-    When PyTorch runs a CUDA BLAS operation it defaults to cuBLAS even if both cuBLAS and cuBLASLt are available.
-    For PyTorch built for ROCm, hipBLAS, hipBLASLt, and CK may offer different performance.
-    This flag (a :class:`str`) allows overriding which BLAS library to use.
-
-    * If `"cublas"` is set then cuBLAS will be used wherever possible.
-    * If `"cublaslt"` is set then cuBLASLt will be used wherever possible.
-    * If `"ck"` is set then CK will be used wherever possible.
-    * If `"default"` (the default) is set then heuristics will be used to pick between the other options.
-    * When no input is given, this function returns the currently preferred library.
-    * User may use the environment variable TORCH_BLAS_PREFER_CUBLASLT=1 to set the preferred library to cuBLASLt
-      globally.
-      This flag only sets the initial value of the preferred library and the preferred library
-      may still be overridden by this function call later in your script.
-
-    Note: When a library is preferred other libraries may still be used if the preferred library
-    doesn't implement the operation(s) called.
-    This flag may achieve better performance if PyTorch's library selection is incorrect
-    for your application's inputs.
-
-    """
-    if backend is None:
-        pass
-    elif isinstance(backend, str):
-        if backend not in _BlasBackends:
-            raise RuntimeError(
-                "Unknown input value. " f"Choose from: {_BlasBackends_str}."
-            )
-        torch._C._set_blas_preferred_backend(_BlasBackends[backend])
-    elif isinstance(backend, torch._C._BlasBackend):
-        torch._C._set_blas_preferred_backend(backend)
-    else:
-        raise RuntimeError("Unknown input value type.")
-
-    return torch._C._get_blas_preferred_backend()
-
-
-_ROCmFABackends = {
-    "default": torch._C._ROCmFABackend.Default,
-    "aotriton": torch._C._ROCmFABackend.AOTriton,
-    "ck": torch._C._ROCmFABackend.Ck,
-}
-_ROCmFABackends_str = ", ".join(_ROCmFABackends.keys())
-
-
 from torch._C import _SDPAParams as SDPAParams, _SDPBackend as SDPBackend
-
-
-def preferred_rocm_fa_library(
-    backend: Union[None, str, torch._C._ROCmFABackend] = None
-) -> torch._C._ROCmFABackend:
-    r"""
-    [ROCm-only]
-    Override the backend PyTorch uses in ROCm environments for Flash Attention. Choose between AOTriton and CK
-
-    .. warning:: This flag is experimeental and subject to change.
-
-    When Flash Attention is enabled and desired, PyTorch defaults to using AOTriton as the backend.
-    This flag (a :class:`str`) allows users to override this backend to use composable_kernel
-
-    * If `"default"` is set then the default backend will be used wherever possible. Currently AOTriton.
-    * If `"aotriton"` is set then AOTriton will be used wherever possible.
-    * If `"ck"` is set then CK will be used wherever possible.
-    * When no input is given, this function returns the currently preferred library.
-    * User may use the environment variable TORCH_ROCM_FA_PREFER_CK=1 to set the preferred library to CK
-      globally.
-
-    Note: When a library is preferred other libraries may still be used if the preferred library
-    doesn't implement the operation(s) called.
-    This flag may achieve better performance if PyTorch's library selection is incorrect
-    for your application's inputs.
-    """
-    if backend is None:
-        pass
-    elif isinstance(backend, str):
-        if backend not in _ROCmFABackends:
-            raise RuntimeError(
-                "Unknown input value. " f"Choose from: {_ROCmFABackends_str}."
-            )
-        torch._C._set_rocm_fa_preferred_backend(_ROCmFABackends[backend])
-    elif isinstance(backend, torch._C._ROCmFABackend):
-        torch._C._set_rocm_fa_preferred_backend(backend)
-    else:
-        raise ValueError("Unknown input value. " f"Choose from: {_ROCmFABackends_str}.")
-
-    return torch._C._get_rocm_fa_preferred_backend()
-
 
 # Set the __module__ attribute
 SDPAParams.__module__ = "torch.backends.cuda"
@@ -382,37 +268,6 @@ def enable_math_sdp(enabled: bool):
     torch._C._set_sdp_use_math(enabled)
 
 
-def allow_fp16_bf16_reduction_math_sdp(enabled: bool):
-    r"""
-    .. warning:: This flag is beta and subject to change.
-
-    Enables or disables fp16/bf16 reduction in math scaled dot product attention.
-    """
-    torch._C._set_math_sdp_allow_fp16_bf16_reduction(enabled)
-
-
-def fp16_bf16_reduction_math_sdp_allowed():
-    r"""
-    .. warning:: This flag is beta and subject to change.
-
-    Returns whether fp16/bf16 reduction in math scaled dot product attention is enabled or not.
-    """
-    return torch._C._get_math_sdp_allow_fp16_bf16_reduction()
-
-
-def is_flash_attention_available() -> bool:
-    r"""Check if PyTorch was built with FlashAttention for scaled_dot_product_attention.
-
-    Returns:
-        True if FlashAttention is built and available; otherwise, False.
-
-    Note:
-        This function is dependent on a CUDA-enabled build of PyTorch. It will return False
-        in non-CUDA environments.
-    """
-    return torch._C._is_flash_attention_available()
-
-
 def can_use_flash_attention(params: SDPAParams, debug: bool = False) -> bool:
     r"""Check if FlashAttention can be utilized in scaled_dot_product_attention.
 
@@ -453,26 +308,6 @@ def can_use_efficient_attention(params: SDPAParams, debug: bool = False) -> bool
     return torch._C._can_use_mem_efficient_attention(params, debug)
 
 
-def can_use_cudnn_attention(params: SDPAParams, debug: bool = False) -> bool:
-    r"""Check if cudnn_attention can be utilized in scaled_dot_product_attention.
-
-    Args:
-        params: An instance of SDPAParams containing the tensors for query,
-                key, value, an optional attention mask, dropout rate, and
-                a flag indicating if the attention is causal.
-        debug: Whether to logging.warn with information as to why cuDNN attention could not be run.
-            Defaults to False.
-
-    Returns:
-        True if cuDNN can be used with the given parameters; otherwise, False.
-
-    Note:
-        This function is dependent on a CUDA-enabled build of PyTorch. It will return False
-        in non-CUDA environments.
-    """
-    return torch._C._can_use_cudnn_attention(params, debug)
-
-
 def cudnn_sdp_enabled():
     r"""
     .. warning:: This flag is beta and subject to change.
@@ -492,15 +327,6 @@ def enable_cudnn_sdp(enabled: bool):
 
 
 @contextlib.contextmanager
-@deprecated(
-    (
-        "`torch.backends.cuda.sdp_kernel()` is deprecated. "
-        "In the future, this context manager will be removed. "
-        "Please see `torch.nn.attention.sdpa_kernel()` for the new context manager, "
-        "with updated signature."
-    ),
-    category=FutureWarning,
-)
 def sdp_kernel(
     enable_flash: bool = True,
     enable_math: bool = True,
@@ -513,7 +339,16 @@ def sdp_kernel(
     This context manager can be used to temporarily enable or disable any of the three backends for scaled dot product attention.
     Upon exiting the context manager, the previous state of the flags will be restored.
     """
-    from torch.nn.attention import sdpa_kernel
+    warnings.warn(
+        (
+            "torch.backends.cuda.sdp_kernel() "
+            "is deprecated. In the future, this context manager will be removed. "
+            "Please see, torch.nn.attention.sdpa_kernel() for the new context manager, with updated "
+            "signature."
+        ),
+        FutureWarning,
+    )
+    from torch.nn.attention import sdpa_kernel, SDPBackend
 
     backend_list = []
     if enable_flash:

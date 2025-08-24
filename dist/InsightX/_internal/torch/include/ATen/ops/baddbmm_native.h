@@ -6,7 +6,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
+#include <c10/util/Optional.h>
 #include <c10/core/QScheme.h>
 #include <ATen/core/Reduction.h>
 #include <ATen/core/Tensor.h>
@@ -23,7 +23,5 @@ struct TORCH_API structured_baddbmm_out_cuda : public at::meta::structured_baddb
 void impl(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, const at::Scalar & beta, const at::Scalar & alpha, const at::Tensor & out);
 };
 TORCH_API at::Tensor & baddbmm_out_sparse_csr_cuda(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, const at::Scalar & beta, const at::Scalar & alpha, at::Tensor & out);
-TORCH_API at::Tensor _baddbmm_dtype_cuda(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::ScalarType out_dtype, const at::Scalar & beta=1, const at::Scalar & alpha=1);
-TORCH_API at::Tensor & _baddbmm_out_dtype_cuda(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::ScalarType out_dtype, const at::Scalar & beta, const at::Scalar & alpha, at::Tensor & out);
 } // namespace native
 } // namespace at

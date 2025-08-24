@@ -1,10 +1,10 @@
 import os.path
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Optional, Tuple, Union
 
 import numpy as np
+from PIL import Image
 
-from ..utils import _Image_fromarray
 from .utils import check_integrity, download_url
 from .vision import VisionDataset
 
@@ -24,7 +24,6 @@ class SEMEION(VisionDataset):
             downloaded again.
 
     """
-
     url = "http://archive.ics.uci.edu/ml/machine-learning-databases/semeion/semeion.data"
     filename = "semeion.data"
     md5_checksum = "cb545d371d2ce14ec121470795a77432"
@@ -52,7 +51,7 @@ class SEMEION(VisionDataset):
         self.data = np.reshape(self.data, (-1, 16, 16))
         self.labels = np.nonzero(data[:, 256:])[1]
 
-    def __getitem__(self, index: int) -> tuple[Any, Any]:
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
         Args:
             index (int): Index
@@ -64,7 +63,7 @@ class SEMEION(VisionDataset):
 
         # doing this so that it is consistent with all other datasets
         # to return a PIL Image
-        img = _Image_fromarray(img, mode="L")
+        img = Image.fromarray(img, mode="L")
 
         if self.transform is not None:
             img = self.transform(img)
@@ -86,6 +85,7 @@ class SEMEION(VisionDataset):
 
     def download(self) -> None:
         if self._check_integrity():
+            print("Files already downloaded and verified")
             return
 
         root = self.root

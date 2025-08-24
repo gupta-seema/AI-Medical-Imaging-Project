@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline const at::Tensor & _resize_output_(const at::Tensor & self, at::IntArrayR
     return at::_ops::_resize_output_::call(self, c10::fromIntArrayRefSlow(size), device);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   const at::Tensor & _resize_output_(const at::Tensor & self, at::IntArrayRef size, at::Device device) {
     return at::_ops::_resize_output_::call(self, c10::fromIntArrayRefSlow(size), device);
   }
@@ -39,7 +38,7 @@ inline const at::Tensor & _resize_output__symint(const at::Tensor & self, c10::S
     return at::_ops::_resize_output_::call(self, size, device);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   const at::Tensor & _resize_output_(const at::Tensor & self, c10::SymIntArrayRef size, at::Device device) {
     return at::_ops::_resize_output_::call(self, size, device);
   }
@@ -50,7 +49,7 @@ inline const at::Tensor & _resize_output_out(const at::Tensor & out, const at::T
     return at::_ops::_resize_output_out::call(self, c10::fromIntArrayRefSlow(size), device, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   const at::Tensor & _resize_output_out(const at::Tensor & out, const at::Tensor & self, at::IntArrayRef size, at::Device device) {
     return at::_ops::_resize_output_out::call(self, c10::fromIntArrayRefSlow(size), device, out);
   }
@@ -61,7 +60,7 @@ inline const at::Tensor & _resize_output_outf(const at::Tensor & self, at::IntAr
     return at::_ops::_resize_output_out::call(self, c10::fromIntArrayRefSlow(size), device, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   const at::Tensor & _resize_output_outf(const at::Tensor & self, at::IntArrayRef size, at::Device device, const at::Tensor & out) {
     return at::_ops::_resize_output_out::call(self, c10::fromIntArrayRefSlow(size), device, out);
   }
@@ -72,7 +71,7 @@ inline const at::Tensor & _resize_output_symint_out(const at::Tensor & out, cons
     return at::_ops::_resize_output_out::call(self, size, device, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   const at::Tensor & _resize_output_out(const at::Tensor & out, const at::Tensor & self, c10::SymIntArrayRef size, at::Device device) {
     return at::_ops::_resize_output_out::call(self, size, device, out);
   }
@@ -83,7 +82,7 @@ inline const at::Tensor & _resize_output_symint_outf(const at::Tensor & self, c1
     return at::_ops::_resize_output_out::call(self, size, device, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   const at::Tensor & _resize_output_outf(const at::Tensor & self, c10::SymIntArrayRef size, at::Device device, const at::Tensor & out) {
     return at::_ops::_resize_output_out::call(self, size, device, out);
   }
@@ -94,7 +93,7 @@ inline at::Tensor _resize_output(const at::Tensor & self, at::IntArrayRef size, 
     return at::_ops::_resize_output::call(self, c10::fromIntArrayRefSlow(size), device);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor _resize_output(const at::Tensor & self, at::IntArrayRef size, at::Device device) {
     return at::_ops::_resize_output::call(self, c10::fromIntArrayRefSlow(size), device);
   }
@@ -105,7 +104,7 @@ inline at::Tensor _resize_output_symint(const at::Tensor & self, c10::SymIntArra
     return at::_ops::_resize_output::call(self, size, device);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor _resize_output(const at::Tensor & self, c10::SymIntArrayRef size, at::Device device) {
     return at::_ops::_resize_output::call(self, size, device);
   }

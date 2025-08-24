@@ -45,7 +45,6 @@ namespace c10 {
   _(VE, extra)                                  \
   _(Lazy, extra)                                \
   _(MTIA, extra)                                \
-  _(MAIA, extra)                                \
   _(PrivateUse1, extra)                         \
   _(PrivateUse2, extra)                         \
   _(PrivateUse3, extra)                         \
@@ -140,10 +139,10 @@ enum class DispatchKey : uint16_t {
   // element we can return for cases when a DispatchKeySet contains no elements.
   // You can think a more semantically accurate definition of DispatchKey is:
   //
-  //    using DispatchKey = std::optional<RealDispatchKey>
+  //    using DispatchKey = optional<RealDispatchKey>
   //
   // and Undefined == nullopt.  We didn't actually represent
-  // it this way because std::optional<RealDispatchKey> would take two
+  // it this way because optional<RealDispatchKey> would take two
   // words, when DispatchKey fits in eight bits.
 
   Undefined = 0,
@@ -180,6 +179,15 @@ enum class DispatchKey : uint16_t {
   // TODO: put this in BackendComponents
   FPGA, // Xilinx support lives out of tree at
   // https://gitlab.com/pytorch-complex/vitis_kernels
+
+  // TODO: put this in BackendComponents
+  // ONNX Runtime, lives out of tree at https://github.com/pytorch/ort and
+  // https://github.com/microsoft/onnxruntime, and is also used to test general
+  // backend/extension machinery in the core. cf:
+  // - test/cpp_extensions/ort_extension.cpp
+  // - test/test_torch.py
+  // - aten/src/ATen/test/extension_backend_test.cpp
+  ORT,
 
   Vulkan, // TODO: put this in BackendComponents
   Metal, // TODO: put this in BackendComponents
@@ -347,15 +355,12 @@ enum class DispatchKey : uint16_t {
   // Autocasting precedes VariableTypeId, to ensure casts are autograd-exposed
   // and inputs are saved for backward in the post-autocast type.
   AutocastCPU,
-  AutocastMTIA,
-  AutocastMAIA,
   AutocastXPU,
   AutocastIPU,
   AutocastHPU,
   AutocastXLA,
   // AutocastXLA is only being used for TPUs. XLA GPUs continue to use
   // AutocastCUDA.
-  AutocastMPS,
   AutocastCUDA,
   AutocastPrivateUse1,
 

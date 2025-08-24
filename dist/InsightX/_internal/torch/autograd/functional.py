@@ -1,10 +1,8 @@
-# mypy: allow-untyped-defs
+from typing import List, Tuple
 
 import torch
 from torch._vmap_internals import _vmap
-
 from . import forward_ad as fwAD
-
 
 __all__ = ["vjp", "jvp", "jacobian", "hessian", "hvp", "vhp"]
 
@@ -180,8 +178,8 @@ def _autograd_grad(
     assert isinstance(grad_outputs, tuple)
     assert len(outputs) == len(grad_outputs)
 
-    new_outputs: tuple[torch.Tensor, ...] = ()
-    new_grad_outputs: tuple[torch.Tensor, ...] = ()
+    new_outputs: Tuple[torch.Tensor, ...] = tuple()
+    new_grad_outputs: Tuple[torch.Tensor, ...] = tuple()
     for out, grad_out in zip(outputs, grad_outputs):
         if out is not None and out.requires_grad:
             new_outputs += (out,)
@@ -210,7 +208,7 @@ def _fill_in_zeros(grads, refs, strict, create_graph, stage):
     if stage not in ["back", "back_trick", "double_back", "double_back_trick"]:
         raise RuntimeError(f"Invalid stage argument '{stage}' to _fill_in_zeros")
 
-    res: tuple[torch.Tensor, ...] = ()
+    res: Tuple[torch.Tensor, ...] = tuple()
     for i, grads_i in enumerate(grads):
         if grads_i is None:
             if strict:
@@ -469,8 +467,8 @@ def jvp(func, inputs, v=None, create_graph=False, strict=False):
 
 
 def _construct_standard_basis_for(
-    tensors: tuple[torch.Tensor, ...], tensor_numels: tuple[int, ...]
-) -> tuple[torch.Tensor, ...]:
+    tensors: Tuple[torch.Tensor, ...], tensor_numels: Tuple[int, ...]
+) -> Tuple[torch.Tensor, ...]:
     # This function:
     # - constructs a N=sum(tensor_numels) standard basis. i.e. an NxN identity matrix.
     # - Splits the identity matrix into chunks with each chunk size determined by `tensor_numels`.
@@ -653,16 +651,6 @@ def jacobian(
                 [0.0000, 3.3963]]),
          tensor([[3., 0.],
                  [0., 3.]]))
-
-        >>> def linear_model(x):
-        ...     W = torch.tensor([[2.0, -1.0], [0.0, 1.0]])
-        ...     b = torch.tensor([1.0, 0.5])
-        ...     return x @ W.T + b
-
-        >>> x = torch.randn(4, 2, requires_grad=True)
-        >>> jac = jacobian(linear_model, x, vectorize=True)
-        >>> jac.shape
-        torch.Size([4, 2, 4, 2])
     """
     assert strategy in ("forward-mode", "reverse-mode"), (
         'Expected strategy to be either "forward-mode" or "reverse-mode". Hint: If your '
@@ -789,11 +777,11 @@ def jacobian(
                 jacobian_output_input, (is_outputs_tuple, is_inputs_tuple)
             )
 
-        jacobian: tuple[torch.Tensor, ...] = ()
+        jacobian: Tuple[torch.Tensor, ...] = tuple()
 
         for i, out in enumerate(outputs):
             # mypy complains that expression and variable have different types due to the empty list
-            jac_i: tuple[list[torch.Tensor]] = tuple([] for _ in range(len(inputs)))  # type: ignore[assignment]
+            jac_i: Tuple[List[torch.Tensor]] = tuple([] for _ in range(len(inputs)))  # type: ignore[assignment]
             for j in range(out.nelement()):
                 vj = _autograd_grad(
                     (out.reshape(-1)[j],),

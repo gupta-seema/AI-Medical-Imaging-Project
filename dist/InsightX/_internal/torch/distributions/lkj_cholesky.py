@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 """
 This closely follows the implementation in NumPyro (https://github.com/pyro-ppl/numpyro).
 
@@ -9,14 +8,11 @@ Original copyright notice:
 """
 
 import math
-from typing import Optional, Union
 
 import torch
-from torch import Tensor
 from torch.distributions import Beta, constraints
 from torch.distributions.distribution import Distribution
 from torch.distributions.utils import broadcast_all
-
 
 __all__ = ["LKJCholesky"]
 
@@ -59,16 +55,10 @@ class LKJCholesky(Distribution):
     Daniel Lewandowski, Dorota Kurowicka, Harry Joe.
     Journal of Multivariate Analysis. 100. 10.1016/j.jmva.2009.04.008
     """
-
     arg_constraints = {"concentration": constraints.positive}
     support = constraints.corr_cholesky
 
-    def __init__(
-        self,
-        dim: int,
-        concentration: Union[Tensor, float] = 1.0,
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, dim, concentration=1.0, validate_args=None):
         if dim < 2:
             raise ValueError(
                 f"Expected dim to be an integer greater than or equal to 2. Found dim={dim}."

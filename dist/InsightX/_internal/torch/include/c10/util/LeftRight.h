@@ -1,5 +1,3 @@
-#pragma once
-
 #include <c10/macros/Macros.h>
 #include <c10/util/Synchronized.h>
 #include <array>
@@ -20,8 +18,6 @@ struct IncrementRAII final {
   ~IncrementRAII() {
     _counter->fetch_sub(1);
   }
-  IncrementRAII(IncrementRAII&&) = delete;
-  IncrementRAII& operator=(IncrementRAII&&) = delete;
 
  private:
   std::atomic<int32_t>* _counter;
@@ -59,7 +55,8 @@ class LeftRight final {
       : _counters{{{0}, {0}}},
         _foregroundCounterIndex(0),
         _foregroundDataIndex(0),
-        _data{{T{args...}, T{args...}}} {}
+        _data{{T{args...}, T{args...}}},
+        _writeMutex() {}
 
   // Copying and moving would not be threadsafe.
   // Needs more thought and careful design to make that work.
@@ -70,9 +67,7 @@ class LeftRight final {
 
   ~LeftRight() {
     // wait until any potentially running writers are finished
-    {
-      std::unique_lock<std::mutex> lock(_writeMutex);
-    }
+    { std::unique_lock<std::mutex> lock(_writeMutex); }
 
     // wait until any potentially running readers are finished
     while (_counters[0].load() != 0 || _counters[1].load() != 0) {
@@ -206,7 +201,6 @@ class RWSafeLeftRightWrapper final {
   RWSafeLeftRightWrapper(RWSafeLeftRightWrapper&&) noexcept = delete;
   RWSafeLeftRightWrapper& operator=(const RWSafeLeftRightWrapper&) = delete;
   RWSafeLeftRightWrapper& operator=(RWSafeLeftRightWrapper&&) noexcept = delete;
-  ~RWSafeLeftRightWrapper() = default;
 
   template <typename F>
   // NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward)

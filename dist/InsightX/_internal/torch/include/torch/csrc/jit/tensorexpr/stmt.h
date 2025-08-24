@@ -8,8 +8,9 @@
 #include <vector>
 
 #include <torch/csrc/jit/tensorexpr/expr.h>
-
-namespace torch::jit::tensorexpr {
+namespace torch {
+namespace jit {
+namespace tensorexpr {
 
 // The common base between all statement node.
 class TORCH_API Stmt : public std::enable_shared_from_this<Stmt> {
@@ -30,10 +31,10 @@ class TORCH_API Stmt : public std::enable_shared_from_this<Stmt> {
    * cloned. Note that the variables are not deep-copied since they are
    * immutable.
    */
-  static StmtPtr clone(const StmtPtr& s);
+  static StmtPtr clone(StmtPtr s);
 
  protected:
-  static void set_parent(const StmtPtr& s, Stmt* new_parent) {
+  static void set_parent(StmtPtr s, Stmt* new_parent) {
     s->parent_ = new_parent;
   }
   std::shared_ptr<Stmt> getptr() {
@@ -52,9 +53,6 @@ class StmtNode : public Stmt {
     visitor->visit(static_to<Op>(getptr()));
   }
   StmtPtr accept_mutator(IRMutator* mutator) override;
-  friend Op;
-
- private:
   StmtNode() = default;
 };
 
@@ -67,6 +65,7 @@ StmtPtr StmtNode<Op>::accept_mutator(IRMutator* mutator) {
 class TORCH_API Block : public StmtNode<Block> {
  public:
   static BlockPtr make(const std::vector<StmtPtr>& stmts) {
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::vector<StmtPtr> valid_stmts;
     for (auto& stmt : stmts) {
       if (!stmt) {
@@ -80,66 +79,70 @@ class TORCH_API Block : public StmtNode<Block> {
     return alloc<Block>(valid_stmts);
   }
 
-  size_t nstmts() const {
+  int nstmts() const {
     return stmts_.size();
   }
   bool empty() const {
     return stmts_.empty();
   }
 
-  void prepend_stmt(const StmtPtr& s) {
+  void prepend_stmt(StmtPtr s) {
     if (s->get_parent()) {
-      throw malformed_input("Block prepend Stmt with existing parent", s);
+      throw malformed_input(
+          "Block prepend Stmt with existing parent", std::move(s));
     }
 
     stmts_.push_front(s);
-    set_parent(s, this);
+    set_parent(std::move(s), this);
   }
-  void append_stmt(const StmtPtr& s) {
+  void append_stmt(StmtPtr s) {
     if (s->get_parent()) {
-      throw malformed_input("Block append Stmt with existing parent", s);
+      throw malformed_input(
+          "Block append Stmt with existing parent", std::move(s));
     }
 
     stmts_.push_back(s);
-    set_parent(s, this);
+    set_parent(std::move(s), this);
   }
 
-  void insert_stmt_before(const StmtPtr& s, const StmtPtr& before) {
+  void insert_stmt_before(StmtPtr s, StmtPtr before) {
     if (s->get_parent()) {
-      throw malformed_input("Block append Stmt with existing parent", s);
+      throw malformed_input(
+          "Block append Stmt with existing parent", std::move(s));
     }
 
     auto pos = std::find(stmts_.begin(), stmts_.end(), before);
     if (pos == stmts_.end()) {
       throw malformed_input(
-          "Inserting after statement that is not in block", s);
+          "Inserting after statement that is not in block", std::move(s));
     }
 
     stmts_.insert(pos, s);
-    set_parent(s, this);
+    set_parent(std::move(s), this);
   }
 
-  void insert_stmt_after(const StmtPtr& s, const StmtPtr& after) {
+  void insert_stmt_after(StmtPtr s, StmtPtr after) {
     if (s->get_parent()) {
-      throw malformed_input("Block append Stmt with existing parent", s);
+      throw malformed_input(
+          "Block append Stmt with existing parent", std::move(s));
     }
 
     auto pos = std::find(stmts_.begin(), stmts_.end(), after);
     if (pos == stmts_.end()) {
       throw malformed_input(
-          "Inserting after statement that is not in block", s);
+          "Inserting after statement that is not in block", std::move(s));
     }
 
     ++pos;
 
     stmts_.insert(pos, s);
-    set_parent(s, this);
+    set_parent(std::move(s), this);
   }
 
-  bool replace_stmt(const StmtPtr& old_stmt, const StmtPtr& new_stmt) {
+  bool replace_stmt(StmtPtr old_stmt, StmtPtr new_stmt) {
     if (new_stmt->get_parent()) {
       throw malformed_input(
-          "Block replace Stmt with existing parent", new_stmt);
+          "Block replace Stmt with existing parent", std::move(new_stmt));
     }
 
     auto pos = std::find(stmts_.begin(), stmts_.end(), old_stmt);
@@ -148,21 +151,23 @@ class TORCH_API Block : public StmtNode<Block> {
     }
     stmts_.insert(pos, new_stmt);
     stmts_.erase(pos);
-    set_parent(old_stmt, nullptr);
-    set_parent(new_stmt, this);
+    set_parent(std::move(old_stmt), nullptr);
+    set_parent(std::move(new_stmt), this);
     return true;
   }
 
   // Creates a new block by cloning `this` block and replacing the given
   // statement with a new statement. Note that `old_stmt` refers to a statement
   // in `this` block. If the `old_stmt` is not found, it will return `nullptr`.
-  BlockPtr clone_and_replace(const StmtPtr& old_stmt, const StmtPtr& new_stmt) {
+  BlockPtr clone_and_replace(StmtPtr old_stmt, StmtPtr new_stmt) {
     if (new_stmt->get_parent()) {
       throw malformed_input(
-          "Block replace Stmt with existing parent", new_stmt);
+          "Block replace Stmt with existing parent", std::move(new_stmt));
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::vector<StmtPtr> stmts(stmts_.begin(), stmts_.end());
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::vector<StmtPtr> cloned_stmts(stmts.size());
     bool found = false;
     for (int i = 0; i < static_cast<int>(stmts.size()); ++i) {
@@ -179,13 +184,13 @@ class TORCH_API Block : public StmtNode<Block> {
     return alloc<Block>(cloned_stmts);
   }
 
-  bool remove_stmt(const StmtPtr& stmt) {
+  bool remove_stmt(StmtPtr stmt) {
     auto pos = std::find(stmts_.begin(), stmts_.end(), stmt);
     if (pos == stmts_.end()) {
       return false;
     }
 
-    set_parent(stmt, nullptr);
+    set_parent(std::move(stmt), nullptr);
     stmts_.erase(pos);
     return true;
   }
@@ -206,6 +211,7 @@ class TORCH_API Block : public StmtNode<Block> {
     init(stmts);
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   explicit Block(const std::vector<StmtPtr>& stmts) {
     init(stmts);
   }
@@ -245,7 +251,7 @@ class TORCH_API Block : public StmtNode<Block> {
     return stmts_.back();
   }
 
-  void splice(Block::iterator it, const BlockPtr& other) {
+  void splice(Block::iterator it, BlockPtr other) {
     for (const StmtPtr& s : *other) {
       set_parent(s, this);
     }
@@ -254,12 +260,15 @@ class TORCH_API Block : public StmtNode<Block> {
   }
 
   static BlockPtr getSharedParent(StmtPtr p1, StmtPtr p2) {
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     std::unordered_set<BlockPtr> enclosing;
 
     StmtPtr p1_p = std::move(p1);
     while (p1_p) {
       if (BlockPtr b = to<Block>(p1_p)) {
-        enclosing.insert(b);
+        if (b) {
+          enclosing.insert(b);
+        }
       }
       p1_p = p1_p->get_parent();
     }
@@ -496,8 +505,8 @@ class TORCH_API Cond : public StmtNode<Cond> {
  public:
   static CondPtr make(
       const ExprHandle& condition,
-      const StmtPtr& true_stmt,
-      const StmtPtr& false_stmt) {
+      StmtPtr true_stmt,
+      StmtPtr false_stmt) {
     return alloc<Cond>(condition.node(), true_stmt, false_stmt);
   }
 
@@ -545,13 +554,11 @@ class TORCH_API Cond : public StmtNode<Cond> {
     set_false_stmt(std::move(false_stmt));
   }
 
-  CondPtr cloneWithNewBodies(
-      const StmtPtr& true_stmt,
-      const StmtPtr& false_stmt) {
+  CondPtr cloneWithNewBodies(StmtPtr true_stmt, StmtPtr false_stmt) {
     return alloc<Cond>(condition_, true_stmt, false_stmt);
   }
 
-  CondPtr cloneWithNewBody(const StmtPtr& true_stmt) {
+  CondPtr cloneWithNewBody(StmtPtr true_stmt) {
     return alloc<Cond>(condition_, true_stmt, nullptr);
   }
 
@@ -710,7 +717,7 @@ class TORCH_API For : public StmtNode<For> {
       const VarHandle& var,
       const ExprHandle& start,
       const ExprHandle& stop,
-      const StmtPtr& body) {
+      StmtPtr body) {
     if (!body) {
       return nullptr;
     }
@@ -720,7 +727,7 @@ class TORCH_API For : public StmtNode<For> {
       const VarHandle& var,
       const ExprHandle& start,
       const ExprHandle& stop,
-      const StmtPtr& body,
+      StmtPtr body,
       const LoopOptions& loop_options) {
     if (!body) {
       return nullptr;
@@ -747,15 +754,15 @@ class TORCH_API For : public StmtNode<For> {
       ExprPtr stop,
       StmtPtr body,
       LoopOptions loop_options)
-      : var_(std::move(var)),
-        start_(std::move(start)),
-        stop_(std::move(stop)),
+      : var_(var),
+        start_(start),
+        stop_(stop),
         loop_options_(std::move(loop_options)) {
-    if (!var_) {
+    if (!var) {
       throw malformed_input("invalid Var in For loop");
-    } else if (!start_) {
+    } else if (!start) {
       throw malformed_input("invalid Start in For loop");
-    } else if (!stop_) {
+    } else if (!stop) {
       throw malformed_input("invalid Stop in For loop");
     } else if (!body || body->get_parent()) {
       throw malformed_input("invalid Body in For loop");
@@ -789,7 +796,7 @@ class TORCH_API For : public StmtNode<For> {
     loop_options_.set_buffer_mapping(map);
   }
 
-  ForPtr cloneWithNewBody(const StmtPtr& body) const {
+  ForPtr cloneWithNewBody(StmtPtr body) const {
     return alloc<For>(var_, start_, stop_, body, loop_options_);
   }
 
@@ -835,6 +842,7 @@ class TORCH_API For : public StmtNode<For> {
 // TODO: make IR nodes extensible.
 class TORCH_API AtomicAdd : public StmtNode<AtomicAdd> {
  public:
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   AtomicAdd(BufPtr buf, std::vector<ExprPtr> indices, ExprPtr value)
       : buf_(std::move(buf)),
         indices_(std::move(indices)),
@@ -939,6 +947,7 @@ class TORCH_API ExternalCall : public StmtNode<ExternalCall> {
     args_ = std::move(args);
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   ExternalCall(
       BufPtr buf,
       std::string func_name,
@@ -992,6 +1001,7 @@ class TORCH_API ExternalCallWithAlloc : public StmtNode<ExternalCallWithAlloc> {
     args_ = std::move(args);
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   ExternalCallWithAlloc(
       std::string func_name,
       std::vector<BufPtr> buf_out_args,
@@ -1009,4 +1019,6 @@ class TORCH_API ExternalCallWithAlloc : public StmtNode<ExternalCallWithAlloc> {
   std::vector<ExprPtr> args_;
 };
 
-} // namespace torch::jit::tensorexpr
+} // namespace tensorexpr
+} // namespace jit
+} // namespace torch

@@ -1,42 +1,9 @@
-#pragma once
-
 #include <c10/util/Logging.h>
 #include <torch/csrc/distributed/c10d/reducer.hpp>
 
-#include <utility>
+#include <mutex>
 
 namespace c10d {
-
-// A struct to hold the latest status of the process group.
-struct ProcessGroupStatus {
-  // the sequential number of the last collective enqueued into workMetaList_
-  // This is useful for identifying a rank that has not join a collective
-  // initialized to be -1 to indicate no collective has been enqueued
-  int64_t lastEnqueuedSeq{-1};
-  // the sequential number of the last collective started as the kernel
-  int64_t lastStartedSeq{-1};
-  // the sequential number of the last collective completed marked by
-  // the watchdog thread
-  // initialized to be -1 to indicate no collective has been completed
-  int64_t lastCompletedSeq{-1};
-
-  // the name of the last collective enqueued into workMetaList_
-  std::string lastEnqueuedWorkName;
-  // the name of the last collective started as the kernel
-  std::string lastStartedWorkName;
-  // the name of the last collective completed
-  std::string lastCompletedWorkName;
-
-  // the sizes of the last work enqueued
-  size_t lastEnqueuedNumelIn;
-  size_t lastEnqueuedNumelOut;
-  // the sizes of the last work completed
-  size_t lastCompletedNumelIn;
-  size_t lastCompletedNumelOut;
-  // the sizes of the last work started
-  size_t lastStartedNumelIn;
-  size_t lastStartedNumelOut;
-};
 
 class TORCH_API Logger {
  public:
@@ -132,40 +99,6 @@ class TORCH_API Logger {
   std::shared_ptr<c10d::Reducer> reducer_;
   // track the number of iterations when runtime stats are collected so far.
   long num_iterations_stats_recorded_ = 0;
-};
-
-// a generic logging data struct that holds different types of logging data.
-// starting with key value pairs of strings and integers,
-// It can be extended to more types as needed.
-struct C10dLoggingData {
-  // logging fields that are string types.
-  std::map<std::string, std::string> strings;
-  // logging fields that are int64_t types.
-  std::map<std::string, int64_t> integers;
-};
-
-class TORCH_API C10dLogger {
- public:
-  C10dLogger(const C10dLogger&) = default;
-  C10dLogger(C10dLogger&&) = delete;
-  C10dLogger& operator=(const C10dLogger&) = default;
-  C10dLogger& operator=(C10dLogger&&) = delete;
-  virtual ~C10dLogger() = default;
-  virtual void log(const C10dLoggingData& data);
-  static C10dLogger* getLogger();
-  static void registerLogger(std::unique_ptr<C10dLogger>);
-
- protected:
-  // singletion, hide constructor from the public
-  C10dLogger(std::string logDestination)
-      : logDestination_(std::move(logDestination)) {}
-
-  // the name of the destination this logger should log to
-  std::string logDestination_;
-
- private:
-  static std::unique_ptr<C10dLogger> logger_;
-  static std::atomic<bool> registered_;
 };
 
 } // namespace c10d

@@ -1,17 +1,16 @@
-# mypy: allow-untyped-defs
+# mypy: ignore-errors
 
-import io
 import time
-from typing import Any
+import io
+from typing import Dict, List, Tuple, Any
 
 import torch
 import torch.distributed as dist
 import torch.distributed.rpc as rpc
 from torch import Tensor
 from torch.autograd.profiler import record_function
-from torch.autograd.profiler_legacy import profile as _profile
 from torch.distributed.rpc import RRef
-from torch.distributed.rpc.internal import _build_rpc_profiling_key, RPCExecMode
+from torch.distributed.rpc.internal import RPCExecMode, _build_rpc_profiling_key
 from torch.futures import Future
 from torch.testing._internal.common_utils import TemporaryFileName
 from torch.testing._internal.dist_utils import (
@@ -24,10 +23,10 @@ from torch.testing._internal.distributed.rpc.rpc_agent_test_fixture import (
     RpcAgentTestFixture,
 )
 
+from torch.autograd.profiler_legacy import profile as _profile
 
 def rref_isinstance(rref, cls_to_check):
     return isinstance(rref.local_value(), cls_to_check)
-
 
 def sleep(t):
     time.sleep(t)
@@ -43,13 +42,13 @@ def rref_local_value(rref: RRef[Tensor]) -> Tensor:
 
 
 @torch.jit.script
-def list_create() -> list[int]:
+def list_create() -> List[int]:
     global_list = [1, 2, 3]
     return global_list
 
 
 @torch.jit.script
-def rref_list_mutate(rref: RRef[list[int]]) -> None:
+def rref_list_mutate(rref: RRef[List[int]]) -> None:
     rref.local_value().append(4)
     rref.to_here().append(5)
     rref.to_here(5.0).append(6)
@@ -141,11 +140,9 @@ def no_arg():
 def one_arg(value):
     return value + 1
 
-
 @torch.jit.script
 def script_add_ones(x):
     return torch.add(x, torch.ones(1))
-
 
 @torch.jit.script
 def script_add_ones_with_record_function(x, block: str):
@@ -156,14 +153,15 @@ def script_add_ones_with_record_function(x, block: str):
 @torch.jit.script
 def record_function_on_caller_rpc_async(dst_worker_name: str, block: str) -> Tensor:
     t: Tensor = torch.ones(1)
-    with record_function(block):
-        fut1 = rpc.rpc_async(dst_worker_name, script_add_ones, (t,))
+    with record_function(block) as rf:
+        fut1 = rpc.rpc_async(dst_worker_name, script_add_ones, (t, ))
         # Extra operator call to avoid de-duplication of the next async call
         # see https://github.com/pytorch/pytorch/pull/62710#discussion_r694680279
         zero = torch.zeros_like(t)
-        fut2 = rpc.rpc_async(dst_worker_name, script_add_ones, (t,))
+        fut2 = rpc.rpc_async(dst_worker_name, script_add_ones, (t, ))
         res = fut1.wait() + fut2.wait() + zero
     return res
+
 
 
 @torch.jit.script
@@ -198,9 +196,7 @@ def script_fork_wait_throw(invalue):
 
 
 @torch.jit.script
-def call_rpc_with_profiling(
-    record: torch.classes.profiler._RecordFunction, dst_worker_name: str
-) -> Tensor:
+def call_rpc_with_profiling(record: torch.classes.profiler._RecordFunction, dst_worker_name: str) -> Tensor:
     # Call rpc_async from within ScriptFunction and ensure that we can attach
     # profiling callbacks. Note that handle here is a Tensor representation of
     # RecordFunction.
@@ -209,14 +205,9 @@ def call_rpc_with_profiling(
     ret = fut.wait()
     return ret
 
-
 @torch.jit.script
-def call_rpc_torchscript_with_record_function(
-    dst_worker_name: str, block: str
-) -> Tensor:
-    fut = rpc.rpc_async(
-        dst_worker_name, script_add_ones_with_record_function, (torch.tensor(1), block)
-    )
+def call_rpc_torchscript_with_record_function(dst_worker_name: str, block: str) -> Tensor:
+    fut = rpc.rpc_async(dst_worker_name, script_add_ones_with_record_function, (torch.tensor(1), block))
     return fut.wait()
 
 
@@ -318,9 +309,11 @@ class FutureTypingTest:
 
         @torch.jit.script
         def future_return_to_python(
-            dst_rank: int, inputs: tuple[Tensor, Tensor]
+            dst_rank: int, inputs: Tuple[Tensor, Tensor]
         ) -> Future[Tensor]:
-            return rpc.rpc_async(f"worker{dst_rank}", two_args_two_kwargs, inputs)
+            return rpc.rpc_async(
+                f"worker{dst_rank}", two_args_two_kwargs, inputs
+            )
 
         fut_res = future_return_to_python(dst_rank, inputs)
         self.assertEqual(fut_res.wait(), expected_res)
@@ -442,7 +435,7 @@ class LocalRRefTest:
 
         def use_rref_on_owner(rref: RRef[MyScriptClass]) -> int:
             args = (rref,)
-            kwargs: dict[str, Any] = {}
+            kwargs: Dict[str, Any] = {}
             fut = rpc.rpc_async(
                 rref.owner(), script_rref_get_value_my_script_class, args, kwargs
             )
@@ -472,7 +465,7 @@ class LocalRRefTest:
 
         def use_rref_on_owner(rref: RRef[MyModuleInterface]) -> Tensor:
             args = (rref,)
-            kwargs: dict[str, Any] = {}
+            kwargs: Dict[str, Any] = {}
             fut = rpc.rpc_async(
                 rref.owner_name(),
                 script_rref_run_forward_my_script_module,
@@ -525,28 +518,25 @@ def raise_script():
 
 @torch.jit.script
 def script_rpc_async_call(
-    dst_worker_name: str, args: tuple[Tensor, Tensor], kwargs: dict[str, Tensor]
+    dst_worker_name: str, args: Tuple[Tensor, Tensor], kwargs: Dict[str, Tensor]
 ):
     fut = rpc.rpc_async(dst_worker_name, two_args_two_kwargs, args, kwargs)
     ret = fut.wait()
     return ret
 
-
 @torch.jit.script
 def script_rpc_sync_call(
-    dst_worker_name: str, args: tuple[Tensor, Tensor], kwargs: dict[str, Tensor]
+    dst_worker_name: str, args: Tuple[Tensor, Tensor], kwargs: Dict[str, Tensor]
 ):
     res = rpc.rpc_sync(dst_worker_name, two_args_two_kwargs, args, kwargs)
     return res
 
-
 @torch.jit.script
 def script_rpc_remote_call(
-    dst_worker_name: str, args: tuple[Tensor, Tensor], kwargs: dict[str, Tensor]
+    dst_worker_name: str, args: Tuple[Tensor, Tensor], kwargs: Dict[str, Tensor]
 ):
     rref_res = rpc.remote(dst_worker_name, two_args_two_kwargs, args, kwargs)
     return rref_res.to_here()
-
 
 class JitRpcOpTest:
     # Call functions remotely from Script.
@@ -560,12 +550,10 @@ class JitRpcOpTest:
         args = (torch.tensor([1, 1]), torch.tensor([2, 2]))
         kwargs = {}
 
-        for script_op in [
-            script_rpc_async_call,
-            script_rpc_sync_call,
-            script_rpc_remote_call,
-        ]:
-            ret = script_op(dst_worker_name, args, kwargs)
+        for script_op in [script_rpc_async_call, script_rpc_sync_call, script_rpc_remote_call]:
+            ret = script_op(
+                dst_worker_name, args, kwargs
+            )
             self.assertEqual(ret, torch.tensor([10, 10]))
 
     @dist_init
@@ -578,12 +566,10 @@ class JitRpcOpTest:
         args = (torch.tensor([1, 1]), torch.tensor([2, 2]))
         kwargs = {"first_kwarg": torch.tensor([2, 2])}
 
-        for script_op in [
-            script_rpc_async_call,
-            script_rpc_sync_call,
-            script_rpc_remote_call,
-        ]:
-            ret = script_op(dst_worker_name, args, kwargs)
+        for script_op in [script_rpc_async_call, script_rpc_sync_call, script_rpc_remote_call]:
+            ret = script_op(
+                dst_worker_name, args, kwargs
+            )
             self.assertEqual(ret, torch.tensor([9, 9]))
 
     @dist_init
@@ -598,12 +584,10 @@ class JitRpcOpTest:
             "first_kwarg": torch.tensor([2, 2]),
             "second_kwarg": torch.tensor([3, 3]),
         }
-        for script_op in [
-            script_rpc_async_call,
-            script_rpc_sync_call,
-            script_rpc_remote_call,
-        ]:
-            ret = script_op(dst_worker_name, args, kwargs)
+        for script_op in [script_rpc_async_call, script_rpc_sync_call, script_rpc_remote_call]:
+            ret = script_op(
+                dst_worker_name, args, kwargs
+            )
             self.assertEqual(ret, torch.tensor([8, 8]))
 
     @dist_init
@@ -623,7 +607,7 @@ class JitRpcOpTest:
             # The error JIT gives is,
             # "Dict values must contain only a single type, "
             # "expected: Tensor but found str instead."
-            kwargs: dict[str, Any] = {
+            kwargs: Dict[str, Any] = {
                 "tensor_kwarg": torch.tensor([3, 3]),
                 "str_kwarg": "_str_kwarg",
                 "int_kwarg": 3,
@@ -634,7 +618,9 @@ class JitRpcOpTest:
             ret = fut.wait()
             return ret
 
-        ret = script_rpc_async_call_with_assorted_types(dst_worker_name)
+        ret = script_rpc_async_call_with_assorted_types(
+            dst_worker_name
+        )
         self.assertEqual(ret, (torch.tensor([4, 4]), "str_arg_str_kwarg", 4))
 
     @dist_init
@@ -653,7 +639,9 @@ class JitRpcOpTest:
             ret = fut.wait()
             return ret
 
-        ret = script_rpc_async_call_without_kwargs_passed(dst_worker_name)
+        ret = script_rpc_async_call_without_kwargs_passed(
+            dst_worker_name
+        )
         self.assertEqual(ret, 0)
 
     @dist_init
@@ -671,13 +659,17 @@ class JitRpcOpTest:
             ret = fut.wait()
             return ret
 
-        ret = script_rpc_async_call_without_args_kwargs_passed(dst_worker_name)
+        ret = script_rpc_async_call_without_args_kwargs_passed(
+            dst_worker_name
+        )
         self.assertEqual(ret, 0)
 
     @dist_init
     def test_less_than_needed_args_are_specified(self):
         if self.rank != 0:
             return
+
+        dst_worker_name = worker_name((self.rank + 1) % self.world_size)
 
         # Notice, args matching happens during scripting.
         with self.assertRaisesRegex(RuntimeError, "Argument second_arg not provided"):
@@ -696,6 +688,8 @@ class JitRpcOpTest:
     def test_more_than_needed_args_are_specified(self):
         if self.rank != 0:
             return
+
+        dst_worker_name = worker_name((self.rank + 1) % self.world_size)
 
         # Notice, args matching happens during scripting.
         with self.assertRaisesRegex(
@@ -740,7 +734,9 @@ class JitRpcOpTest:
         with self.assertRaisesRegex(
             RuntimeError, "Unknown keyword argument 'third_kwarg'"
         ):
-            ret = script_rpc_async_call_with_unexpected_kwarg(dst_worker_name)
+            ret = script_rpc_async_call_with_unexpected_kwarg(
+                dst_worker_name
+            )
             self.assertEqual(ret, 0)
 
     @dist_init
@@ -897,10 +893,10 @@ class JitRpcTest(
     def test_torchscript_function_exception(self):
         dst_worker_name = worker_name((self.rank + 1) % self.world_size)
         with self.assertRaisesRegex(RuntimeError, r"one_arg\(\) expected at most"):
-            rpc.rpc_sync(dst_worker_name, one_arg, args=(10, 20))
+            ret = rpc.rpc_sync(dst_worker_name, one_arg, args=(10, 20))
 
         with self.assertRaisesRegex(RuntimeError, r"one_arg\(\) expected at most"):
-            rpc.remote(dst_worker_name, one_arg, args=(10, 20))
+            rref = rpc.remote(dst_worker_name, one_arg, args=(10, 20))
 
     @dist_init
     def test_torchscript_functions_not_supported(self):
@@ -917,13 +913,15 @@ class JitRpcTest(
 
         # rpc_sync still accepts script class and run it in
         # the same code path as python call.
-        rpc.rpc_sync(dst_worker_name, MyScriptClass, args=(self.rank,))
+        ret = rpc.rpc_sync(dst_worker_name, MyScriptClass, args=(self.rank,))
 
         # rpc_sync does not accept script module method.
         # Python 3.5 and Python 3.6 throw different error message, the only
         # common word can be greped is "pickle".
         with self.assertRaisesRegex(TypeError, "pickle"):
-            rpc.rpc_async(dst_worker_name, my_local_script_module.forward, args=())
+            ret = rpc.rpc_async(
+                dst_worker_name, my_local_script_module.forward, args=()
+            )
 
     @dist_init
     def test_remote_script_module(self):
@@ -1011,7 +1009,9 @@ class JitRpcTest(
         rpc._disable_jit_rref_pickle()
 
         out1 = rpc.rpc_sync(
-            dst_name, load_script_module_with_pickled_rref, args=(f.getvalue(),)
+            dst_name,
+            load_script_module_with_pickled_rref,
+            args=(f.getvalue(),)
         )
         out2 = m2()
         self.assertEqual(out1, out2)
@@ -1070,6 +1070,7 @@ class JitRpcTest(
     @dist_init
     def test_callback_chain(self):
         n = self.rank + 1
+        dst = worker_name(n % self.world_size)
 
         def callback(fut):
             return fut.wait() + 1
@@ -1147,16 +1148,14 @@ class JitRpcTest(
                     "worker1",
                 )
                 with torch.autograd.profiler.record_function(prof_key) as rf:
-                    call_rpc_with_profiling(rf.record, "worker1")
+                    ret = call_rpc_with_profiling(rf.record, "worker1")
             # TODO: Can't get a reliable time for this profiling event since
             # it's hard to estimate the execution time on the remote end for non-UDFs.
             # This can be resolved by https://github.com/pytorch/pytorch/issues/36272.
             # After that, this test should be modified to validate the function time.
             events = prof.function_events
             function_event = get_function_event(events, prof_key)
-            self.assertTrue(
-                torch._jit_internal._qualified_name(one_arg) in function_event.name
-            )
+            self.assertTrue(torch._jit_internal._qualified_name(one_arg) in function_event.name)
 
     @dist_init
     def test_rpc_async_jit_profiled(self):
@@ -1168,7 +1167,9 @@ class JitRpcTest(
             args = (torch.tensor([1, 1]), torch.tensor([2, 2]))
             kwargs = {}
             with _profile() as prof:
-                script_rpc_async_call(dst_worker_name, args, kwargs)
+                script_rpc_async_call(
+                    dst_worker_name, args, kwargs
+                )
 
             # Ensure rpc_async call is profiled
             function_events = prof.function_events
@@ -1296,7 +1297,7 @@ class JitRpcTest(
         # future from within a script function with torch.jit.fork
         with _profile() as prof:
             with torch.autograd.profiler.record_function("foo") as rf:
-                call_fork_with_profiling(rf.record)
+                ret = call_fork_with_profiling(rf.record)
 
         events = prof.function_events
         function_event = get_function_event(events, "foo")
@@ -1360,12 +1361,13 @@ class JitRpcTest(
         dst2 = worker_name((self.rank + 2) % self.world_size)
 
         num = 20
-        rrefs = [
-            rpc.remote(
-                dst1, async_add, args=(dst2, torch.ones(2, 2), torch.ones(2, 2) * i)
+        rrefs = []
+        for i in range(num):
+            rrefs.append(
+                rpc.remote(
+                    dst1, async_add, args=(dst2, torch.ones(2, 2), torch.ones(2, 2) * i)
+                )
             )
-            for i in range(num)
-        ]
 
         for i in range(num):
             self.assertEqual(rrefs[i].to_here(), torch.ones(2, 2) + i)

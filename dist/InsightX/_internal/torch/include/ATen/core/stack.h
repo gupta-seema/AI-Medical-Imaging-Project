@@ -8,8 +8,8 @@
 
 // TODO move this to c10 namespace
 
-
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 using c10::IValue;
 using Stack = std::vector<IValue>;
@@ -28,7 +28,7 @@ class Operation {
 
   template <typename F,
             std::enable_if_t<accepts<F, Stack&>::value &&
-                !std::is_same_v<std::decay_t<F>, Operation>, int> = 0>
+                !std::is_same<std::decay_t<F>, Operation>::value, int> = 0>
   Operation(F&& op): op_(std::forward<F>(op)) {}
 
   Operation(std::nullptr_t) noexcept {}
@@ -65,52 +65,48 @@ class Operation {
 
 // treat the last N elements of the stack as a list, looking up
 // element i
-inline IValue& peek(Stack& stack, size_t i, size_t N) {
-  // NOLINTNEXTLINE(*-narrowing-conversions)
+static inline IValue& peek(Stack& stack, size_t i, size_t N) {
   return *(stack.end() - N + i);
 }
-inline IValue& peek(Stack* stack, size_t i, size_t N) {
+static inline IValue& peek(Stack* stack, size_t i, size_t N) {
   return peek(*stack, i, N);
 }
-inline const IValue& peek(const Stack& stack, size_t i, size_t N) {
-  // NOLINTNEXTLINE(*-narrowing-conversions)
+static inline const IValue& peek(const Stack& stack, size_t i, size_t N) {
   return *(stack.end() - N + i);
 }
-inline const IValue& peek(const Stack* stack, size_t i, size_t N) {
+static inline const IValue& peek(const Stack* stack, size_t i, size_t N) {
   return peek(*stack, i, N);
 }
 // treat the last N elements of the stack as a list, looking up the
 // slice starting at index i and having length len
-inline at::ArrayRef<IValue> peekSlice(
+static inline at::ArrayRef<IValue> peekSlice(
     const Stack& stack,
     size_t i,
     size_t len,
     size_t N) {
   return at::ArrayRef<IValue>(stack).slice(stack.size() - N + i, len);
 }
-inline at::ArrayRef<IValue> last(const Stack& stack, size_t N) {
+static inline at::ArrayRef<IValue> last(const Stack& stack, size_t N) {
   return peekSlice(stack, 0, N, N);
 }
-inline at::ArrayRef<IValue> last(const Stack* stack, size_t N) {
+static inline at::ArrayRef<IValue> last(const Stack* stack, size_t N) {
   return last(*stack, N);
 }
-inline void drop(Stack& stack, size_t n) {
-  // NOLINTNEXTLINE(*-narrowing-conversions)
+static inline void drop(Stack& stack, size_t n) {
   stack.erase(stack.end() - n, stack.end());
 }
-inline void drop(Stack* stack, size_t n) {
+static inline void drop(Stack* stack, size_t n) {
   drop(*stack, n);
 }
-inline IValue pop(Stack& stack) {
-  TORCH_CHECK(!stack.empty(), "pop() called on empty stack");
+static inline IValue pop(Stack& stack) {
   auto r = std::move(stack.back());
   stack.pop_back();
   return r;
 }
-inline IValue pop(Stack* stack) {
+static inline IValue pop(Stack* stack) {
   return pop(*stack);
 }
-inline std::vector<IValue> pop(Stack& stack, size_t n) {
+static inline std::vector<IValue> pop(Stack& stack, size_t n) {
   std::vector<IValue> result;
   result.reserve(n);
   for (const auto i : c10::irange(n)) {
@@ -127,7 +123,7 @@ inline std::vector<IValue> pop(Stack& stack, size_t n) {
 // b = pop(stack).toTensor();
 // a = pop(stack).toInt();
 template <typename... Types>
-inline void pop(Stack& stack, Types&... args) {
+static inline void pop(Stack& stack, Types&... args) {
   size_t i = 0;
   constexpr size_t N = sizeof...(args);
   (void)std::initializer_list<int>{
@@ -135,15 +131,15 @@ inline void pop(Stack& stack, Types&... args) {
   drop(stack, N);
 }
 template <typename... Types>
-inline void pop(Stack* stack, Types&... args) {
+static inline void pop(Stack* stack, Types&... args) {
   pop(*stack, args...);
 }
 template <typename Type>
-inline void push_one(Stack& stack, Type&& arg) {
+static inline void push_one(Stack& stack, Type&& arg) {
   stack.emplace_back(std::forward<Type>(arg));
 }
 
-inline void push_one(Stack& stack, c10::TensorOptions options) {
+static inline void push_one(Stack& stack, c10::TensorOptions options) {
   stack.emplace_back(c10::typeMetaToScalarType(options.dtype()));
   stack.emplace_back(options.layout());
   stack.emplace_back(options.device());
@@ -151,15 +147,15 @@ inline void push_one(Stack& stack, c10::TensorOptions options) {
 }
 
 template <typename... Types>
-inline void push(Stack& stack, Types&&... args) {
+static inline void push(Stack& stack, Types&&... args) {
   (void)std::initializer_list<int>{(push_one(stack, std::forward<Types>(args)), 0)...};
 }
 template <typename... Types>
-inline void push(Stack* stack, Types&&... args) {
+static inline void push(Stack* stack, Types&&... args) {
   return push(*stack, std::forward<Types>(args)...);
 }
 template <class T>
-inline void push_list_elements(Stack& stack, const c10::List<T>& elements) {
+static inline void push_list_elements(Stack& stack, const c10::List<T>& elements) {
   for (T elem : elements) {
     stack.push_back(std::move(elem));
   }
@@ -192,8 +188,7 @@ struct TuplePacker {
 
 template <typename... Args>
 struct TuplePacker<0, Args...> {
-  // NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved)
-  static void execute(Stack& /*stack*/, std::tuple<Args...>&& /*t*/){}
+  static void execute(Stack& /*stack*/, std::tuple<Args...>&& /*t*/){};
 };
 
 template <typename... Args>
@@ -201,4 +196,5 @@ inline void pack(Stack& stack, std::tuple<Args...>&& t) {
   TuplePacker<sizeof...(Args), Args...>::execute(stack, std::move(t));
 }
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

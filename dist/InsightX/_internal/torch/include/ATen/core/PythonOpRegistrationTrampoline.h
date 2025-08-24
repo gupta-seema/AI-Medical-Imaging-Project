@@ -4,8 +4,8 @@
 
 // TODO: this can probably live in c10
 
-
-namespace at::impl {
+namespace at {
+namespace impl {
 
 class TORCH_API PythonOpRegistrationTrampoline final {
   static std::atomic<c10::impl::PyInterpreter*> interpreter_;
@@ -19,4 +19,5 @@ public:
   static c10::impl::PyInterpreter* getInterpreter();
 };
 
-} // namespace at::impl
+} // namespace impl
+} // namespace at

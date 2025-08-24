@@ -32,9 +32,7 @@
 #define DLPACK_DLL
 #endif
 
-// NOLINTNEXTLINE(modernize-deprecated-headers)
 #include <stdint.h>
-// NOLINTNEXTLINE(modernize-deprecated-headers)
 #include <stddef.h>
 
 #ifdef __cplusplus
@@ -91,8 +89,6 @@ typedef enum {
   kDLWebGPU = 15,
   /*! \brief Qualcomm Hexagon DSP */
   kDLHexagon = 16,
-  /*! \brief Microsoft AI Accelerator */
-  kDLMAIA = 17,
 } DLDeviceType;
 
 /*!

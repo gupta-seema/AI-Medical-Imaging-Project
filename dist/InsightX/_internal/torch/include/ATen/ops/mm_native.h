@@ -6,7 +6,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
+#include <c10/util/Optional.h>
 #include <c10/core/QScheme.h>
 #include <ATen/core/Reduction.h>
 #include <ATen/core/Tensor.h>
@@ -26,7 +26,5 @@ TORCH_API at::Tensor _sparse_mm(const at::Tensor & self, const at::Tensor & mat2
 TORCH_API at::Tensor & _sparse_mm_out(const at::Tensor & self, const at::Tensor & mat2, at::Tensor & out);
 TORCH_API at::Tensor _sparse_csr_mm(const at::Tensor & self, const at::Tensor & mat2);
 TORCH_API at::Tensor & _sparse_csr_mm_out(const at::Tensor & self, const at::Tensor & mat2, at::Tensor & out);
-TORCH_API at::Tensor _mm_dtype_cuda(const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype);
-TORCH_API at::Tensor & _mm_dtype_out_cuda(const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype, at::Tensor & out);
 } // namespace native
 } // namespace at

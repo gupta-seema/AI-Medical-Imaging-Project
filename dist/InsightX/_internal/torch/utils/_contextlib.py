@@ -1,19 +1,17 @@
-# mypy: allow-untyped-defs
 # Extra utilities for working with context managers that should have been
 # in the standard library but are not
 
 import functools
 import inspect
-import sys
 import warnings
-from typing import Any, Callable, cast, TypeVar
-
+import sys
+from typing import Any, Callable, TypeVar, cast
 
 # Used for annotating the decorator usage of _DecoratorContextManager (e.g.,
 # 'no_grad' and 'enable_grad').
 # See https://mypy.readthedocs.io/en/latest/generics.html#declaring-decorators
 FuncType = Callable[..., Any]
-F = TypeVar("F", bound=FuncType)
+F = TypeVar('F', bound=FuncType)
 
 
 def _wrap_generator(ctx_factory, func):
@@ -23,7 +21,6 @@ def _wrap_generator(ctx_factory, func):
     The input should be a function that returns a context manager,
     not a context manager itself, to handle one-shot context managers.
     """
-
     @functools.wraps(func)
     def generator_context(*args, **kwargs):
         gen = func(*args, **kwargs)
@@ -85,7 +82,7 @@ def context_decorator(ctx, func):
     be a multi-shot context manager that can be directly invoked multiple times)
     or a callable that produces a context manager.
     """
-    assert not (callable(ctx) and hasattr(ctx, "__enter__")), (
+    assert not (callable(ctx) and hasattr(ctx, '__enter__')), (
         f"Passed in {ctx} is both callable and also a valid context manager "
         "(has __enter__), making it ambiguous which interface to use.  If you "
         "intended to pass a context manager factory, rewrite your call as "
@@ -94,10 +91,8 @@ def context_decorator(ctx, func):
     )
 
     if not callable(ctx):
-
         def ctx_factory():
             return ctx
-
     else:
         ctx_factory = ctx
 
@@ -127,14 +122,10 @@ class _DecoratorContextManager:
 
     def __call__(self, orig_func: F) -> F:
         if inspect.isclass(orig_func):
-            warnings.warn(
-                "Decorating classes is deprecated and will be disabled in "
-                "future versions. You should only decorate functions or methods. "
-                "To preserve the current behavior of class decoration, you can "
-                "directly decorate the `__init__` method and nothing else.",
-                FutureWarning,
-                stacklevel=2,
-            )
+            warnings.warn("Decorating classes is deprecated and will be disabled in "
+                          "future versions. You should only decorate functions or methods. "
+                          "To preserve the current behavior of class decoration, you can "
+                          "directly decorate the `__init__` method and nothing else.")
             func = cast(F, lambda *args, **kwargs: orig_func(*args, **kwargs))
         else:
             func = orig_func

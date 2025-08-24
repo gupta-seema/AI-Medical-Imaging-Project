@@ -8,26 +8,12 @@
 
 namespace at::native {
 
-enum class EmbeddingBagMode {
-  SUM = 0,
-  MEAN = 1,
-  MAX = 2,
-};
-
-[[maybe_unused]] static bool operator==(int64_t op1, EmbeddingBagMode op2) {
-  return op1 == static_cast<int64_t>(op2);
-}
-
-[[maybe_unused]] static bool operator!=(int64_t op1, EmbeddingBagMode op2) {
-  return !(op1 == op2);
-}
-
 void check_arguments(
     const Tensor& weight,
     const Tensor& indices,
     const Tensor& offsets,
     const int64_t mode,
-    const std::optional<Tensor>& per_sample_weights,
+    const c10::optional<Tensor>& per_sample_weights,
     bool include_last_offset);
 
 void make_bag_size_out(
@@ -54,7 +40,7 @@ void make_offset2bag_out(
     const Tensor& indices,
     const Tensor& offsets,
     const int64_t mode,
-    const std::optional<Tensor>& per_sample_weights,
+    const c10::optional<Tensor>& per_sample_weights,
     const int64_t padding_idx = -1);
 
 #ifdef USE_FBGEMM
@@ -78,7 +64,7 @@ struct _CallbackAndBlockSize {
 
     _CallbackAndBlockSize() = default;
 
-    explicit _CallbackAndBlockSize(std::optional<int64_t> maybe_block_size)
+    explicit _CallbackAndBlockSize(c10::optional<int64_t> maybe_block_size)
       : blockSize(maybe_block_size.value_or(-1))
       , callback(maybe_block_size.has_value() ? generateCallback(maybe_block_size.value()) : nullptr)
     {}
@@ -89,7 +75,7 @@ struct _EmbeddingBagKernelCacheImpl : private StorageMixins... {
 
     _EmbeddingBagKernelCacheImpl() = default;
     // use each of the mixins to store corresponding kernel and block size
-    explicit _EmbeddingBagKernelCacheImpl(std::optional<int64_t> maybe_block_size)
+    explicit _EmbeddingBagKernelCacheImpl(c10::optional<int64_t> maybe_block_size)
       : StorageMixins(maybe_block_size)...
     {}
 
@@ -121,7 +107,7 @@ using _EmbeddingBagKernelCache = _EmbeddingBagKernelCacheImpl<
     _CallbackAndBlockSize<false, int64_t, unsigned short>>;
 #else
 struct _EmbeddingBagKernelCache {
-    explicit _EmbeddingBagKernelCache(std::optional<int64_t> /* maybe_block_size */) {}
+    explicit _EmbeddingBagKernelCache(c10::optional<int64_t> /* maybe_block_size */) {}
 };
 #endif
 
@@ -129,7 +115,7 @@ void _embedding_bag_cpu_impl_out(Tensor& output, Tensor& offset2bag,
     Tensor& bag_size, Tensor* max_indices,
     const Tensor &weight, const Tensor &indices,
     const Tensor &offsets, const int64_t mode = 0,
-    const std::optional<Tensor>& per_sample_weights = std::nullopt,
+    const c10::optional<Tensor>& per_sample_weights = c10::nullopt,
     bool include_last_offset = false,
     int64_t padding_idx = -1,
     _EmbeddingBagKernelCache* fbgemm_kernel_cache = nullptr);
@@ -145,9 +131,9 @@ void _embedding_bag_cpu_out(
     const bool scale_grad_by_freq,
     const int64_t mode,
     const bool sparse,
-    const std::optional<at::Tensor>& per_sample_weights,
+    const c10::optional<at::Tensor>& per_sample_weights,
     const bool include_last_offset,
-    const std::optional<int64_t>& padding_idx,
+    const c10::optional<int64_t>& padding_idx,
     _EmbeddingBagKernelCache* fbgemm_kernel_cache = nullptr);
 
 } // namespace at::native

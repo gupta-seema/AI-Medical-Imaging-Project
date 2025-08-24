@@ -16,7 +16,8 @@
 #include <memory>
 #include <vector>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 namespace detail {
 /// Base class for all RNN implementations (intended for code sharing).
@@ -90,7 +91,7 @@ class TORCH_API RNNImplBase : public torch::nn::Cloneable<Derived> {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ RNN ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// A multi-layer Elman RNN module with Tanh or ReLU activation.
-/// See https://pytorch.org/docs/main/generated/torch.nn.RNN.html to learn
+/// See https://pytorch.org/docs/master/generated/torch.nn.RNN.html to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::RNNOptions` class to learn what
@@ -139,7 +140,7 @@ TORCH_MODULE(RNN);
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ LSTM ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// A multi-layer long-short-term-memory (LSTM) module.
-/// See https://pytorch.org/docs/main/generated/torch.nn.LSTM.html to learn
+/// See https://pytorch.org/docs/master/generated/torch.nn.LSTM.html to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::LSTMOptions` class to learn what
@@ -158,17 +159,17 @@ class TORCH_API LSTMImpl : public detail::RNNImplBase<LSTMImpl> {
 
   std::tuple<Tensor, std::tuple<Tensor, Tensor>> forward(
       const Tensor& input,
-      std::optional<std::tuple<Tensor, Tensor>> hx_opt = {});
+      torch::optional<std::tuple<Tensor, Tensor>> hx_opt = {});
 
  protected:
   FORWARD_HAS_DEFAULT_ARGS(
-      {1, AnyValue(std::optional<std::tuple<Tensor, Tensor>>())})
+      {1, AnyValue(torch::optional<std::tuple<Tensor, Tensor>>())})
 
  public:
   std::tuple<torch::nn::utils::rnn::PackedSequence, std::tuple<Tensor, Tensor>>
   forward_with_packed_input(
       const torch::nn::utils::rnn::PackedSequence& packed_input,
-      std::optional<std::tuple<Tensor, Tensor>> hx_opt = {});
+      torch::optional<std::tuple<Tensor, Tensor>> hx_opt = {});
 
   LSTMOptions options;
 
@@ -191,7 +192,7 @@ class TORCH_API LSTMImpl : public detail::RNNImplBase<LSTMImpl> {
       const Tensor& batch_sizes,
       const Tensor& sorted_indices,
       int64_t max_batch_size,
-      std::optional<std::tuple<Tensor, Tensor>> hx_opt);
+      torch::optional<std::tuple<Tensor, Tensor>> hx_opt);
 };
 
 /// A `ModuleHolder` subclass for `LSTMImpl`.
@@ -204,7 +205,7 @@ TORCH_MODULE(LSTM);
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ GRU ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// A multi-layer gated recurrent unit (GRU) module.
-/// See https://pytorch.org/docs/main/generated/torch.nn.GRU.html to learn
+/// See https://pytorch.org/docs/master/generated/torch.nn.GRU.html to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::GRUOptions` class to learn what
@@ -276,7 +277,7 @@ class TORCH_API RNNCellImplBase : public torch::nn::Cloneable<Derived> {
   Tensor bias_hh;
 
  protected:
-  void check_forward_input(const Tensor& input, const std::string& name) const;
+  void check_forward_input(const Tensor& input, const std::string name) const;
   virtual std::string get_nonlinearity_str() const;
 };
 } // namespace detail
@@ -285,7 +286,7 @@ class TORCH_API RNNCellImplBase : public torch::nn::Cloneable<Derived> {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// An Elman RNN cell with tanh or ReLU non-linearity.
-/// See https://pytorch.org/docs/main/nn.html#torch.nn.RNNCell to learn
+/// See https://pytorch.org/docs/master/nn.html#torch.nn.RNNCell to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::RNNCellOptions` class to learn what
@@ -302,7 +303,7 @@ class TORCH_API RNNCellImpl : public detail::RNNCellImplBase<RNNCellImpl> {
       : RNNCellImpl(RNNCellOptions(input_size, hidden_size)) {}
   explicit RNNCellImpl(const RNNCellOptions& options_);
 
-  Tensor forward(const Tensor& input, const Tensor& hx = {});
+  Tensor forward(const Tensor& input, Tensor hx = {});
 
  protected:
   FORWARD_HAS_DEFAULT_ARGS({1, AnyValue(Tensor())})
@@ -325,7 +326,7 @@ TORCH_MODULE(RNNCell);
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// A long short-term memory (LSTM) cell.
-/// See https://pytorch.org/docs/main/nn.html#torch.nn.LSTMCell to learn
+/// See https://pytorch.org/docs/master/nn.html#torch.nn.LSTMCell to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::LSTMCellOptions` class to learn what
@@ -343,11 +344,11 @@ class TORCH_API LSTMCellImpl : public detail::RNNCellImplBase<LSTMCellImpl> {
 
   std::tuple<Tensor, Tensor> forward(
       const Tensor& input,
-      std::optional<std::tuple<Tensor, Tensor>> hx_opt = {});
+      torch::optional<std::tuple<Tensor, Tensor>> hx_opt = {});
 
  protected:
   FORWARD_HAS_DEFAULT_ARGS(
-      {1, AnyValue(std::optional<std::tuple<Tensor, Tensor>>())})
+      {1, AnyValue(torch::optional<std::tuple<Tensor, Tensor>>())})
 
  public:
   LSTMCellOptions options;
@@ -364,7 +365,7 @@ TORCH_MODULE(LSTMCell);
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// A gated recurrent unit (GRU) cell.
-/// See https://pytorch.org/docs/main/nn.html#torch.nn.GRUCell to learn
+/// See https://pytorch.org/docs/master/nn.html#torch.nn.GRUCell to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::GRUCellOptions` class to learn what
@@ -380,7 +381,7 @@ class TORCH_API GRUCellImpl : public detail::RNNCellImplBase<GRUCellImpl> {
       : GRUCellImpl(GRUCellOptions(input_size, hidden_size)) {}
   explicit GRUCellImpl(const GRUCellOptions& options_);
 
-  Tensor forward(const Tensor& input, const Tensor& hx = {});
+  Tensor forward(const Tensor& input, Tensor hx = {});
 
  protected:
   FORWARD_HAS_DEFAULT_ARGS({1, AnyValue(Tensor())})
@@ -396,4 +397,5 @@ class TORCH_API GRUCellImpl : public detail::RNNCellImplBase<GRUCellImpl> {
 /// learn about PyTorch's module storage semantics.
 TORCH_MODULE(GRUCell);
 
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

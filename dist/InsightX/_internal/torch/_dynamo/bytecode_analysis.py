@@ -1,25 +1,8 @@
-# mypy: allow-untyped-defs
-
-"""
-This module provides utilities for analyzing and optimizing Python bytecode.
-Key functionality includes:
-- Dead code elimination
-- Jump instruction optimization
-- Stack size analysis and verification
-- Live variable analysis
-- Line number propagation and cleanup
-- Exception table handling for Python 3.11+
-
-The utilities in this module are used to analyze and transform bytecode
-for better performance while maintaining correct semantics.
-"""
-
 import bisect
 import dataclasses
 import dis
 import sys
-from typing import Any, Union
-
+from typing import Any, Set, Union
 
 TERMINAL_OPCODES = {
     dis.opmap["RETURN_VALUE"],
@@ -27,16 +10,13 @@ TERMINAL_OPCODES = {
     dis.opmap["RAISE_VARARGS"],
     # TODO(jansel): double check exception handling
 }
-TERMINAL_OPCODES.add(dis.opmap["RERAISE"])
+if sys.version_info >= (3, 9):
+    TERMINAL_OPCODES.add(dis.opmap["RERAISE"])
 if sys.version_info >= (3, 11):
     TERMINAL_OPCODES.add(dis.opmap["JUMP_BACKWARD"])
     TERMINAL_OPCODES.add(dis.opmap["JUMP_FORWARD"])
 else:
     TERMINAL_OPCODES.add(dis.opmap["JUMP_ABSOLUTE"])
-if sys.version_info >= (3, 12):
-    TERMINAL_OPCODES.add(dis.opmap["RETURN_CONST"])
-if sys.version_info >= (3, 13):
-    TERMINAL_OPCODES.add(dis.opmap["JUMP_BACKWARD_NO_INTERRUPT"])
 JUMP_OPCODES = set(dis.hasjrel + dis.hasjabs)
 JUMP_OPNAMES = {dis.opname[opcode] for opcode in JUMP_OPCODES}
 HASLOCAL = set(dis.haslocal)
@@ -147,9 +127,9 @@ def remove_extra_line_nums(instructions):
 
 @dataclasses.dataclass
 class ReadsWrites:
-    reads: set[Any]
-    writes: set[Any]
-    visited: set[Any]
+    reads: Set[Any]
+    writes: Set[Any]
+    visited: Set[Any]
 
 
 def livevars_analysis(instructions, instruction):
@@ -233,11 +213,21 @@ def stacksize_analysis(instructions) -> Union[int, float]:
 
         for inst, next_inst in zip(instructions, instructions[1:] + [None]):
             stack_size = stack_sizes[inst]
+            # CALL_FINALLY in Python 3.8 is handled differently when determining stack depth.
+            # See https://github.com/python/cpython/blob/3.8/Python/compile.c#L5450.
+            # Essentially, the stack effect of CALL_FINALLY is computed with jump=True,
+            # but the resulting stack depth is propagated to the next instruction, not the
+            # jump target.
+            is_call_finally = (
+                sys.version_info < (3, 9) and inst.opcode == dis.opmap["CALL_FINALLY"]
+            )
             if inst.opcode not in TERMINAL_OPCODES:
                 assert next_inst is not None, f"missing next inst: {inst}"
-                eff = stack_effect(inst.opcode, inst.arg, jump=False)
-                stack_sizes[next_inst].offset_of(stack_size, eff)
-            if inst.opcode in JUMP_OPCODES:
+                stack_sizes[next_inst].offset_of(
+                    stack_size,
+                    stack_effect(inst.opcode, inst.arg, jump=is_call_finally),
+                )
+            if inst.opcode in JUMP_OPCODES and not is_call_finally:
                 stack_sizes[inst.target].offset_of(
                     stack_size, stack_effect(inst.opcode, inst.arg, jump=True)
                 )
@@ -252,8 +242,8 @@ def stacksize_analysis(instructions) -> Union[int, float]:
             stack_size = stack_sizes[inst]
             print(stack_size.low, stack_size.high, inst)
 
-    low = min(x.low for x in stack_sizes.values())
-    high = max(x.high for x in stack_sizes.values())
+    low = min([x.low for x in stack_sizes.values()])
+    high = max([x.high for x in stack_sizes.values()])
 
     assert fixed_point.value, "failed to reach fixed point"
     assert low >= 0

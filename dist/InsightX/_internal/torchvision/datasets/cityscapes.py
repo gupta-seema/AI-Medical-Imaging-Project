@@ -2,7 +2,7 @@ import json
 import os
 from collections import namedtuple
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from PIL import Image
 
@@ -107,7 +107,7 @@ class Cityscapes(VisionDataset):
         root: Union[str, Path],
         split: str = "train",
         mode: str = "fine",
-        target_type: Union[list[str], str] = "instance",
+        target_type: Union[List[str], str] = "instance",
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
         transforms: Optional[Callable] = None,
@@ -172,7 +172,7 @@ class Cityscapes(VisionDataset):
                 self.images.append(os.path.join(img_dir, file_name))
                 self.targets.append(target_types)
 
-    def __getitem__(self, index: int) -> tuple[Any, Any]:
+    def __getitem__(self, index: int) -> Tuple[Any, Any]:
         """
         Args:
             index (int): Index
@@ -188,11 +188,11 @@ class Cityscapes(VisionDataset):
             if t == "polygon":
                 target = self._load_json(self.targets[index][i])
             else:
-                target = Image.open(self.targets[index][i])  # type: ignore[assignment]
+                target = Image.open(self.targets[index][i])
 
             targets.append(target)
 
-        target = tuple(targets) if len(targets) > 1 else targets[0]  # type: ignore[assignment]
+        target = tuple(targets) if len(targets) > 1 else targets[0]
 
         if self.transforms is not None:
             image, target = self.transforms(image, target)
@@ -206,7 +206,7 @@ class Cityscapes(VisionDataset):
         lines = ["Split: {split}", "Mode: {mode}", "Type: {target_type}"]
         return "\n".join(lines).format(**self.__dict__)
 
-    def _load_json(self, path: str) -> dict[str, Any]:
+    def _load_json(self, path: str) -> Dict[str, Any]:
         with open(path) as file:
             data = json.load(file)
         return data

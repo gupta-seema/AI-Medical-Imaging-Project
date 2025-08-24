@@ -1,6 +1,5 @@
 #pragma once
 
-#include <torch/csrc/Export.h>
 #include <torch/csrc/python_headers.h>
 
 #include <c10/core/MemoryFormat.h>
@@ -10,13 +9,12 @@
 const int MEMORY_FORMAT_NAME_LEN = 64;
 
 struct THPMemoryFormat {
-  PyObject_HEAD
-  at::MemoryFormat memory_format;
+  PyObject_HEAD at::MemoryFormat memory_format;
   // NOLINTNEXTLINE(cppcoreguidelines-avoid-c-arrays,modernize-avoid-c-arrays)
   char name[MEMORY_FORMAT_NAME_LEN + 1];
 };
 
-TORCH_PYTHON_API extern PyTypeObject THPMemoryFormatType;
+extern PyTypeObject THPMemoryFormatType;
 
 inline bool THPMemoryFormat_Check(PyObject* obj) {
   return Py_TYPE(obj) == &THPMemoryFormatType;

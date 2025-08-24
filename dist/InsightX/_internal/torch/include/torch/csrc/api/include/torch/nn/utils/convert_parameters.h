@@ -3,24 +3,26 @@
 #include <torch/csrc/Export.h>
 #include <torch/types.h>
 
-namespace torch::nn::utils {
+namespace torch {
+namespace nn {
+namespace utils {
 
 // This helper function is to check if the parameters are located
 // in the same device. Currently, the conversion between model parameters
 // and single vector form is not supported for multiple allocations,
 // e.g. parameters in different GPUs, or mixture of CPU/GPU.
-inline std::optional<int64_t> _check_param_device(
+inline c10::optional<int64_t> _check_param_device(
     const torch::Tensor& param,
-    std::optional<int64_t> old_param_device) {
+    c10::optional<int64_t> old_param_device) {
   // Meet the first parameter
-  if (old_param_device == std::nullopt) {
+  if (old_param_device == c10::nullopt) {
     old_param_device = param.is_cuda() ? param.get_device() : -1;
   } else {
     bool warn = false;
     if (param.is_cuda()) { // Check if in same GPU
-      warn = (param.get_device() != old_param_device);
+      warn = (param.get_device() != old_param_device.value());
     } else { // Check if in CPU
-      warn = (old_param_device != -1);
+      warn = (old_param_device.value() != -1);
     }
     if (warn) {
       TORCH_CHECK(
@@ -36,7 +38,7 @@ inline std::optional<int64_t> _check_param_device(
 // Convert parameters to one vector
 inline torch::Tensor parameters_to_vector(
     const std::vector<torch::Tensor>& parameters) {
-  std::optional<int64_t> param_device;
+  c10::optional<int64_t> param_device;
 
   std::vector<torch::Tensor> vec;
   vec.reserve(parameters.size());
@@ -56,7 +58,7 @@ inline void vector_to_parameters(
     const torch::Tensor& vec,
     const std::vector<torch::Tensor>& parameters) {
   // Flag for the device where the parameter is located
-  std::optional<int64_t> param_device;
+  c10::optional<int64_t> param_device;
 
   // Pointer for slicing the vector for each parameter
   int64_t pointer = 0;
@@ -75,4 +77,6 @@ inline void vector_to_parameters(
   }
 }
 
-} // namespace torch::nn::utils
+} // namespace utils
+} // namespace nn
+} // namespace torch

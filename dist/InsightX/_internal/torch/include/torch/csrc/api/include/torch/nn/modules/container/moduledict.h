@@ -5,7 +5,8 @@
 #include <torch/ordered_dict.h>
 #include <vector>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 /// An OrderedDict of `Module`s that registers its elements by their `key`s.
 ///
@@ -130,7 +131,7 @@ class ModuleDictImpl : public Cloneable<ModuleDictImpl> {
     return modules_.is_empty();
   }
 
-  /// Check if the certain parameter with the key in the `ModuleDict`.
+  /// Check if the centain parameter with the key in the `ModuleDict`.
   bool contains(const std::string& key) const noexcept {
     return modules_.contains(key);
   }
@@ -145,7 +146,7 @@ class ModuleDictImpl : public Cloneable<ModuleDictImpl> {
   /// Special cloning function for `ModuleDict` because it does not use
   /// `reset()`.
   std::shared_ptr<Module> clone(
-      const std::optional<Device>& device = std::nullopt) const override {
+      const optional<Device>& device = nullopt) const override {
     auto clone = std::make_shared<ModuleDictImpl>();
     for (const auto& module : modules_) {
       clone->insert(module.key(), module.value()->clone(device));
@@ -257,4 +258,5 @@ class ModuleDictImpl : public Cloneable<ModuleDictImpl> {
 /// module storage semantics.
 TORCH_MODULE(ModuleDict);
 
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

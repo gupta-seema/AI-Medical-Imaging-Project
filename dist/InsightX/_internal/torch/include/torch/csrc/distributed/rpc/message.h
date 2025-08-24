@@ -3,10 +3,11 @@
 #include <torch/types.h>
 #include <vector>
 
-namespace torch::distributed::rpc {
+namespace torch {
+namespace distributed {
+namespace rpc {
 
 // An enum denoting common RPC errors to allow specific error handling for them.
-// NOLINTNEXTLINE(performance-enum-size)
 enum RPCErrorType {
   UNKNOWN_ERROR = 0, /* Indicates that error type could not be parsed */
   TIMEOUT = 1, /* Indicates that the RPC has timed out */
@@ -17,14 +18,12 @@ enum RPCErrorType {
 // The enum values are bitwise ORed with MessageType
 // They are bit flags starting from 0x100 and should have
 // value such as 0x100, 0x200, 0x400, 0x800, 0xF00, etc.
-// NOLINTNEXTLINE(performance-enum-size)
 enum MessageTypeFlags {
   REQUEST_TYPE = 0x100,
   RESPONSE_TYPE = 0x200,
 };
 
 // Message types must have values between 0x00 to 0xff
-// NOLINTNEXTLINE(performance-enum-size)
 enum MessageType {
   // messages for dist.rpc on builtin operators
   SCRIPT_CALL = 0x00 | MessageTypeFlags::REQUEST_TYPE,
@@ -133,7 +132,6 @@ class TORCH_API Message final : public torch::CustomClassHolder {
   Message(Message&& other) = delete;
   Message& operator=(Message const& rhs) = delete;
   Message& operator=(Message&& rhs) = delete;
-  ~Message() override = default;
 
   // Destructively retrieves the payload.
   std::vector<char>&& movePayload() &&;
@@ -190,4 +188,6 @@ withStorages(c10::intrusive_ptr<Message> message) {
 
 using JitFuture = c10::ivalue::Future;
 
-} // namespace torch::distributed::rpc
+} // namespace rpc
+} // namespace distributed
+} // namespace torch

@@ -1,13 +1,9 @@
-# mypy: allow-untyped-defs
-from typing import Optional, Union
+from numbers import Number
 
 import torch
-from torch import Tensor
 from torch.distributions import constraints
 from torch.distributions.distribution import Distribution
 from torch.distributions.utils import broadcast_all
-from torch.types import _Number, _size
-
 
 __all__ = ["Laplace"]
 
@@ -27,35 +23,29 @@ class Laplace(Distribution):
         loc (float or Tensor): mean of the distribution
         scale (float or Tensor): scale of the distribution
     """
-
     arg_constraints = {"loc": constraints.real, "scale": constraints.positive}
     support = constraints.real
     has_rsample = True
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return self.loc
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return self.loc
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return 2 * self.scale.pow(2)
 
     @property
-    def stddev(self) -> Tensor:
+    def stddev(self):
         return (2**0.5) * self.scale
 
-    def __init__(
-        self,
-        loc: Union[Tensor, float],
-        scale: Union[Tensor, float],
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, loc, scale, validate_args=None):
         self.loc, self.scale = broadcast_all(loc, scale)
-        if isinstance(loc, _Number) and isinstance(scale, _Number):
+        if isinstance(loc, Number) and isinstance(scale, Number):
             batch_shape = torch.Size()
         else:
             batch_shape = self.loc.size()
@@ -70,7 +60,7 @@ class Laplace(Distribution):
         new._validate_args = self._validate_args
         return new
 
-    def rsample(self, sample_shape: _size = torch.Size()) -> Tensor:
+    def rsample(self, sample_shape=torch.Size()):
         shape = self._extended_shape(sample_shape)
         finfo = torch.finfo(self.loc.dtype)
         if torch._C._get_tracing_state():

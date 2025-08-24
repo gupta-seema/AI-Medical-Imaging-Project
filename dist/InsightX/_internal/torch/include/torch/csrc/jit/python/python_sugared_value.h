@@ -27,12 +27,12 @@ std::shared_ptr<SugaredValue> toSugaredValue(
     const SourceRange& loc,
     bool is_constant = false);
 
-std::optional<StrongFunctionPtr> as_function(const py::object& obj);
+c10::optional<StrongFunctionPtr> as_function(const py::object& obj);
 
 struct VISIBILITY_HIDDEN PythonValue : public SugaredValue {
   PythonValue(
       py::object the_self,
-      std::optional<py::object> rcb = std::nullopt,
+      c10::optional<py::object> rcb = c10::nullopt,
       Value* module_self = nullptr)
       : self(std::move(the_self)),
         rcb(std::move(rcb)),
@@ -56,7 +56,7 @@ struct VISIBILITY_HIDDEN PythonValue : public SugaredValue {
   std::vector<std::shared_ptr<SugaredValue>> asTuple(
       const SourceRange& loc,
       GraphFunction& m,
-      const std::optional<size_t>& size_hint = {}) override;
+      const c10::optional<size_t>& size_hint = {}) override;
 
   std::shared_ptr<SugaredValue> attr(
       const SourceRange& loc,
@@ -64,12 +64,11 @@ struct VISIBILITY_HIDDEN PythonValue : public SugaredValue {
       const std::string& field) override;
 
   Value* asValue(const SourceRange& loc, GraphFunction& m) override {
-    throw(
-        ErrorReport(loc)
+    throw ErrorReport(loc)
         << kind() << " cannot be used as a value. "
         << "Perhaps it is a closed over global variable? If so, please "
         << "consider passing it in as an argument or use a local varible "
-        << "instead.");
+        << "instead.";
   }
 
  protected:
@@ -80,7 +79,7 @@ struct VISIBILITY_HIDDEN PythonValue : public SugaredValue {
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   py::object self;
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
-  std::optional<py::object> rcb;
+  c10::optional<py::object> rcb;
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   Value* moduleSelf_ = nullptr;
 };
@@ -127,7 +126,7 @@ struct VISIBILITY_HIDDEN ConstantParameterList : public SugaredValue {
 
 struct VISIBILITY_HIDDEN ModuleDictMethod : public SugaredValue {
   explicit ModuleDictMethod(SugaredValuePtr iterable, std::string name)
-      : iterable_(std::move(iterable)), name_(std::move(name)) {}
+      : iterable_(std::move(iterable)), name_(std::move(name)){};
 
   std::string kind() const override {
     return name_;
@@ -140,14 +139,13 @@ struct VISIBILITY_HIDDEN ModuleDictMethod : public SugaredValue {
       at::ArrayRef<NamedValue> kwargs,
       size_t n_binders) override {
     if (!args.empty() || !kwargs.empty()) {
-      throw(
-          ErrorReport(loc) << name_ << " method does not accept any arguments");
+      throw ErrorReport(loc)
+          << name_ << " method does not accept any arguments";
     }
     return iterable_;
   }
 
   SugaredValuePtr iterable_;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const std::string name_;
 };
 
@@ -286,7 +284,7 @@ struct VISIBILITY_HIDDEN SugaredDict : public SugaredValue {
 
   SugaredValuePtr iter(const SourceRange& loc, GraphFunction& m) override {
     return keys_;
-  }
+  };
 
   std::shared_ptr<ModuleValue> self_;
   std::shared_ptr<SugaredTupleValue> keys_;

@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 """torch.multiprocessing is a wrapper around the native :mod:`multiprocessing` module.
 
 It registers custom reducers, that use shared memory to provide shared
@@ -14,14 +13,11 @@ memory.
 Because of the similarity of APIs we do not document most of this package
 contents, and we recommend referring to very good docs of the original module.
 """
-
 import multiprocessing
 import sys
 
 import torch
-
 from .reductions import init_reductions
-
 
 __all__ = ["set_sharing_strategy", "get_sharing_strategy", "get_all_sharing_strategies"]
 
@@ -40,7 +36,6 @@ torch._C._multiprocessing_init()
 """Add helper function to spawn N processes and wait for completion of any of
 them. This depends `mp.get_context` which was added in Python 3.4."""
 from .spawn import (
-    ENV_VAR_PARALLEL_START,
     ProcessContext,
     ProcessExitedException,
     ProcessRaisedException,
@@ -80,43 +75,4 @@ def get_all_sharing_strategies():
     return _all_sharing_strategies
 
 
-def _set_thread_name(name: str) -> None:
-    """Set the name of the current thread.
-
-    Args:
-        name (str): Name of the current thread.
-    """
-    torch._C._set_thread_name(name)
-
-
-def _get_thread_name() -> str:
-    """Get the name of the current thread.
-
-    Returns:
-        str: Name of the current thread.
-    """
-    return torch._C._get_thread_name()
-
-
 init_reductions()
-
-# Leak ResourceTracker at exit for Python-3.12 on MacOS
-# See https://github.com/pytorch/pytorch/issues/153050 and
-# https://github.com/python/cpython/issues/88887 for more details
-from multiprocessing.resource_tracker import ResourceTracker as _RT
-
-
-if (
-    sys.platform == "darwin"
-    and sys.version_info >= (3, 12, 2)
-    and hasattr(_RT, "__del__")
-):
-    import atexit
-
-    def _leak_RT_at_exit():
-        def _noop(x):
-            pass
-
-        _RT.__del__ = _noop  # type: ignore[attr-defined]
-
-    atexit.register(_leak_RT_at_exit)

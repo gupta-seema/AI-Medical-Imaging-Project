@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,23 +23,23 @@ namespace at {
 
 
 // aten::_pad_enum(Tensor self, SymInt[] pad, int mode, float? value=None) -> Tensor
-inline at::Tensor _pad_enum(const at::Tensor & self, at::IntArrayRef pad, int64_t mode, ::std::optional<double> value=::std::nullopt) {
+inline at::Tensor _pad_enum(const at::Tensor & self, at::IntArrayRef pad, int64_t mode, c10::optional<double> value=c10::nullopt) {
     return at::_ops::_pad_enum::call(self, c10::fromIntArrayRefSlow(pad), mode, value);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor _pad_enum(const at::Tensor & self, at::IntArrayRef pad, int64_t mode, ::std::optional<double> value=::std::nullopt) {
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
+  at::Tensor _pad_enum(const at::Tensor & self, at::IntArrayRef pad, int64_t mode, c10::optional<double> value=c10::nullopt) {
     return at::_ops::_pad_enum::call(self, c10::fromIntArrayRefSlow(pad), mode, value);
   }
 }
 
 // aten::_pad_enum(Tensor self, SymInt[] pad, int mode, float? value=None) -> Tensor
-inline at::Tensor _pad_enum_symint(const at::Tensor & self, c10::SymIntArrayRef pad, int64_t mode, ::std::optional<double> value=::std::nullopt) {
+inline at::Tensor _pad_enum_symint(const at::Tensor & self, c10::SymIntArrayRef pad, int64_t mode, c10::optional<double> value=c10::nullopt) {
     return at::_ops::_pad_enum::call(self, pad, mode, value);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor _pad_enum(const at::Tensor & self, c10::SymIntArrayRef pad, int64_t mode, ::std::optional<double> value=::std::nullopt) {
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
+  at::Tensor _pad_enum(const at::Tensor & self, c10::SymIntArrayRef pad, int64_t mode, c10::optional<double> value=c10::nullopt) {
     return at::_ops::_pad_enum::call(self, pad, mode, value);
   }
 }

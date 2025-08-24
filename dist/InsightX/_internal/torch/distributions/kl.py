@@ -1,11 +1,10 @@
-# mypy: allow-untyped-defs
 import math
 import warnings
 from functools import total_ordering
-from typing import Callable
+from typing import Callable, Dict, Tuple, Type
 
 import torch
-from torch import inf, Tensor
+from torch import inf
 
 from .bernoulli import Bernoulli
 from .beta import Beta
@@ -37,12 +36,11 @@ from .transformed_distribution import TransformedDistribution
 from .uniform import Uniform
 from .utils import _sum_rightmost, euler_constant as _euler_gamma
 
-
-_KL_REGISTRY: dict[
-    tuple[type, type], Callable
+_KL_REGISTRY: Dict[
+    Tuple[Type, Type], Callable
 ] = {}  # Source of truth mapping a few general (type, type) pairs to functions.
-_KL_MEMOIZE: dict[
-    tuple[type, type], Callable
+_KL_MEMOIZE: Dict[
+    Tuple[Type, Type], Callable
 ] = {}  # Memoized version mapping many specific (type, type) pairs to functions.
 
 __all__ = ["register_kl", "kl_divergence"]
@@ -130,8 +128,9 @@ def _dispatch_kl(type_p, type_q):
     right_fun = _KL_REGISTRY[right_p, right_q]
     if left_fun is not right_fun:
         warnings.warn(
-            f"Ambiguous kl_divergence({type_p.__name__}, {type_q.__name__}). "
-            f"Please register_kl({left_p.__name__}, {right_q.__name__})",
+            "Ambiguous kl_divergence({}, {}). Please register_kl({}, {})".format(
+                type_p.__name__, type_q.__name__, left_p.__name__, right_q.__name__
+            ),
             RuntimeWarning,
         )
     return left_fun
@@ -148,7 +147,7 @@ def _x_log_x(tensor):
     """
     Utility function for calculating x log x
     """
-    return torch.special.xlogy(tensor, tensor)  # produces correct result for x=0
+    return tensor * tensor.log()
 
 
 def _batch_trace_XXT(bmat):
@@ -161,7 +160,7 @@ def _batch_trace_XXT(bmat):
     return flat_trace.reshape(bmat.shape[:-2])
 
 
-def kl_divergence(p: Distribution, q: Distribution) -> Tensor:
+def kl_divergence(p: Distribution, q: Distribution) -> torch.Tensor:
     r"""
     Compute Kullback-Leibler divergence :math:`KL(p \| q)` between two distributions.
 
@@ -969,4 +968,4 @@ def _add_kl_info():
         )
     kl_info = "\n\t".join(rows)
     if kl_divergence.__doc__:
-        kl_divergence.__doc__ += kl_info
+        kl_divergence.__doc__ += kl_info  # type: ignore[operator]

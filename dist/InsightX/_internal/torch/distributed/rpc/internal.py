@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import collections
 import copyreg
 import io
@@ -11,7 +10,6 @@ from enum import Enum
 import torch
 import torch.distributed as dist
 from torch._C._distributed_rpc import _get_current_rpc_agent
-
 
 __all__ = ["RPCExecMode", "serialize", "deserialize", "PythonUDF", "RemoteException"]
 
@@ -252,9 +250,7 @@ def _build_rpc_profiling_key(
     Returns:
         String representing profiling key
     """
-    profile_key = (
-        f"rpc_{exec_type.value}#{func_name}({current_worker_name} -> {dst_worker_name})"
-    )
+    profile_key = f"rpc_{exec_type.value}#{func_name}({current_worker_name} -> {dst_worker_name})"
     return profile_key
 
 

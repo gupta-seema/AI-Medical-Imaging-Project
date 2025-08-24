@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import warnings
 
 import torch
@@ -9,7 +8,7 @@ class PostLocalSGDOptimizer(torch.optim.Optimizer):
     r"""
     Wraps an arbitrary :class:`torch.optim.Optimizer` and runs `post-local SGD <https://arxiv.org/abs/1808.07217>`_,
     This optimizer runs local optimizer at every step.
-    After the warm-up stage, it averages parameters periodically after the local optimizer is applied.
+    After the warm-up stage, it averages parameters periodically afer the local optimizer is applied.
 
     Args:
         optim: The local optimizer.
@@ -61,7 +60,7 @@ class PostLocalSGDOptimizer(torch.optim.Optimizer):
         self.averager = averager
 
     @property
-    def state(self):  # type: ignore[override]
+    def state(self):
         return self.optim.state
 
     def __repr__(self):
@@ -96,7 +95,7 @@ class PostLocalSGDOptimizer(torch.optim.Optimizer):
             )
             self.averager.step = 0
 
-    def step(self):  # type: ignore[override]
+    def step(self):
         r"""
         Performs a single optimization step (parameter update).
         """

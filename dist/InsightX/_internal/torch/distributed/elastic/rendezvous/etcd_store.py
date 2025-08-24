@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 #
@@ -11,14 +10,10 @@ import time
 from base64 import b64decode, b64encode
 from typing import Optional
 
+import etcd  # type: ignore[import]
+
 # pyre-ignore[21]: Could not find name `Store` in `torch.distributed`.
 from torch.distributed import Store
-
-
-try:
-    import etcd  # type: ignore[import]
-except ModuleNotFoundError:
-    from . import _etcd_stub as etcd
 
 
 # Delay (sleep) for a small random amount to reduce CAS failures.
@@ -180,32 +175,25 @@ class EtcdStore(Store):
 
         while True:
             # Read whole directory (of keys), filter only the ones waited for
-            all_nodes = None
-            try:
-                all_nodes = self.client.get(key=self.prefix)
-                req_nodes = {
-                    node.key: node.value
-                    for node in all_nodes.children
-                    if node.key in b64_keys
-                }
+            all_nodes = self.client.get(key=self.prefix)
+            req_nodes = {
+                node.key: node.value for node in all_nodes.children if node.key in b64_keys
+            }
 
-                if len(req_nodes) == len(b64_keys):
-                    # All keys are available
-                    return req_nodes
-            except etcd.EtcdKeyNotFound:
-                pass
+            if len(req_nodes) == len(b64_keys):
+                # All keys are available
+                return req_nodes
 
             watch_timeout = deadline - time.time()
             if watch_timeout <= 0:
                 return None
 
             try:
-                index = all_nodes.etcd_index + 1 if all_nodes else 0
                 self.client.watch(
                     key=self.prefix,
                     recursive=True,
                     timeout=watch_timeout,
-                    index=index,
+                    index=all_nodes.etcd_index + 1,
                 )
             except etcd.EtcdWatchTimedOut:
                 if time.time() >= deadline:

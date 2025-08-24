@@ -1,17 +1,15 @@
 import io
 import warnings
-from collections.abc import Iterator
 
-from typing import Any
+from typing import Any, Dict, Iterator
 
 import torch
 
 from ..utils import _log_api_usage_once
-from ._video_deprecation_warning import _raise_video_deprecation_warning
 
-from ._video_opt import _HAS_CPU_VIDEO_DECODER
+from ._video_opt import _HAS_VIDEO_OPT
 
-if _HAS_CPU_VIDEO_DECODER:
+if _HAS_VIDEO_OPT:
 
     def _has_video_opt() -> bool:
         return True
@@ -47,19 +45,12 @@ install PyAV on your system.
 
 
 class VideoReader:
-    """[DEPRECATED] Fine-grained video-reading API.
+    """
+    Fine-grained video-reading API.
     Supports frame-by-frame reading of various streams from a single video
     container. Much like previous video_reader API it supports the following
     backends: video_reader, pyav, and cuda.
     Backends can be set via `torchvision.set_video_backend` function.
-
-    .. warning::
-
-        DEPRECATED: All the video decoding and encoding capabilities of torchvision
-        are deprecated from version 0.22 and will be removed in version 0.24.  We
-        recommend that you migrate to
-        `TorchCodec <https://github.com/pytorch/torchcodec>`__, where we'll
-        consolidate the future decoding/encoding capabilities of PyTorch
 
     .. betastatus:: VideoReader class
 
@@ -126,7 +117,6 @@ class VideoReader:
         stream: str = "video",
         num_threads: int = 0,
     ) -> None:
-        _raise_video_deprecation_warning()
         _log_api_usage_once(self)
         from .. import get_video_backend
 
@@ -176,9 +166,9 @@ class VideoReader:
             # TODO: add extradata exception
 
         else:
-            raise RuntimeError(f"Unknown video backend: {self.backend}")
+            raise RuntimeError("Unknown video backend: {}".format(self.backend))
 
-    def __next__(self) -> dict[str, Any]:
+    def __next__(self) -> Dict[str, Any]:
         """Decodes and returns the next frame of the current stream.
         Frames are encoded as a dict with mandatory
         data and pts fields, where data is a tensor, and pts is a
@@ -215,7 +205,7 @@ class VideoReader:
 
         return {"data": frame, "pts": pts}
 
-    def __iter__(self) -> Iterator[dict[str, Any]]:
+    def __iter__(self) -> Iterator[Dict[str, Any]]:
         return self
 
     def seek(self, time_s: float, keyframes_only: bool = False) -> "VideoReader":
@@ -245,7 +235,7 @@ class VideoReader:
             self._c = self.container.decode(**self.pyav_stream)
         return self
 
-    def get_metadata(self) -> dict[str, Any]:
+    def get_metadata(self) -> Dict[str, Any]:
         """Returns video metadata
 
         Returns:
@@ -261,7 +251,7 @@ class VideoReader:
                         rate_n = "framerate"
                     metadata[stream.type] = {rate_n: [], "duration": []}
 
-                rate = getattr(stream, "average_rate", None) or stream.sample_rate
+                rate = stream.average_rate if stream.average_rate is not None else stream.sample_rate
 
                 metadata[stream.type]["duration"].append(float(stream.duration * stream.time_base))
                 metadata[stream.type][rate_n].append(float(rate))

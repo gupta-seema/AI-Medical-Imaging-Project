@@ -1,15 +1,14 @@
-# mypy: allow-untyped-defs
 import bisect
 import itertools
 import math
+
 from collections import defaultdict, namedtuple
 from operator import attrgetter
-from typing import Any, Optional
-from typing_extensions import deprecated
+
+from typing import Any, Dict, List, Optional, Tuple
 
 import torch
 from torch.autograd import DeviceType
-
 
 __all__ = [
     "EventList",
@@ -27,10 +26,12 @@ class EventList(list):
     """A list of Events (for pretty printing)."""
 
     def __init__(self, *args, **kwargs):
+        use_cuda = kwargs.pop("use_cuda", True)
         use_device = kwargs.pop("use_device", None)
         profile_memory = kwargs.pop("profile_memory", False)
         with_flops = kwargs.pop("with_flops", False)
         super().__init__(*args, **kwargs)
+        self._use_cuda = use_cuda
         self._use_device = use_device
         self._profile_memory = profile_memory
         self._tree_built = False
@@ -109,12 +110,13 @@ class EventList(list):
         #
         # Algorithm has O(N * log(N)) complexity where N is number of
         # intervals
-        for _thread_id, thread_events in threads:
+        for thread_id, thread_events in threads:
             thread_events_ = sorted(
                 thread_events,
                 key=lambda event: [event.time_range.start, -event.time_range.end],
             )
-            current_events: list[FunctionEvent] = []
+            current_events: List[FunctionEvent] = []
+            cur_end = 0
             for event in thread_events_:
                 while len(current_events) > 0:
                     parent = current_events[-1]
@@ -162,7 +164,7 @@ class EventList(list):
 
     @property
     def self_cpu_time_total(self):
-        return sum(event.self_cpu_time_total for event in self)
+        return sum([event.self_cpu_time_total for event in self])
 
     def table(
         self,
@@ -179,16 +181,14 @@ class EventList(list):
         Args:
             sort_by (str, optional): Attribute used to sort entries. By default
                 they are printed in the same order as they were registered.
-                Valid keys include: ``cpu_time``, ``cuda_time``, ``xpu_time``,
-                ``cpu_time_total``, ``cuda_time_total``, ``xpu_time_total``,
-                ``cpu_memory_usage``, ``cuda_memory_usage``, ``xpu_memory_usage``,
-                ``self_cpu_memory_usage``, ``self_cuda_memory_usage``,
-                ``self_xpu_memory_usage``, ``count``.
+                Valid keys include: ``cpu_time``, ``cuda_time``, ``cpu_time_total``,
+                ``cuda_time_total``, ``cpu_memory_usage``, ``cuda_memory_usage``,
+                ``self_cpu_memory_usage``, ``self_cuda_memory_usage``, ``count``.
             top_level_events_only(bool, optional): Boolean flag to determine the
                 selection of events to display. If true, the profiler will only
                 display events at top level like top-level invocation of python
                 `lstm`, python `add` or other functions, nested events like low-level
-                cpu/cuda/xpu ops events are omitted for profiler result readability.
+                cpu/cuda ops events are omitted for profiler result readability.
 
         Returns:
             A string containing the table.
@@ -218,6 +218,7 @@ class EventList(list):
 
         device_name = "cuda" if not self._use_device else self._use_device
         with open(path, "w") as f:
+            chrome_events = []
             next_id = 0
             # Use file IO over using json.dump since JSON dumping is very slow and
             # this technique is proven to give a 4x speedup.
@@ -241,7 +242,7 @@ class EventList(list):
                         else f'" node_id:{evt.node_id}, thread_id:{evt.thread} "',
                     )
                 )
-                for _ in evt.kernels:
+                for k in evt.kernels:
                     # 's' and 'f' draw Flow arrows from
                     # the CPU launch to the GPU kernel
                     f.write(
@@ -266,7 +267,6 @@ class EventList(list):
         return [
             "self_cpu_time_total",
             "self_cuda_time_total",
-            "self_xpu_time_total",
             "self_privateuse1_time_total",
         ]
 
@@ -280,12 +280,7 @@ class EventList(list):
         with open(path, "w") as f:
             for evt in self:
                 if evt.stack and len(evt.stack) > 0:
-                    metric_value = getattr(
-                        evt,
-                        metric.replace("cuda", "device")
-                        .replace("xpu", "device")
-                        .replace("privateuse1", "device"),
-                    )
+                    metric_value = getattr(evt, metric)
                     if int(metric_value) > 0:
                         stack_str = ""
                         for entry in reversed(evt.stack):
@@ -294,12 +289,7 @@ class EventList(list):
                         stack_str = stack_str[:-1] + " " + str(int(metric_value))
                         f.write(stack_str + "\n")
 
-    def key_averages(
-        self,
-        group_by_input_shapes=False,
-        group_by_stack_n=0,
-        group_by_overload_name=False,
-    ):
+    def key_averages(self, group_by_input_shapes=False, group_by_stack_n=0):
         """Averages all function events over their keys.
 
         Args:
@@ -311,27 +301,19 @@ class EventList(list):
 
             group_by_stack_n: group by top n stack trace entries
 
-            group_by_overload_name: Differentiate operators by their overload name e.g. aten::add.Tensor
-            and aten::add.out will be aggregated separately
-
         Returns:
             An EventList containing FunctionEventAvg objects.
         """
         assert self._tree_built
-        stats: dict[tuple[str, ...], FunctionEventAvg] = defaultdict(FunctionEventAvg)
+        stats: Dict[Tuple[str, ...], FunctionEventAvg] = defaultdict(FunctionEventAvg)
 
-        def get_key(
-            event, group_by_input_shapes, group_by_stack_n, group_by_overload_name
-        ) -> tuple[str, ...]:
+        def get_key(event, group_by_input_shapes, group_by_stack_n) -> Tuple[str, ...]:
             key = [
                 str(event.key),
                 str(event.node_id),
                 str(event.device_type),
                 str(event.is_legacy),
-                str(event.is_user_annotation),
             ]
-            if group_by_overload_name:
-                key.append(evt.overload_name)
             if group_by_input_shapes:
                 key.append(str(event.input_shapes))
             if group_by_stack_n > 0:
@@ -339,14 +321,11 @@ class EventList(list):
             return tuple(key)
 
         for evt in self:
-            stats[
-                get_key(
-                    evt, group_by_input_shapes, group_by_stack_n, group_by_overload_name
-                )
-            ].add(evt)
+            stats[get_key(evt, group_by_input_shapes, group_by_stack_n)].add(evt)
 
         avg_list = EventList(
             stats.values(),
+            use_cuda=self._use_cuda,
             use_device=self._use_device,
             profile_memory=self._profile_memory,
             with_flops=self._with_flops,
@@ -355,8 +334,6 @@ class EventList(list):
             evt.stack = evt.stack[:group_by_stack_n]
             if not group_by_input_shapes:
                 evt.input_shapes = ""
-            if not group_by_overload_name:
-                evt.overload_name = ""
         return avg_list
 
     def total_average(self):
@@ -398,13 +375,13 @@ def _format_memory(nbytes):
     MB = 1024 * KB
     GB = 1024 * MB
     if abs(nbytes) >= GB:
-        return f"{nbytes * 1.0 / GB:.2f} GB"
+        return f"{nbytes * 1.0 / GB:.2f} Gb"
     elif abs(nbytes) >= MB:
-        return f"{nbytes * 1.0 / MB:.2f} MB"
+        return f"{nbytes * 1.0 / MB:.2f} Mb"
     elif abs(nbytes) >= KB:
-        return f"{nbytes * 1.0 / KB:.2f} KB"
+        return f"{nbytes * 1.0 / KB:.2f} Kb"
     else:
-        return str(nbytes) + " B"
+        return str(nbytes) + " b"
 
 
 def _attr_formatter(name):
@@ -418,27 +395,26 @@ class FormattedTimesMixin:
     """
 
     cpu_time_str = _attr_formatter("cpu_time")
-    device_time_str = _attr_formatter("device_time")
+    cuda_time_str = _attr_formatter("cuda_time")
+    privateuse1_time_str = _attr_formatter("privateuse1_time")
     cpu_time_total_str = _attr_formatter("cpu_time_total")
-    device_time_total_str = _attr_formatter("device_time_total")
+    cuda_time_total_str = _attr_formatter("cuda_time_total")
+    privateuse1_time_total_str = _attr_formatter("privateuse1_time_total")
     self_cpu_time_total_str = _attr_formatter("self_cpu_time_total")
-    self_device_time_total_str = _attr_formatter("self_device_time_total")
+    self_cuda_time_total_str = _attr_formatter("self_cuda_time_total")
+    self_privateuse1_time_total_str = _attr_formatter("self_privateuse1_time_total")
 
     @property
     def cpu_time(self):
         return 0.0 if self.count == 0 else 1.0 * self.cpu_time_total / self.count  # type: ignore[attr-defined]
 
     @property
-    def device_time(self):
-        return 0.0 if self.count == 0 else 1.0 * self.device_time_total / self.count  # type: ignore[attr-defined]
+    def cuda_time(self):
+        return 0.0 if self.count == 0 else 1.0 * self.cuda_time_total / self.count  # type: ignore[attr-defined]
 
     @property
-    @deprecated(
-        "`cuda_time` is deprecated, please use `device_time` instead.",
-        category=FutureWarning,
-    )
-    def cuda_time(self):  # To be deprecated
-        return self.device_time
+    def privateuse1_time(self):
+        return 0.0 if self.count == 0 else 1.0 * self.privateuse1_time_total / self.count  # type: ignore[attr-defined]
 
 
 class Interval:
@@ -466,62 +442,51 @@ class FunctionEvent(FormattedTimesMixin):
         thread,
         start_us,
         end_us,
-        overload_name=None,
         fwd_thread=None,
         input_shapes=None,
         stack=None,
         scope=0,
         use_device=None,
         cpu_memory_usage=0,
-        device_memory_usage=0,
+        cuda_memory_usage=0,
+        privateuse1_memory_usage=0,
         is_async=False,
         is_remote=False,
         sequence_nr=-1,
         node_id=-1,
         device_type=DeviceType.CPU,
         device_index=0,
-        device_resource_id=None,
         is_legacy=False,
         flops=None,
         trace_name=None,
         concrete_inputs=None,
-        kwinputs=None,
-        is_user_annotation=False,
     ):
         self.id: int = id
         self.node_id: int = node_id
         self.name: str = name
-        self.overload_name: str = overload_name
         self.trace_name: str = trace_name
         self.time_range: Interval = Interval(start_us, end_us)
         self.thread: int = thread
         self.fwd_thread: Optional[int] = fwd_thread
-        self.kernels: list[Kernel] = []
+        self.kernels: List[Kernel] = []
         self.count: int = 1
-        self.cpu_children: list[FunctionEvent] = []
+        self.cpu_children: List[FunctionEvent] = []
         self.cpu_parent: Optional[FunctionEvent] = None
-        self.input_shapes: tuple[int, ...] = input_shapes
-        self.concrete_inputs: list[Any] = concrete_inputs
-        self.kwinputs: dict[str, Any] = kwinputs
-        self.stack: list = stack
+        self.input_shapes: Tuple[int, ...] = input_shapes
+        self.concrete_inputs: List[Any] = concrete_inputs
+        self.stack: List = stack
         self.scope: int = scope
         self.use_device: Optional[str] = use_device
         self.cpu_memory_usage: int = cpu_memory_usage
-        self.device_memory_usage: int = device_memory_usage
+        self.cuda_memory_usage: int = cuda_memory_usage
+        self.privateuse1_memory_usage: int = privateuse1_memory_usage
         self.is_async: bool = is_async
         self.is_remote: bool = is_remote
         self.sequence_nr: int = sequence_nr
         self.device_type: DeviceType = device_type
         self.device_index: int = device_index
-        self.device_resource_id: int = (
-            thread if device_resource_id is None else device_resource_id
-        )
         self.is_legacy: bool = is_legacy
         self.flops: Optional[int] = flops
-        self.is_user_annotation: Optional[bool] = is_user_annotation
-        self.self_cpu_percent = -1
-        self.total_cpu_percent = -1
-        self.total_device_percent = -1
 
     def append_kernel(self, name, device, duration):
         assert self.device_type == DeviceType.CPU
@@ -557,24 +522,61 @@ class FunctionEvent(FormattedTimesMixin):
         if self.is_async or self.device_type != DeviceType.CPU:
             return 0
         return self.cpu_memory_usage - sum(
-            child.cpu_memory_usage for child in self.cpu_children
+            [child.cpu_memory_usage for child in self.cpu_children]
         )
 
     @property
-    def self_device_memory_usage(self):
+    def self_cuda_memory_usage(self):
         if self.is_async or self.device_type != DeviceType.CPU:
             return 0
-        return self.device_memory_usage - sum(
-            child.device_memory_usage for child in self.cpu_children
+        return self.cuda_memory_usage - sum(
+            [child.cuda_memory_usage for child in self.cpu_children]
         )
 
     @property
-    @deprecated(
-        "`self_cuda_memory_usage` is deprecated. Use `self_device_memory_usage` instead.",
-        category=FutureWarning,
-    )
-    def self_cuda_memory_usage(self):  # To be deprecated
-        return self.self_device_memory_usage
+    def self_privateuse1_memory_usage(self):
+        if self.is_async or self.device_type != DeviceType.CPU:
+            return 0
+        return self.privateuse1_memory_usage - sum(
+            [child.privateuse1_memory_usage for child in self.cpu_children]
+        )
+
+    @property
+    def self_cpu_time_total(self):
+        if self.is_async or self.device_type != DeviceType.CPU:
+            return 0
+        return self.cpu_time_total - sum(
+            [child.cpu_time_total for child in self.cpu_children]
+        )
+
+    @property
+    def cuda_time_total(self):
+        if self.is_async or self.use_device:
+            return 0
+        if self.device_type == DeviceType.CPU:
+            if not self.is_legacy:
+                # account for the kernels in the children ops
+                return sum(kinfo.duration for kinfo in self.kernels) + sum(
+                    ch.cuda_time_total for ch in self.cpu_children
+                )
+            else:
+                # each legacy cpu events has a single (fake) kernel
+                return sum(kinfo.duration for kinfo in self.kernels)
+        else:
+            assert self.device_type == DeviceType.CUDA
+            return self.time_range.elapsed_us()
+
+    @property
+    def self_cuda_time_total(self):
+        if self.is_async or self.use_device:
+            return 0
+        if self.device_type == DeviceType.CPU:
+            return self.cuda_time_total - sum(
+                [child.cuda_time_total for child in self.cpu_children]
+            )
+        else:
+            assert self.device_type == DeviceType.CUDA
+            return self.cuda_time_total
 
     @property
     def cpu_time_total(self):
@@ -584,91 +586,80 @@ class FunctionEvent(FormattedTimesMixin):
             return 0
 
     @property
-    def self_cpu_time_total(self):
-        if self.is_async or self.device_type != DeviceType.CPU:
+    def self_privateuse1_time_total(self):
+        if self.is_async or not self.use_device:
             return 0
-        return self.cpu_time_total - sum(
-            child.cpu_time_total for child in self.cpu_children
-        )
+        if self.device_type == DeviceType.CPU:
+            return self.privateuse1_time_total - sum(
+                [child.privateuse1_time_total for child in self.cpu_children]
+            )
+        else:
+            assert self.device_type == DeviceType.CUDA
+            return self.privateuse1_time_total
 
     @property
-    def device_time_total(self):
+    def privateuse1_time_total(self):
         if self.is_async or not self.use_device:
             return 0
         if self.device_type == DeviceType.CPU:
             if not self.is_legacy:
                 # account for the kernels in the children ops
                 return sum(kinfo.duration for kinfo in self.kernels) + sum(
-                    ch.device_time_total for ch in self.cpu_children
+                    ch.privateuse1_time_total for ch in self.cpu_children
                 )
             else:
                 # each legacy cpu events has a single (fake) kernel
                 return sum(kinfo.duration for kinfo in self.kernels)
         else:
-            assert self.device_type in [
-                DeviceType.CUDA,
-                DeviceType.PrivateUse1,
-                DeviceType.MTIA,
-                DeviceType.HPU,
-            ]
+            assert self.device_type == DeviceType.PrivateUse1
             return self.time_range.elapsed_us()
-
-    @property
-    @deprecated(
-        "`cuda_time_total` is deprecated. Use `device_time_total` instead.",
-        category=FutureWarning,
-    )
-    def cuda_time_total(self):  # To be deprecated
-        return self.device_time_total
-
-    @property
-    def self_device_time_total(self):
-        if self.is_async or not self.use_device:
-            return 0
-        if self.device_type == DeviceType.CPU:
-            return self.device_time_total - sum(
-                child.device_time_total for child in self.cpu_children
-            )
-        else:
-            assert self.device_type in [
-                DeviceType.CUDA,
-                DeviceType.PrivateUse1,
-                DeviceType.MTIA,
-                DeviceType.HPU,
-            ]
-            return self.device_time_total
-
-    @property
-    @deprecated(
-        "`self_cuda_time_total` is deprecated. Use `self_device_time_total` instead.",
-        category=FutureWarning,
-    )
-    def self_cuda_time_total(self):  # To be deprecated
-        return self.self_device_time_total
 
     @property
     def key(self):
         return self.name
 
     def __repr__(self):
-        device_name = self.use_device
-        device_time = self.device_time_str
-        device_memory_usage = self.device_memory_usage
+        device_name = "cuda" if not self.use_device else self.use_device
+        device_time = (
+            self.cuda_time_str if not self.use_device else self.privateuse1_time_str
+        )
+        device_memory_usage = (
+            self.cuda_memory_usage
+            if not self.use_device
+            else self.privateuse1_memory_usage
+        )
         return (
-            f"<FunctionEvent id={self.id} name={self.name} overload_name={self.overload_name} "
-            f"device_type={self.device_type} node_id={self.node_id} cpu_time={self.cpu_time_str} "
-            f"start_us={self.time_range.start} end_us={self.time_range.end} "
-            f"cpu_children={str([child.id for child in self.cpu_children])} {device_name}_time={device_time} "
-            f"name={self.name} thread={self.thread} input_shapes={str(self.input_shapes)} "
-            f"cpu_memory_usage={self.cpu_memory_usage} {device_name}_memory_usage={device_memory_usage} "
-            f"is_async={self.is_async} is_remote={self.is_remote} seq_nr={self.sequence_nr} is_legacy={self.is_legacy}>"
+            "<FunctionEvent id={} name={} device_type={} node_id={} cpu_time={} start_us={} end_us={} "
+            "cpu_children={} {}_time={} name={} thread={} input_shapes={} "
+            "cpu_memory_usage={} {}_memory_usage={} is_async={} is_remote={} seq_nr={} is_legacy={}>".format(
+                self.id,
+                self.name,
+                self.device_type,
+                self.node_id,
+                self.cpu_time_str,
+                self.time_range.start,
+                self.time_range.end,
+                str([child.id for child in self.cpu_children]),
+                device_name,
+                device_time,
+                self.name,
+                self.thread,
+                str(self.input_shapes),
+                self.cpu_memory_usage,
+                device_name,
+                device_memory_usage,
+                self.is_async,
+                self.is_remote,
+                self.sequence_nr,
+                self.is_legacy,
+            )
         )
 
 
 class FunctionEventAvg(FormattedTimesMixin):
     """Used to average stats over multiple FunctionEvent objects."""
 
-    def __init__(self) -> None:
+    def __init__(self):
         self.key: Optional[str] = None
         self.count: int = 0
         self.node_id: int = 0
@@ -676,18 +667,21 @@ class FunctionEventAvg(FormattedTimesMixin):
         self.is_remote: bool = False
         self.use_device: Optional[str] = None
         self.cpu_time_total: int = 0
-        self.device_time_total: int = 0
+        self.cuda_time_total: int = 0
+        self.privateuse1_time_total: int = 0
         self.self_cpu_time_total: int = 0
-        self.self_device_time_total: int = 0
-        self.input_shapes: Optional[list[list[int]]] = None
-        self.overload_name: Optional[str] = None
-        self.stack: Optional[list] = None
+        self.self_cuda_time_total: int = 0
+        self.self_privateuse1_time_total: int = 0
+        self.input_shapes: Optional[List[List[int]]] = None
+        self.stack: Optional[List] = None
         self.scope: Optional[int] = None
         self.cpu_memory_usage: int = 0
-        self.device_memory_usage: int = 0
+        self.cuda_memory_usage: int = 0
+        self.privateuse1_memory_usage: int = 0
         self.self_cpu_memory_usage: int = 0
-        self.self_device_memory_usage: int = 0
-        self.cpu_children: Optional[list[FunctionEvent]] = None
+        self.self_cuda_memory_usage: int = 0
+        self.self_privateuse1_memory_usage: int = 0
+        self.cpu_children: Optional[List[FunctionEvent]] = None
         self.cpu_parent: Optional[FunctionEvent] = None
         self.device_type: DeviceType = DeviceType.CPU
         self.is_legacy: bool = False
@@ -704,26 +698,27 @@ class FunctionEventAvg(FormattedTimesMixin):
             self.cpu_parent = other.cpu_parent
             self.cpu_children = other.cpu_children
 
-            self.overload_name = other.overload_name
             self.input_shapes = other.input_shapes
             self.stack = other.stack
             self.scope = other.scope
             self.device_type = other.device_type
             self.is_legacy = other.is_legacy
             self.use_device = other.use_device
-            self.is_user_annotation = other.is_user_annotation
 
         assert isinstance(other, (FunctionEvent, FunctionEventAvg))
         assert other.key == self.key
-
         self.cpu_time_total += other.cpu_time_total
-        self.device_time_total += other.device_time_total
+        self.cuda_time_total += other.cuda_time_total
+        self.privateuse1_time_total += other.privateuse1_time_total
         self.self_cpu_time_total += other.self_cpu_time_total
-        self.self_device_time_total += other.self_device_time_total
+        self.self_cuda_time_total += other.self_cuda_time_total
+        self.self_privateuse1_time_total += other.self_privateuse1_time_total
         self.cpu_memory_usage += other.cpu_memory_usage
-        self.device_memory_usage += other.device_memory_usage
+        self.cuda_memory_usage += other.cuda_memory_usage
+        self.privateuse1_memory_usage += other.privateuse1_memory_usage
         self.self_cpu_memory_usage += other.self_cpu_memory_usage
-        self.self_device_memory_usage += other.self_device_memory_usage
+        self.self_cuda_memory_usage += other.self_cuda_memory_usage
+        self.self_privateuse1_memory_usage += other.self_privateuse1_memory_usage
         self.count += other.count
         if self.flops is None:
             self.flops = other.flops
@@ -736,13 +731,35 @@ class FunctionEventAvg(FormattedTimesMixin):
 
     def __repr__(self):
         device_name = "cuda" if not self.use_device else self.use_device
-        self_device_time = self.self_device_time_total_str
-        device_time = self.device_time_str
-        device_memory = self.device_memory_usage
+        self_device_time = (
+            self.self_cuda_time_total_str
+            if not self.use_device
+            else self.self_privateuse1_time_total_str
+        )
+        device_time = (
+            self.cuda_time_str if not self.use_device else self.privateuse1_time_str
+        )
+        device_memory = (
+            self.cuda_memory_usage
+            if not self.use_device
+            else self.privateuse1_memory_usage
+        )
         return (
-            f"<FunctionEventAvg key={self.key} self_cpu_time={self.self_cpu_time_total_str} cpu_time={self.cpu_time_str} "
-            f" self_{device_name}_time={self_device_time} {device_name}_time={device_time} input_shapes={str(self.input_shapes)} "
-            f"cpu_memory_usage={self.cpu_memory_usage} {device_name}_memory_usage={device_memory}>"
+            "<FunctionEventAvg key={} self_cpu_time={} cpu_time={} "
+            " self_{}_time={} {}_time={} input_shapes={} "
+            "cpu_memory_usage={} {}_memory_usage={}>".format(
+                self.key,
+                self.self_cpu_time_total_str,
+                self.cpu_time_str,
+                device_name,
+                self_device_time,
+                device_name,
+                device_time,
+                str(self.input_shapes),
+                self.cpu_memory_usage,
+                device_name,
+                device_memory,
+            )
         )
 
 
@@ -760,19 +777,18 @@ class MemRecordsAcc:
 
     def __init__(self, mem_records):
         self._mem_records = mem_records
-        self._start_nses: list[int] = []
-        self._indices: list[int] = []
+        self._start_uses: List[int] = []
+        self._indices: List[int] = []
         if len(mem_records) > 0:
-            tmp = sorted([(r[0].start_ns(), i) for i, r in enumerate(mem_records)])
-            self._start_nses, self._indices = zip(*tmp)  # type: ignore[assignment]
+            tmp = sorted([(r[0].start_us(), i) for i, r in enumerate(mem_records)])
+            self._start_uses, self._indices = zip(*tmp)  # type: ignore[assignment]
 
     def in_interval(self, start_us, end_us):
         r"""
         Return all records in the given interval
-        To maintain backward compatibility, convert us to ns in function
         """
-        start_idx = bisect.bisect_left(self._start_nses, start_us * 1000)
-        end_idx = bisect.bisect_right(self._start_nses, end_us * 1000)
+        start_idx = bisect.bisect_left(self._start_uses, start_us)
+        end_idx = bisect.bisect_right(self._start_uses, end_us)
         for i in range(start_idx, end_idx):
             yield self._mem_records[self._indices[i]]
 
@@ -837,47 +853,39 @@ def _build_table(
     if len(events) == 0:
         return ""
 
-    has_device_time = any(event.self_device_time_total > 0 for event in events)
-    has_device_mem = any(event.self_device_memory_usage > 0 for event in events)
+    has_cuda_time = any(event.self_cuda_time_total > 0 for event in events)
+    has_cuda_mem = any(event.self_cuda_memory_usage > 0 for event in events)
+    has_privateuse1_time = any(
+        event.self_privateuse1_time_total > 0 for event in events
+    )
+    has_privateuse1_mem = any(
+        event.self_privateuse1_memory_usage > 0 for event in events
+    )
     use_device = events[0].use_device
-    # Running on PrivateUse1 device with profiler but not enable
-    # ProfilerActivity.PrivateUse1 can also catch privateuse1 memory usage.
-    # Here only need to check has_privateuse1_time if not use_device.
-    if not use_device and has_device_time:
-        raise RuntimeError("use_device is None, but there is device performance data.")
+    if not use_device and (has_privateuse1_mem or has_privateuse1_time):
+        raise RuntimeError(
+            "use_device is None, but there is private device performance data."
+        )
 
     has_input_shapes = any(
         (event.input_shapes is not None and len(event.input_shapes) > 0)
         for event in events
     )
 
-    has_overload_names = any(
-        (event.overload_name is not None and len(event.overload_name) > 0)
-        for event in events
-    )
-
     if sort_by is not None:
         events = EventList(
-            sorted(
-                events,
-                key=lambda evt: getattr(
-                    evt,
-                    sort_by.replace("cuda", "device")
-                    .replace("xpu", "device")
-                    .replace("privateuse1", "device"),
-                ),
-                reverse=True,
-            ),
+            sorted(events, key=lambda evt: getattr(evt, sort_by), reverse=True),
+            use_cuda=has_cuda_time,
             use_device=use_device,
             profile_memory=profile_memory,
             with_flops=with_flops,
         )
 
-    name_column_width = max(len(evt.key) for evt in events) + 4
+    name_column_width = max([len(evt.key) for evt in events]) + 4
     if max_name_column_width is not None:
         name_column_width = min(name_column_width, max_name_column_width)
 
-    shapes_column_width = max(len(str(evt.input_shapes)) for evt in events) + 4
+    shapes_column_width = max([len(str(evt.input_shapes)) for evt in events]) + 4
     if max_shapes_column_width is not None:
         shapes_column_width = min(shapes_column_width, max_shapes_column_width)
 
@@ -885,36 +893,43 @@ def _build_table(
     flops_column_width = DEFAULT_COLUMN_WIDTH
 
     src_column_width = None
-    stacks = [
-        evt.stack for evt in events if evt.stack is not None and len(evt.stack) > 0
-    ]
+    stacks = []
+    for evt in events:
+        if evt.stack is not None and len(evt.stack) > 0:
+            stacks.append(evt.stack)
     has_stack = len(stacks) > 0
     if has_stack:
         src_column_width = (
-            max(max(len(entry) for entry in stack) for stack in stacks) + 4
+            max([max([len(entry) for entry in stack]) for stack in stacks]) + 4
         )
         if max_src_column_width is not None:
             src_column_width = min(src_column_width, max_src_column_width)
 
-    headers = ["Name"]
-    if has_overload_names:
-        headers.append("Overload Name")
-    headers += [
+    headers = [
+        "Name",
         "Self CPU %",
         "Self CPU",
         "CPU total %",
         "CPU total",
         "CPU time avg",
     ]
-
-    device_name = use_device.upper() if use_device is not None else "None"
-    if has_device_time:
+    if has_cuda_time:
         headers.extend(
             [
-                f"Self {device_name}",
-                f"Self {device_name} %",
-                f"{device_name} total",
-                f"{device_name} time avg",
+                "Self CUDA",
+                "Self CUDA %",
+                "CUDA total",
+                "CUDA time avg",
+            ]
+        )
+    if has_privateuse1_time:
+        privateuse1 = use_device.upper()
+        headers.extend(
+            [
+                f"Self {privateuse1}",
+                f"Self {privateuse1} %",
+                f"{privateuse1} total",
+                f"{privateuse1} time avg",
             ]
         )
     if profile_memory:
@@ -924,11 +939,19 @@ def _build_table(
                 "Self CPU Mem",
             ]
         )
-        if use_device and has_device_mem:
+        if has_cuda_mem:
             headers.extend(
                 [
-                    f"{device_name} Mem",
-                    f"Self {device_name} Mem",
+                    "CUDA Mem",
+                    "Self CUDA Mem",
+                ]
+            )
+        if has_privateuse1_mem:
+            privateuse1 = use_device.upper()
+            headers.extend(
+                [
+                    f"{privateuse1} Mem",
+                    f"Self {privateuse1} Mem",
                 ]
             )
     headers.append("# of Calls")
@@ -942,6 +965,7 @@ def _build_table(
     row_format_lst = [""]
     header_sep_lst = [""]
     line_length_lst = [-SPACING_SIZE]
+    MAX_STACK_ENTRY = 5
 
     def add_column(padding, text_dir=">"):
         row_format_lst[0] += (
@@ -965,9 +989,7 @@ def _build_table(
         return (pow(10, (math.floor(log_flops) * -3.0)), flop_headers[int(log_flops)])
 
     add_column(name_column_width)
-    if has_overload_names:
-        add_column(name_column_width)
-    for _ in headers[1 + has_overload_names :]:
+    for _ in headers[1:]:
         add_column(DEFAULT_COLUMN_WIDTH)
 
     if has_input_shapes:
@@ -980,7 +1002,10 @@ def _build_table(
 
     if with_flops:
         # Auto-scaling of flops header
-        raw_flops = [evt.flops for evt in events if evt.flops > 0]
+        raw_flops = []
+        for evt in events:
+            if evt.flops > 0:
+                raw_flops.append(evt.flops)
         if len(raw_flops) != 0:
             (flops_scale, flops_header) = auto_scale_flops(min(raw_flops))
             headers.append(f"Total {flops_header}")
@@ -1000,24 +1025,22 @@ def _build_table(
         result.append(s)
         result.append("\n")  # Yes, newline after the end as well
 
-    sum_self_cpu_time_total = 0
-    sum_self_device_time_total = 0
+    sum_self_cpu_time_total = sum([event.self_cpu_time_total for event in events])
+    sum_self_cuda_time_total = 0
+    sum_self_privateuse1_time_total = 0
     for evt in events:
-        sum_self_cpu_time_total += evt.self_cpu_time_total
-        if evt.device_type == DeviceType.CPU and evt.is_legacy:
+        if evt.device_type == DeviceType.CPU:
             # in legacy profiler, kernel info is stored in cpu events
-            sum_self_device_time_total += evt.self_device_time_total
-        elif (
-            evt.device_type
-            in [
-                DeviceType.CUDA,
-                DeviceType.PrivateUse1,
-                DeviceType.MTIA,
-            ]
-            and not evt.is_user_annotation
-        ):
+            if evt.is_legacy:
+                if not use_device:
+                    sum_self_cuda_time_total += evt.self_cuda_time_total
+                else:
+                    sum_self_privateuse1_time_total += evt.self_privateuse1_time_total
+        elif evt.device_type == DeviceType.CUDA:
             # in kineto profiler, there're events with the correct device type (e.g. CUDA)
-            sum_self_device_time_total += evt.self_device_time_total
+            sum_self_cuda_time_total += evt.self_cuda_time_total
+        elif evt.device_type == DeviceType.PrivateUse1:
+            sum_self_privateuse1_time_total += evt.self_privateuse1_time_total
 
     # Actual printing
     if header is not None:
@@ -1050,45 +1073,40 @@ def _build_table(
         name = evt.key
         if max_name_column_width is not None and len(name) >= max_name_column_width - 3:
             name = name[: (max_name_column_width - 3)] + "..."
-
-        evt.self_cpu_percent = _format_time_share(
-            evt.self_cpu_time_total, sum_self_cpu_time_total
-        )
-        evt.total_cpu_percent = (
-            _format_time_share(evt.cpu_time_total, sum_self_cpu_time_total)
-            if not evt.is_async
-            else 0
-        )
-
-        row_values = [name]
-        if has_overload_names:
-            overload_name = evt.overload_name
-            if (
-                max_name_column_width is not None
-                and len(overload_name) >= max_name_column_width - 3
-            ):
-                overload_name = overload_name[: (max_name_column_width - 3)] + "..."
-            row_values += [overload_name]
-        row_values += [
+        row_values = [
+            name,
             # Self CPU total %, 0 for async events.
-            evt.self_cpu_percent,
+            _format_time_share(evt.self_cpu_time_total, sum_self_cpu_time_total),
             evt.self_cpu_time_total_str,  # Self CPU total
             # CPU total %, 0 for async events.
-            evt.total_cpu_percent,
+            _format_time_share(evt.cpu_time_total, sum_self_cpu_time_total)
+            if not evt.is_async
+            else 0,
             evt.cpu_time_total_str,  # CPU total
             evt.cpu_time_str,  # CPU time avg
         ]
-        if has_device_time:
-            evt.total_device_percent = _format_time_share(
-                evt.self_device_time_total, sum_self_device_time_total
-            )
+        if has_cuda_time:
             row_values.extend(
                 [
-                    evt.self_device_time_total_str,
-                    # device time total %
-                    evt.total_device_percent,
-                    evt.device_time_total_str,
-                    evt.device_time_str,  # device time avg
+                    evt.self_cuda_time_total_str,
+                    # CUDA time total %
+                    _format_time_share(
+                        evt.self_cuda_time_total, sum_self_cuda_time_total
+                    ),
+                    evt.cuda_time_total_str,
+                    evt.cuda_time_str,  # Cuda time avg
+                ]
+            )
+        if has_privateuse1_time:
+            row_values.extend(
+                [
+                    evt.self_privateuse1_time_total_str,
+                    # PrivateUse1 time total %
+                    _format_time_share(
+                        evt.self_privateuse1_time_total, sum_self_privateuse1_time_total
+                    ),
+                    evt.privateuse1_time_total_str,
+                    evt.privateuse1_time_str,  # PrivateUse1 time avg
                 ]
             )
         if profile_memory:
@@ -1100,13 +1118,22 @@ def _build_table(
                     _format_memory(evt.self_cpu_memory_usage),
                 ]
             )
-            if use_device and has_device_mem:
+            if has_cuda_mem:
                 row_values.extend(
                     [
-                        # Device Mem Total
-                        _format_memory(evt.device_memory_usage),
-                        # Self Device Mem Total
-                        _format_memory(evt.self_device_memory_usage),
+                        # CUDA Mem Total
+                        _format_memory(evt.cuda_memory_usage),
+                        # Self CUDA Mem Total
+                        _format_memory(evt.self_cuda_memory_usage),
+                    ]
+                )
+            if has_privateuse1_mem:
+                row_values.extend(
+                    [
+                        # PrivateUse1 Mem Total
+                        _format_memory(evt.privateuse1_memory_usage),
+                        # Self PrivateUse1 Mem Total
+                        _format_memory(evt.self_privateuse1_memory_usage),
                     ]
                 )
         row_values.append(
@@ -1131,7 +1158,7 @@ def _build_table(
 
         if has_stack:
             empty_headers = [""] * (len(headers) - 1)
-            for entry in evt.stack[1:]:
+            for entry in evt.stack[1:MAX_STACK_ENTRY]:
                 append(
                     row_format.format(
                         *(empty_headers + [trim_path(entry, src_column_width)])
@@ -1142,9 +1169,10 @@ def _build_table(
 
     append(header_sep)
     append(f"Self CPU time total: {_format_time(sum_self_cpu_time_total)}")
-    if has_device_time:
+    if has_cuda_time:
+        append(f"Self CUDA time total: {_format_time(sum_self_cuda_time_total)}")
+    if has_privateuse1_time:
         append(
-            f"Self {use_device.upper() if use_device is not None else 'None'} "
-            f"time total: {_format_time(sum_self_device_time_total)}"
+            f"Self {use_device.upper()} time total: {_format_time(sum_self_privateuse1_time_total)}"
         )
     return "".join(result)

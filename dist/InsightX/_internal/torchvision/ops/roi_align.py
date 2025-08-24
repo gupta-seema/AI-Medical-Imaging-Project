@@ -1,34 +1,15 @@
-import functools
-from typing import Union
+from typing import List, Union
 
 import torch
+import torch._dynamo
 import torch.fx
 from torch import nn, Tensor
-from torch._dynamo.utils import is_compile_supported
 from torch.jit.annotations import BroadcastingList2
 from torch.nn.modules.utils import _pair
 from torchvision.extension import _assert_has_ops, _has_ops
 
 from ..utils import _log_api_usage_once
 from ._utils import check_roi_boxes_shape, convert_boxes_to_roi_format
-
-
-def lazy_compile(**compile_kwargs):
-    """Lazily wrap a function with torch.compile on the first call
-
-    This avoids eagerly importing dynamo.
-    """
-
-    def decorate_fn(fn):
-        @functools.wraps(fn)
-        def compile_hook(*args, **kwargs):
-            compiled_fn = torch.compile(fn, **compile_kwargs)
-            globals()[fn.__name__] = functools.wraps(fn)(compiled_fn)
-            return compiled_fn(*args, **kwargs)
-
-        return compile_hook
-
-    return decorate_fn
 
 
 # NB: all inputs are tensors
@@ -105,13 +86,15 @@ def maybe_cast(tensor):
         return tensor
 
 
-# This is a pure Python and differentiable implementation of roi_align.  When
-# run in eager mode, it uses a lot of memory, but when compiled it has
-# acceptable memory usage.  The main point of this implementation is that
-# its backwards is deterministic.
+# This is a slow but pure Python and differentiable implementation of
+# roi_align.  It potentially is a good basis for Inductor compilation
+# (but I have not benchmarked it) but today it is solely used for the
+# fact that its backwards can be implemented deterministically,
+# which is needed for the PT2 benchmark suite.
+#
 # It is transcribed directly off of the roi_align CUDA kernel, see
 # https://dev-discuss.pytorch.org/t/a-pure-python-implementation-of-roi-align-that-looks-just-like-its-cuda-kernel/1266
-@lazy_compile(dynamic=True)
+@torch._dynamo.allow_in_graph
 def _roi_align(input, rois, spatial_scale, pooled_height, pooled_width, sampling_ratio, aligned):
     orig_dtype = input.dtype
 
@@ -203,7 +186,7 @@ def _roi_align(input, rois, spatial_scale, pooled_height, pooled_width, sampling
 @torch.fx.wrap
 def roi_align(
     input: Tensor,
-    boxes: Union[Tensor, list[Tensor]],
+    boxes: Union[Tensor, List[Tensor]],
     output_size: BroadcastingList2[int],
     spatial_scale: float = 1.0,
     sampling_ratio: int = -1,
@@ -249,10 +232,7 @@ def roi_align(
     if not isinstance(rois, torch.Tensor):
         rois = convert_boxes_to_roi_format(rois)
     if not torch.jit.is_scripting():
-        if (
-            not _has_ops()
-            or (torch.are_deterministic_algorithms_enabled() and (input.is_cuda or input.is_mps or input.is_xpu))
-        ) and is_compile_supported(input.device.type):
+        if not _has_ops() or (torch.are_deterministic_algorithms_enabled() and (input.is_cuda or input.is_mps)):
             return _roi_align(input, rois, spatial_scale, output_size[0], output_size[1], sampling_ratio, aligned)
     _assert_has_ops()
     return torch.ops.torchvision.roi_align(
@@ -279,7 +259,7 @@ class RoIAlign(nn.Module):
         self.sampling_ratio = sampling_ratio
         self.aligned = aligned
 
-    def forward(self, input: Tensor, rois: Union[Tensor, list[Tensor]]) -> Tensor:
+    def forward(self, input: Tensor, rois: Union[Tensor, List[Tensor]]) -> Tensor:
         return roi_align(input, rois, self.output_size, self.spatial_scale, self.sampling_ratio, self.aligned)
 
     def __repr__(self) -> str:

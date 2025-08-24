@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 """
 Contains utils for logging in AOTAutograd, including managing the names of the graphs under
 compilation, capturing user-friendly tracebacks, and debug messages.
@@ -6,13 +5,13 @@ compilation, capturing user-friendly tracebacks, and debug messages.
 
 import collections
 from contextlib import contextmanager
+from typing import List, Tuple
 
 import torch
 import torch.fx.traceback as fx_traceback
 
-
 # This is a list since looking forward, we can have this arbitrarily nested.
-graph_being_compiled: list[str] = []
+graph_being_compiled: List[str] = []
 # TODO: It would be nice to reset the numbering every time aot_id goes
 # up, but this is annoying to do right now (because we don't know if
 # an aot_id will come back from the dead), so right now this also happens
@@ -27,7 +26,7 @@ def set_model_name(name):
     model_name = name
 
 
-def get_aot_compilation_context() -> tuple[list[str], str, int]:
+def get_aot_compilation_context() -> Tuple[List[str], str, int]:
     return list(graph_being_compiled), model_name, nth_graph
 
 
@@ -47,29 +46,19 @@ def track_graph_compiling(aot_config, graph_name):
     global graph_being_compiled
     # TODO: Don't shove the aot_id in here; set it in the context
     graph_being_compiled = [f"{aot_config.aot_id}_{graph_name}"]
-    old_name = None
-    if tracing_context := torch._guards.TracingContext.try_get():
-        old_name = tracing_context.aot_graph_name
-        tracing_context.aot_graph_name = graph_being_compiled
-        has_tracing_context = True
-    else:
-        has_tracing_context = False
     try:
         yield
     finally:
         global nth_graph
         nth_graph += 1
         graph_being_compiled = []
-        if has_tracing_context:
-            if tracing_context := torch._guards.TracingContext.try_get():
-                tracing_context.aot_graph_name = old_name
 
 
 # Set up hooks so that during backward the fx's stack_trace is properly set
 callback_set = False
 
 
-def setup_stacktrace_preservation_hooks(roots: list):
+def setup_stacktrace_preservation_hooks(roots: List):
     def iter_graph(roots):
         if not roots:
             return

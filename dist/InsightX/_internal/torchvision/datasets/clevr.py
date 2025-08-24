@@ -1,9 +1,9 @@
 import json
 import pathlib
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, List, Optional, Tuple, Union
 from urllib.parse import urlparse
 
-from .folder import default_loader
+from PIL import Image
 
 from .utils import download_and_extract_archive, verify_str_arg
 from .vision import VisionDataset
@@ -18,14 +18,11 @@ class CLEVRClassification(VisionDataset):
         root (str or ``pathlib.Path``): Root directory of dataset where directory ``root/clevr`` exists or will be saved to if download is
             set to True.
         split (string, optional): The dataset split, supports ``"train"`` (default), ``"val"``, or ``"test"``.
-        transform (callable, optional): A function/transform that takes in a PIL image or torch.Tensor, depends on the given loader,
-            and returns a transformed version. E.g, ``transforms.RandomCrop``
+        transform (callable, optional): A function/transform that takes in a PIL image and returns a transformed
+            version. E.g, ``transforms.RandomCrop``
         target_transform (callable, optional): A function/transform that takes in them target and transforms it.
         download (bool, optional): If true, downloads the dataset from the internet and puts it in root directory. If
             dataset is already downloaded, it is not downloaded again.
-        loader (callable, optional): A function to load an image given its path.
-            By default, it uses PIL as its image loader, but users could also pass in
-            ``torchvision.io.decode_image`` for decoding image data into tensors directly.
     """
 
     _URL = "https://dl.fbaipublicfiles.com/clevr/CLEVR_v1.0.zip"
@@ -38,11 +35,9 @@ class CLEVRClassification(VisionDataset):
         transform: Optional[Callable] = None,
         target_transform: Optional[Callable] = None,
         download: bool = False,
-        loader: Callable[[Union[str, pathlib.Path]], Any] = default_loader,
     ) -> None:
         self._split = verify_str_arg(split, "split", ("train", "val", "test"))
         super().__init__(root, transform=transform, target_transform=target_transform)
-        self.loader = loader
         self._base_folder = pathlib.Path(self.root) / "clevr"
         self._data_folder = self._base_folder / pathlib.Path(urlparse(self._URL).path).stem
 
@@ -54,7 +49,7 @@ class CLEVRClassification(VisionDataset):
 
         self._image_files = sorted(self._data_folder.joinpath("images", self._split).glob("*"))
 
-        self._labels: list[Optional[int]]
+        self._labels: List[Optional[int]]
         if self._split != "test":
             with open(self._data_folder / "scenes" / f"CLEVR_{self._split}_scenes.json") as file:
                 content = json.load(file)
@@ -66,11 +61,11 @@ class CLEVRClassification(VisionDataset):
     def __len__(self) -> int:
         return len(self._image_files)
 
-    def __getitem__(self, idx: int) -> tuple[Any, Any]:
+    def __getitem__(self, idx: int) -> Tuple[Any, Any]:
         image_file = self._image_files[idx]
         label = self._labels[idx]
 
-        image = self.loader(image_file)
+        image = Image.open(image_file).convert("RGB")
 
         if self.transform:
             image = self.transform(image)

@@ -1,8 +1,7 @@
 # Copyright (c) Meta Platforms, Inc. and affiliates
 
 import dataclasses
-from collections.abc import Sequence
-from typing import cast, Optional, Union
+from typing import cast, Dict, List, Optional, Sequence, Tuple, Union
 
 import torch
 import torch.distributed as dist
@@ -13,6 +12,7 @@ from torch.distributed._shard.sharded_tensor.metadata import (
 )
 from torch.distributed._shard.sharded_tensor.shard import Shard
 from torch.distributed._shard.sharding_spec.chunk_sharding_spec import ChunkShardingSpec
+from torch.distributed._tensor import DTensor
 from torch.distributed.checkpoint._nested_dict import unflatten_state_dict
 from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 from torch.distributed.checkpoint.metadata import (
@@ -39,10 +39,8 @@ from torch.distributed.checkpoint.utils import (
 from torch.distributed.distributed_c10d import _get_default_group
 from torch.distributed.fsdp._shard_utils import _create_chunk_sharded_tensor
 from torch.distributed.remote_device import _remote_device
-from torch.distributed.tensor import DTensor
 
-
-STATE_DICT_2D_LAYOUT = dict[str, tuple[Optional[Sequence[int]], Sequence[int]]]
+STATE_DICT_2D_LAYOUT = Dict[str, Tuple[Optional[Sequence[int]], Sequence[int]]]
 
 
 # TODO: Update docstrings for optimizer.py
@@ -78,7 +76,7 @@ def _create_colwise_spec(
         ]
     return ChunkShardingSpec(
         dim=0,
-        placements=cast(list[Union[_remote_device, str]], placements),
+        placements=cast(List[Union[_remote_device, str]], placements),
     )
 
 
@@ -89,7 +87,7 @@ def _is_nested_tensor(val: torch.Tensor) -> bool:
         if type(val.local_shards()[0].tensor) is ShardedTensor:
             return True
         if type(val.local_shards()[0].tensor) is DTensor:
-            raise ValueError("Cannot handle DTensor nested inside ShardedTensor")
+            raise ValueError("Cannot handle DTensor nested insided ShardedTensor")
     elif type(val) is DTensor and (
         type(val._local_tensor) is DTensor or type(val._local_tensor) is ShardedTensor
     ):
@@ -100,26 +98,19 @@ def _is_nested_tensor(val: torch.Tensor) -> bool:
 def _alloc_tensor(
     props: TensorProperties, size: Sequence[int], device_type: str = "cuda"
 ) -> torch.Tensor:
-    if device_type == "cpu":
-        device = cast(torch.device, _get_device_module(device_type).current_device())
-    else:
-        device = torch.device(
-            device_type, _get_device_module(device_type).current_device()
-        )
-
     return torch.empty(
         size=size,
         dtype=props.dtype,
         layout=props.layout,
         requires_grad=props.requires_grad,
         pin_memory=props.pin_memory,
-        device=device,
+        device=cast(torch.device, _get_device_module(device_type).current_device()),
     )
 
 
 def _get_state_dict_2d_layout(
     state_dict: STATE_DICT_TYPE,
-) -> tuple[STATE_DICT_2D_LAYOUT, Optional[dist.ProcessGroup]]:
+) -> Tuple[STATE_DICT_2D_LAYOUT, Optional[dist.ProcessGroup]]:
     """
     Load the right TP slice of the optimizer state.
 
@@ -135,12 +126,12 @@ def _get_state_dict_2d_layout(
     for key, value in state_dict.items():
         specs[key] = (None, value.size())
         if _is_nested_tensor(value):
-            assert len(value.local_shards()) == 1, (
-                "Cannot handle ST with multiple shards"
-            )
-            assert isinstance(value, ShardedTensor), (
-                "Can only handle nested ShardedTensor"
-            )
+            assert (
+                len(value.local_shards()) == 1
+            ), "Cannot handle ST with multiple shards"
+            assert isinstance(
+                value, ShardedTensor
+            ), "Can only handle nested ShardedTensor"
             shard = value.local_shards()[0]
             specs[key] = (
                 shard.metadata.shard_offsets,
@@ -155,11 +146,11 @@ def _get_state_dict_2d_layout(
 
 
 class _ReaderWithOffset(DefaultLoadPlanner):
-    translation: dict[MetadataIndex, MetadataIndex]
+    translation: Dict[MetadataIndex, MetadataIndex]
     state_dict: STATE_DICT_TYPE
     metadata: Metadata
 
-    def __init__(self, fqn_to_offset: dict[str, Sequence[int]]) -> None:
+    def __init__(self, fqn_to_offset: Dict[str, Sequence[int]]) -> None:
         super().__init__()
         self.fqn_to_offset = fqn_to_offset
         self.metadata = Metadata({})
@@ -285,7 +276,7 @@ def load_sharded_optimizer_state_dict(
     # Create a state_dict for optimizer state
     state_dict: STATE_DICT_TYPE = {}
 
-    fqn_to_offset: dict[str, Sequence[int]] = {}
+    fqn_to_offset: Dict[str, Sequence[int]] = {}
     for key, value in metadata.state_dict_metadata.items():
         key_path = metadata.planner_data[key]
         if key_path[0] != optimizer_key:

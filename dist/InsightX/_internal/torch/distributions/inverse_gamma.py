@@ -1,8 +1,4 @@
-# mypy: allow-untyped-defs
-from typing import Optional, Union
-
 import torch
-from torch import Tensor
 from torch.distributions import constraints
 from torch.distributions.gamma import Gamma
 from torch.distributions.transformed_distribution import TransformedDistribution
@@ -33,21 +29,14 @@ class InverseGamma(TransformedDistribution):
         rate (float or Tensor): rate = 1 / scale of the distribution
             (often referred to as beta)
     """
-
     arg_constraints = {
         "concentration": constraints.positive,
         "rate": constraints.positive,
     }
     support = constraints.positive
     has_rsample = True
-    base_dist: Gamma
 
-    def __init__(
-        self,
-        concentration: Union[Tensor, float],
-        rate: Union[Tensor, float],
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, concentration, rate, validate_args=None):
         base_dist = Gamma(concentration, rate, validate_args=validate_args)
         neg_one = -base_dist.rate.new_ones(())
         super().__init__(
@@ -59,24 +48,24 @@ class InverseGamma(TransformedDistribution):
         return super().expand(batch_shape, _instance=new)
 
     @property
-    def concentration(self) -> Tensor:
+    def concentration(self):
         return self.base_dist.concentration
 
     @property
-    def rate(self) -> Tensor:
+    def rate(self):
         return self.base_dist.rate
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         result = self.rate / (self.concentration - 1)
         return torch.where(self.concentration > 1, result, torch.inf)
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return self.rate / (self.concentration + 1)
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         result = self.rate.square() / (
             (self.concentration - 1).square() * (self.concentration - 2)
         )

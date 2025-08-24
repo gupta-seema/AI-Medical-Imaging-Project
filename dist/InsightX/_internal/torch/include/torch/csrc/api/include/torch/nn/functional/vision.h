@@ -3,7 +3,9 @@
 #include <torch/nn/options/vision.h>
 #include <torch/types.h>
 
-namespace torch::nn::functional {
+namespace torch {
+namespace nn {
+namespace functional {
 
 inline Tensor affine_grid(
     const Tensor& theta,
@@ -57,8 +59,9 @@ inline Tensor grid_sample(
     const Tensor& grid,
     GridSampleFuncOptions::mode_t mode,
     GridSampleFuncOptions::padding_mode_t padding_mode,
-    std::optional<bool> align_corners) {
-  int64_t mode_enum = 0, padding_mode_enum = 0;
+    c10::optional<bool> align_corners) {
+  // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+  int64_t mode_enum, padding_mode_enum;
 
   if (std::holds_alternative<enumtype::kBilinear>(mode)) {
     mode_enum = 0;
@@ -92,7 +95,7 @@ inline Tensor grid_sample(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.grid_sample
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.grid_sample
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::GridSampleFuncOptions`
@@ -116,4 +119,6 @@ inline Tensor grid_sample(
       options.align_corners());
 }
 
-} // namespace torch::nn::functional
+} // namespace functional
+} // namespace nn
+} // namespace torch

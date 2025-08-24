@@ -1,6 +1,5 @@
 #ifndef THCP_CUDA_MODULE_INC
 #define THCP_CUDA_MODULE_INC
-#include <torch/csrc/utils/pythoncapi_compat.h>
 
 PyObject* THCPModule_getDevice_wrap(PyObject* self);
 PyObject* THCPModule_setDevice_wrap(PyObject* self, PyObject* arg);

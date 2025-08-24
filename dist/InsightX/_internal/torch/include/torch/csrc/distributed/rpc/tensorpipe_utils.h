@@ -10,7 +10,9 @@ class Allocation;
 class Descriptor;
 } // namespace tensorpipe
 
-namespace torch::distributed::rpc {
+namespace torch {
+namespace distributed {
+namespace rpc {
 
 TORCH_API const c10::Stream& getStreamForDevice(
     const std::vector<c10::Stream>& streams,
@@ -25,7 +27,7 @@ class TensorpipeDeviceTypeConverter {
   // cannot include the TensorPipe headers because it's a private dependency.
   // Thus we bend over backwards and entrust this method with appending that
   // object to the `tensors` field of the tensorpipe::Message object we pass.
-  virtual std::optional<std::vector<char>> prepareTensorForSending(
+  virtual c10::optional<std::vector<char>> prepareTensorForSending(
       const c10::Storage& storage,
       const std::vector<c10::Stream>& streams,
       tensorpipe::Message& message) const = 0;
@@ -94,7 +96,7 @@ struct TensorpipeReadBuffers {
 // data that must be kept alive while the write is performed asynchronously.
 TORCH_API std::tuple<tensorpipe::Message, TensorpipeWriteBuffers>
 tensorpipeSerialize(
-    const c10::intrusive_ptr<Message>& rpcMessage,
+    c10::intrusive_ptr<Message> rpcMessage,
     std::vector<c10::Device> devices,
     const std::vector<c10::Stream>& streams);
 
@@ -111,9 +113,11 @@ tensorpipeAllocate(
 // to be available and can thus only be performed once the asynchronous read has
 // completed. The holder can be destroyed once this function returns.
 TORCH_API c10::intrusive_ptr<Message> tensorpipeDeserialize(
-    const tensorpipe::Descriptor& tpDescriptor,
+    tensorpipe::Descriptor&& tpDescriptor,
     TensorpipeReadBuffers&& holder);
 
-} // namespace torch::distributed::rpc
+} // namespace rpc
+} // namespace distributed
+} // namespace torch
 
 #endif // USE_TENSORPIPE

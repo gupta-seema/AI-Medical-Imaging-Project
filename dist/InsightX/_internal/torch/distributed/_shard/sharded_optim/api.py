@@ -1,6 +1,4 @@
-# mypy: allow-untyped-defs
-from collections.abc import Mapping
-from typing import Any, Union
+from typing import List, Union, Mapping, Dict, Any
 
 import torch.optim as optim
 from torch import Tensor
@@ -13,7 +11,7 @@ class ShardedOptimizer(optim.Optimizer):
         named_params: Mapping[str, Union[Tensor, ShardedTensor]],
         optimizer_class,
         *optimizer_args,
-        **optimizer_kwargs,
+        **optimizer_kwargs
     ):
         """
         ShardedOptimizer collects all tensors and local shard tensors of
@@ -29,12 +27,11 @@ class ShardedOptimizer(optim.Optimizer):
             **optimizer_kwargs: the key-word arguments to initialize the optimizer.
 
         """
-        tensors: list[Tensor] = []
+        tensors: List[Tensor] = []
         for value in named_params.values():
             if isinstance(value, ShardedTensor):
-                tensors.extend(
-                    local_shard.tensor for local_shard in value.local_shards()
-                )
+                for local_shard in value.local_shards():
+                    tensors.append(local_shard.tensor)
             else:
                 tensors.append(value)
 
@@ -73,7 +70,7 @@ class ShardedOptimizer(optim.Optimizer):
         """
         self._optim.step(closure)
 
-    def state_dict(self) -> dict[str, Any]:
+    def state_dict(self) -> Dict[str, Any]:
         """
         Returned state and param_groups will contain parameter keys
         instead of parameter indices like torch.optim.Optimizer.
@@ -81,6 +78,7 @@ class ShardedOptimizer(optim.Optimizer):
         """
         # TODO: implement state_dict
         raise NotImplementedError("ShardedOptimizer state_dict not implemented yet!")
+
 
     def load_state_dict(self, state_dict: Mapping[str, Any]):
         r"""Loads the ShardedOptimizer state.
@@ -90,13 +88,10 @@ class ShardedOptimizer(optim.Optimizer):
                 from a call to :meth:`state_dict`.
         """
         # TODO: implement load_state_dict
-        raise NotImplementedError(
-            "ShardedOptimizer load_state_dict not implemented yet!"
-        )
+        raise NotImplementedError("ShardedOptimizer load_state_dict not implemented yet!")
 
     def add_param_group(self, param_group: Any):
-        r"""Add a new param group"""
+        r"""Add a new param group
+        """
         # TODO: implement add_param_group
-        raise NotImplementedError(
-            "ShardedOptimizer add_param_group not implemented yet!"
-        )
+        raise NotImplementedError("ShardedOptimizer add_param_group not implemented yet!")

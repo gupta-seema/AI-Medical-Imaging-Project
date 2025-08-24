@@ -1,54 +1,30 @@
 # mypy: ignore-errors
 
-"""
-This module implements CUDA graphs support for TorchDynamo backends.
-
-CUDA graphs allow for capturing and replaying GPU operations, which can significantly
-reduce CPU overhead in GPU-accelerated PyTorch models. This module provides:
-
-- CUDA graph creation and management for both forward and backward passes
-- Input mutation detection and handling
-- Device compatibility checking
-- Stack trace management for debugging
-- Integration with TorchInductor's cudagraph trees
-
-The backend supports two main modes:
-1. cudagraphs: Full CUDA graph support with both forward and backward pass optimization
-2. cudagraphs_inner: Lower-level CUDA graph implementation used for benchmarking
-
-Key components:
-- CudagraphsBackend: Main backend class for CUDA graph integration
-- Mutation detection utilities to ensure graph safety
-- Device mapping and compatibility checks
-- Stack trace collection for debugging
-"""
-
 import functools
+import operator
 from collections import defaultdict
-from typing import Optional
+from typing import Dict, List, Optional
 
 import torch
-from torch._dynamo import config
-from torch._dynamo.backends.common import aot_autograd
 from torch._dynamo.backends.debugging import boxed_nop
+from torch._inductor.cudagraph_trees import cudagraphify_impl
 from torch._inductor.cudagraph_utils import (
     BoxedDeviceIndex,
     check_multiple_devices_or_any_cpu_nodes,
-    format_default_skip_message,
     get_mutation_stack_trace,
-    get_placeholder_info,
-    log_cudagraph_skip_and_bump_counter,
 )
 from torch._inductor.utils import (
     BoxedBool,
     count_tangents,
-    get_first_incompatible_cudagraph_node,
+    has_incompatible_cudagraph_ops,
     num_fw_fixed_arguments,
     output_node,
 )
 from torch.multiprocessing.reductions import StorageWeakRef
-
+from .common import aot_autograd
 from .registry import register_backend
+
+perf_log = torch._logging.getArtifactLogger(__name__, "perf_hints")
 
 
 def find_input_mutations(g):
@@ -64,9 +40,8 @@ def find_input_mutations(g):
                 inputs[StorageWeakRef(meta_fk(n.meta)._typed_storage())].add(input_idx)
             input_idx += 1
         elif n.op == "call_function":
-            if not hasattr(n.target, "_schema"):
+            if n.target is operator.getitem:
                 continue
-
             schema = n.target._schema
             for i, arg in enumerate(schema.arguments):
                 if i < len(n.args):
@@ -91,7 +66,7 @@ def find_input_mutations(g):
 
 
 def get_device_node_mapping(gm: torch.fx.GraphModule):
-    device_node_mapping: dict[torch.device, torch.fx.Node] = {}
+    device_node_mapping: Dict[torch.device, torch.fx.Node] = {}
     for n in gm.graph.nodes:
         t = n.meta.get("val", None)
         if isinstance(t, torch.Tensor) and t.device not in device_node_mapping:
@@ -99,31 +74,25 @@ def get_device_node_mapping(gm: torch.fx.GraphModule):
     return device_node_mapping
 
 
-def check_for_mutation_ignore_cuda_graph_managed_tensor(
-    aot_model: torch.fx.GraphModule, num_fixed
-) -> Optional[str]:
+def check_for_mutation(aot_model: torch.fx.GraphModule, num_fixed) -> Optional[str]:
     mutation_indices = find_input_mutations(aot_model.graph) - set(range(num_fixed))
     if not mutation_indices:
         return None
 
-    placeholders = get_placeholder_info(aot_model.graph)
-    return get_mutation_stack_trace(placeholders, mutation_indices)
+    return get_mutation_stack_trace(aot_model, mutation_indices)
 
 
 def check_for_skip(aot_model: torch.fx.GraphModule, num_fixed) -> Optional[str]:
-    if not config.cudagraph_backend_support_input_mutation:
-        if mut_skip := check_for_mutation_ignore_cuda_graph_managed_tensor(
-            aot_model, num_fixed
-        ):
-            return mut_skip
+    if mut_skip := check_for_mutation(aot_model, num_fixed):
+        return mut_skip
 
     if skip := check_multiple_devices_or_any_cpu_nodes(
         get_device_node_mapping(aot_model)
     ):
         return skip
 
-    if node := get_first_incompatible_cudagraph_node(aot_model):
-        return format_default_skip_message(f"incompatible op ({node.name})")
+    if has_incompatible_cudagraph_ops(aot_model):
+        return "skipping cudagraphs due to incompatible op"
 
     return None
 
@@ -134,7 +103,7 @@ def get_device_index(gm) -> int:
     return device.index
 
 
-def get_stack_traces(gm) -> list[Optional[str]]:
+def get_stack_traces(gm) -> List[Optional[str]]:
     output = output_node(gm)
     assert len(output.args) == 1
     return [
@@ -144,8 +113,6 @@ def get_stack_traces(gm) -> list[Optional[str]]:
 
 
 def cudagraphs(dynamo_model, dynamo_inputs):
-    from torch._inductor.cudagraph_trees import cudagraphify_impl
-
     do_cudagraphs = BoxedBool(True)
     boxed_device_index = BoxedDeviceIndex(None)
 
@@ -154,12 +121,11 @@ def cudagraphs(dynamo_model, dynamo_inputs):
         fixed = num_fw_fixed_arguments(len(dynamo_inputs), len(aot_inputs))
         if skip_msg := check_for_skip(aot_model, fixed):
             BoxedBool.disable(do_cudagraphs)
-            log_cudagraph_skip_and_bump_counter(
-                f"skipping cudagraphs due to {skip_msg}"
-            )
+            perf_log.warning("skipping cudagraphs due to %s", skip_msg)
             return interp
 
         boxed_device_index.set(get_device_index(aot_model))
+
         out = cudagraphify_impl(
             interp,
             aot_inputs,
@@ -168,8 +134,6 @@ def cudagraphs(dynamo_model, dynamo_inputs):
             is_backward=False,
             is_inference=False,
             stack_traces=get_stack_traces(aot_model),
-            placeholders=get_placeholder_info(aot_model.graph),
-            mutated_input_idxs=find_input_mutations(aot_model.graph),
         )
         out._boxed_call = True
         return out
@@ -181,9 +145,7 @@ def cudagraphs(dynamo_model, dynamo_inputs):
 
         fixed = count_tangents(aot_model)
         if skip_msg := check_for_skip(aot_model, fixed):
-            log_cudagraph_skip_and_bump_counter(
-                "skipping cudagraphs due to %s", skip_msg
-            )
+            perf_log.warning("skipping cudagraphs due to %s", skip_msg)
 
             # See [Backward Generation Handling]
             manager = torch._inductor.cudagraph_trees.get_manager(
@@ -206,8 +168,6 @@ def cudagraphs(dynamo_model, dynamo_inputs):
             is_backward=True,
             is_inference=False,
             stack_traces=get_stack_traces(aot_model),
-            placeholders=get_placeholder_info(aot_model.graph),
-            mutated_input_idxs=find_input_mutations(aot_model.graph),
         )
         out._boxed_call = True
         return out

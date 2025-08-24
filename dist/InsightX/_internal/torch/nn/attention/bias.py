@@ -1,16 +1,12 @@
-# mypy: allow-untyped-defs
 """Defines bias subclasses that work with scaled_dot_product_attention"""
-
 from enum import auto, IntEnum
 from typing import Optional
 from warnings import warn
 
 import torch
-import torch.nn.functional as F
 from torch.backends.cuda import (
     can_use_efficient_attention,
     can_use_flash_attention,
-    is_flash_attention_available,
     SDPAParams,
 )
 from torch.nn.attention import _raise_kernel_warnings
@@ -20,12 +16,11 @@ from torch.nn.attention._utils import (
     _postprocess_flash_output,
     _validate_sdpa_input,
 )
-
+from torch.nn.functional import scaled_dot_product_attention
 
 __all__ = ["causal_upper_left", "causal_lower_right", "CausalVariant", "CausalBias"]
 
 
-torch._dynamo.allow_in_graph(is_flash_attention_available)
 torch._dynamo.allow_in_graph(can_use_flash_attention)
 torch._dynamo.allow_in_graph(can_use_efficient_attention)
 torch._dynamo.allow_in_graph(SDPAParams)
@@ -37,14 +32,14 @@ class CausalVariant(IntEnum):
 
     Defines two types of causal biases:
 
-    ``UPPER_LEFT``: Represents upper-left triangular bias for standard causal attention.
+    `UPPER_LEFT`: Represents upper-left triangular bias for standard causal attention.
     The equivalent pytorch code for constructing this bias is:
 
     .. code-block:: python
 
         torch.tril(torch.ones(size, dtype=torch.bool))
 
-    For instance, with ``shape=(3,4)``, the materialized bias tensor will be:
+    For instance, with `shape=(3,4)`, the materialized bias tensor will be:
 
     .. code-block:: text
 
@@ -53,7 +48,7 @@ class CausalVariant(IntEnum):
          [1, 1, 1, 0]]
 
 
-    ``LOWER_RIGHT``: Represents lower-right triangular bias, the include values are aligned to the lower
+    `LOWER_RIGHT`: Represents lower-right triangular bias, the include values are aligned to the lower
     right corner of the matrix.
 
     The equivalent pytorch code for constructing this bias is:
@@ -66,7 +61,7 @@ class CausalVariant(IntEnum):
             diagonal=diagonal_offset,
         )
 
-    For instance, with ``shape=(3,4)``, the materialized bias tensor will be:
+    For instance, with `shape=(3,4)`, the materialized bias tensor will be:
 
     .. code-block:: text
 
@@ -102,15 +97,9 @@ class CausalBias(torch.Tensor):
         # Create a lower-right causal bias
         attn_bias = causal_lower_right(seqlen_q, seqlen_kv)
 
-        q = torch.randn(
-            bsz, num_heads, seqlen_q, head_dim, device="cuda", dtype=torch.float16
-        )
-        k = torch.randn(
-            bsz, num_heads, seqlen_kv, head_dim, device="cuda", dtype=torch.float16
-        )
-        v = torch.randn(
-            bsz, num_heads, seqlen_kv, head_dim, device="cuda", dtype=torch.float16
-        )
+        q = torch.randn(bsz, num_heads, seqlen_q, head_dim, device="cuda", dtype=torch.float16)
+        k = torch.randn(bsz, num_heads, seqlen_kv, head_dim, device="cuda", dtype=torch.float16)
+        v = torch.randn(bsz, num_heads, seqlen_kv, head_dim, device="cuda", dtype=torch.float16)
 
         out = F.scaled_dot_product_attention(q, k, v, attn_bias)
 
@@ -182,7 +171,6 @@ class CausalBias(torch.Tensor):
         dropout_p: float = 0.0,
         is_causal: bool = False,
         scale: Optional[float] = None,
-        enable_gqa: bool = False,
     ) -> torch.Tensor:
         r"""
         Handles the logic for computing attention with the specified causal bias.
@@ -199,7 +187,6 @@ class CausalBias(torch.Tensor):
                 are set.
             scale (optional float): Scaling factor applied prior to softmax. If None, the default value is set
                 to :math:`\frac{1}{\sqrt{E}}`.
-            enable_gqa (optional bool): If set to True, Grouped Query Attention (GQA) is enabled, by default it is set to False.
 
         Returns:
             output (Tensor): Attention output; shape :math:`(N, ..., L, Ev)`.
@@ -215,7 +202,7 @@ class CausalBias(torch.Tensor):
             attn_mask.seq_len_q == attn_mask.seq_len_kv
             or attn_mask.variant == CausalVariant.UPPER_LEFT
         ):
-            return F.scaled_dot_product_attention(
+            return scaled_dot_product_attention(
                 query,
                 key,
                 value,
@@ -223,13 +210,10 @@ class CausalBias(torch.Tensor):
                 dropout_p=dropout_p,
                 is_causal=True,
                 scale=scale,
-                enable_gqa=enable_gqa,
             )
         elif attn_mask.variant == CausalVariant.LOWER_RIGHT:
             _validate_sdpa_input(query, key, value, None, dropout_p, is_causal, scale)
-            sdpa_params = SDPAParams(
-                query, key, value, None, dropout_p, is_causal, enable_gqa
-            )
+            sdpa_params = SDPAParams(query, key, value, None, dropout_p, is_causal)
             if can_use_flash_attention(sdpa_params):
                 needs_padding = query.size(-1) % 8 != 0
                 og_head_size = query.size(-1)
@@ -265,12 +249,13 @@ class CausalBias(torch.Tensor):
                     custom_mask_type=int(attn_mask.variant),
                     compute_log_sumexp=compute_log_sumexp,
                     scale=scale,
+                    causal_diagonal=None,
                     seqlen_k=None,
                 )[0].transpose(1, 2)
             else:
                 _raise_kernel_warnings(sdpa_params)
                 # We cant use efficient attention the only support for lower right is via materialization
-                return F.scaled_dot_product_attention(
+                return scaled_dot_product_attention(
                     query,
                     key,
                     value,
@@ -278,7 +263,6 @@ class CausalBias(torch.Tensor):
                     dropout_p=dropout_p,
                     is_causal=False,
                     scale=scale,
-                    enable_gqa=enable_gqa,
                 )
         else:
             raise ValueError(
@@ -290,11 +274,13 @@ class CausalBias(torch.Tensor):
         """Defines the behavior of torch.nn.functional.scaled_dot_product_attention when the attn_bias is an AttnBias"""
         if kwargs is None:
             kwargs = {}
-        if func is torch.nn.functional.scaled_dot_product_attention:
-            return cls._dispatch(*args, **kwargs)
-        return super().__torch_function__(func, types, args, kwargs)
+        if func != torch.nn.functional.scaled_dot_product_attention:
+            raise NotImplementedError(
+                "CausalBias only supports scaled_dot_product_attention"
+            )
+        return cls._dispatch(*args, **kwargs)
 
-    def __repr__(self):  # type:ignore[override]
+    def __repr__(self):
         return self._materialize().__repr__()
 
 

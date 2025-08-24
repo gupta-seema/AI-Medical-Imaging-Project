@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor index_select_backward(const at::Tensor & grad, at::IntArrayRef
     return at::_ops::index_select_backward::call(grad, c10::fromIntArrayRefSlow(self_sizes), dim, index);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor index_select_backward(const at::Tensor & grad, at::IntArrayRef self_sizes, int64_t dim, const at::Tensor & index) {
     return at::_ops::index_select_backward::call(grad, c10::fromIntArrayRefSlow(self_sizes), dim, index);
   }
@@ -39,7 +38,7 @@ inline at::Tensor index_select_backward_symint(const at::Tensor & grad, c10::Sym
     return at::_ops::index_select_backward::call(grad, self_sizes, dim, index);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor index_select_backward(const at::Tensor & grad, c10::SymIntArrayRef self_sizes, int64_t dim, const at::Tensor & index) {
     return at::_ops::index_select_backward::call(grad, self_sizes, dim, index);
   }

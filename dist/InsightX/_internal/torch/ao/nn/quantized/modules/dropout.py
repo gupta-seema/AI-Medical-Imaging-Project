@@ -1,9 +1,6 @@
-# mypy: allow-untyped-defs
 import torch
 
-
-__all__ = ["Dropout"]
-
+__all__ = ['Dropout']
 
 class Dropout(torch.nn.Dropout):
     r"""This is the quantized equivalent of :class:`~torch.nn.Dropout`.
@@ -19,10 +16,10 @@ class Dropout(torch.nn.Dropout):
         return input
 
     def _get_name(self):
-        return "QuantizedDropout"
+        return 'QuantizedDropout'
 
     @classmethod
-    def from_float(cls, mod, use_precomputed_fake_quant=False):
+    def from_float(cls, mod):
         return cls(mod.p, mod.inplace)
 
     @classmethod

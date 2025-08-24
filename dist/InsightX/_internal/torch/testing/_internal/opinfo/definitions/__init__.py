@@ -1,5 +1,7 @@
 # mypy: ignore-errors
 
+from typing import List
+
 from torch.testing._internal.opinfo.core import OpInfo
 from torch.testing._internal.opinfo.definitions import (
     _masked,
@@ -9,9 +11,8 @@ from torch.testing._internal.opinfo.definitions import (
     special,
 )
 
-
 # Operator database
-op_db: list[OpInfo] = [
+op_db: List[OpInfo] = [
     *fft.op_db,
     *linalg.op_db,
     *signal.op_db,
@@ -19,7 +20,7 @@ op_db: list[OpInfo] = [
     *_masked.op_db,
 ]
 
-python_ref_db: list[OpInfo] = [
+python_ref_db: List[OpInfo] = [
     *fft.python_ref_db,
     *linalg.python_ref_db,
     *special.python_ref_db,

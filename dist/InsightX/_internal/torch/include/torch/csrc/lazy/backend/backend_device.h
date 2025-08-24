@@ -7,13 +7,14 @@
 #include <ATen/Tensor.h>
 #include <c10/macros/Export.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
+#include <c10/util/Optional.h>
 
 namespace c10 {
 struct Device;
 }
 
-namespace torch::lazy {
+namespace torch {
+namespace lazy {
 
 // Backend should extend it and define their own supported hardware types.
 struct TORCH_API BackendDeviceType {
@@ -72,21 +73,20 @@ TORCH_API c10::Device backendDeviceToAtenDevice(const BackendDevice& device);
 
 // Tries to extract the backend device out of the lazy tensor. Returns nullopt
 // if the input is not a lazy tensor.
-TORCH_API std::optional<BackendDevice> GetBackendDevice(
+TORCH_API c10::optional<BackendDevice> GetBackendDevice(
     const at::ITensorListRef tensors);
-TORCH_API std::optional<BackendDevice> GetBackendDevice(
+TORCH_API c10::optional<BackendDevice> GetBackendDevice(
     const at::TensorList tensors);
-TORCH_API std::optional<BackendDevice> GetBackendDevice(
+TORCH_API c10::optional<BackendDevice> GetBackendDevice(
     const at::Tensor& tensor);
-TORCH_API std::optional<BackendDevice> GetBackendDevice(
-    const std::optional<c10::Device>& device);
+TORCH_API c10::optional<BackendDevice> GetBackendDevice(
+    const c10::optional<c10::Device>& device);
 
 // For variadic template.
-TORCH_API std::optional<BackendDevice> GetBackendDevice();
+TORCH_API c10::optional<BackendDevice> GetBackendDevice();
 
-C10_DIAGNOSTIC_PUSH_AND_IGNORED_IF_DEFINED("-Winfinite-recursion")
 template <typename T, typename... Args>
-std::optional<BackendDevice> GetBackendDevice(
+c10::optional<BackendDevice> GetBackendDevice(
     const T& tensor,
     const Args&... forward_tensors) {
   auto optional_device = GetBackendDevice(tensor);
@@ -95,6 +95,6 @@ std::optional<BackendDevice> GetBackendDevice(
   }
   return GetBackendDevice(forward_tensors...);
 }
-C10_DIAGNOSTIC_POP()
 
-} // namespace torch::lazy
+} // namespace lazy
+} // namespace torch

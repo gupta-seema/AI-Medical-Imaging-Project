@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 """
 This module is one of the analysis modules - it takes as input a function or graph
 and some preexisting properties, and returns some data that is useful for deciding
@@ -9,16 +8,13 @@ a functionalized version of the graph under compilation.
 """
 
 import collections
-import contextlib
 import logging
 from functools import wraps
-from typing import Callable, Optional
+from typing import Callable, DefaultDict, Dict, List
 
 import torch
 import torch.utils._pytree as pytree
 from torch import Tensor
-from torch._guards import detect_fake_mode
-from torch._logging import getArtifactLogger
 from torch._subclasses.functional_tensor import FunctionalTensor, FunctionalTensorMode
 from torch._subclasses.meta_utils import safe_is_leaf
 from torch.fx.experimental.symbolic_shapes import is_concrete_int
@@ -27,102 +23,29 @@ from torch.utils._python_dispatch import (
     is_traceable_wrapper_subclass,
     transform_subclass,
 )
-
 from .functional_utils import (
     are_all_mutations_hidden_from_autograd,
     are_all_mutations_under_no_grad_or_inference_mode,
     from_fun,
     has_data_mutation,
     has_metadata_mutation,
-    MetadataKey,
+    has_same_metadata,
     to_fun,
-    was_inductor_storage_resized,
 )
 from .schemas import (
-    FunctionalTensorMetadataEq,
     InputAliasInfo,
-    MemoryFormatMeta,
     MutationType,
     OutputAliasInfo,
     OutputType,
     ViewAndMutationMeta,
 )
 from .subclass_utils import create_subclass_meta
-from .utils import _get_autocast_states, KNOWN_TYPES, strict_zip
 
+from .utils import _get_autocast_states, KNOWN_TYPES, strict_zip
 
 zip = strict_zip
 
 log = logging.getLogger(__name__)
-static_input_logger = getArtifactLogger("torch._dynamo", "cudagraph_static_inputs")
-
-
-# Note [Tangents memory format]
-# We assume tangents memory format to be similar to corresponding output's memory_format.
-# The idea is that we are technically making a guess about the strides of our tangents,
-# while we trace out the joint.
-# If runtime specfied tangents will not have the same memory format as predicted traced tangents,
-# we coerce them at runtime to traced tangents memory format.
-
-
-# Coercing and collecting traced tangents memory format in one recursive traversal
-# mypy: ignore-errors
-def coerce_tangent_and_suggest_memory_format(x: Tensor):
-    updated = False
-    if not isinstance(x, Tensor):
-        return x, None, updated
-
-    out = x.detach()
-
-    is_subclass = is_traceable_wrapper_subclass(out)
-
-    memory_format = MemoryFormatMeta.from_tensor(out)
-
-    if memory_format.memory_format is not None:
-        was = out
-        out = out.contiguous(memory_format=memory_format.memory_format)
-        updated = was is not out
-
-    # For subclass we keep memory format of outer strides at the beggining of the list
-    out_memory_format = [memory_format] if is_subclass else memory_format
-
-    # Note [Tangents memory format, Part 2]
-    # In the same way that "what strides do we assigns to our tangents" is a question
-    # that we can not answer (and therefore have to guess) as we trace the backward ahead-of-time,
-    # The same applies to any tensor subclass metadata, when we have tangents that are subclasses.
-    # To handle this situation, we have two new methods that a tensor subclass can implement:
-    # (1) __coerce_tangent_metadata__(self)
-    #     Given a subclass with "non-standard" metadata, turn it into a new subclass with "normal" metadata.
-    #     The main example here is a DTensor with the "_Partial" placement.
-    #     If we have a forward output with a _Partial placement, and corresponding tangent
-    #     with a Replicate/Shard placement, we have no way to convert the tangent "back" to a _Partial placement.
-    #     This method lets us avoid the problem entirely by allowing subclasses to ensure that we can never
-    #     have a tangent with "problematic" metadata, that we cannot convert to.
-    # (1) __coerce_same_metadata_as_tangent__(self, metadata)
-    #     Given a subclass, and a target differing metadata,
-    #     convert self to have the same metadata as the target.
-    #     With DTensor being the main example, we can use this to convert a DTensor with a Replicate()
-    #     placement into one with a Shard() placement, in the case that we "guessed wrong",
-    #     and traced tangents with a Shard() placement at compile time.
-    #
-    if is_subclass and hasattr(out, "__coerce_tangent_metadata__"):
-        out = out.__coerce_tangent_metadata__()  # type: ignore[attr-defined]
-
-    if is_subclass:
-        attrs = out.__tensor_flatten__()[0]
-
-        for attr in attrs:
-            elem = getattr(out, attr)
-            (
-                new_elem,
-                new_elem_memory_format,
-                elem_updated,
-            ) = coerce_tangent_and_suggest_memory_format(elem)
-            out_memory_format.append(new_elem_memory_format)
-            if elem_updated:
-                setattr(out, attr, new_elem)
-
-    return out, out_memory_format, updated
 
 
 # This is a version of functionalization that is specifically designed
@@ -150,14 +73,9 @@ def run_functionalized_fw_and_collect_metadata(
     keep_input_mutations: bool,
     # TODO: refactor to kill this flag
     is_train: bool = False,
-    # Note: this is guaranteed to be set when running under dynamo
-    static_input_indices: Optional[list[int]] = None,
     pre_dispatch: bool = False,
-    # is_export is technically only needed to avoid using functionalization V2
-    # during analysis
-    is_export: bool = False,
 ) -> Callable[..., ViewAndMutationMeta]:
-    memo: dict[Tensor, Tensor] = {}
+    memo: Dict[Tensor, Tensor] = {}
 
     def _to_fun(t):
         if isinstance(t, Tensor):
@@ -174,8 +92,8 @@ def run_functionalized_fw_and_collect_metadata(
         # This function is meant to be run with the forward, which expects a flat list of tensor/symint/other args.
         assert all(isinstance(a, tuple(KNOWN_TYPES)) for a in flat_args)
 
-        input_info: list[InputAliasInfo] = []
-        output_info: list[OutputAliasInfo] = []
+        input_info: List[InputAliasInfo] = []
+        output_info: List[OutputAliasInfo] = []
 
         prior_grad_enabled = torch.is_grad_enabled()
         prior_autocast_states = _get_autocast_states()
@@ -187,21 +105,11 @@ def run_functionalized_fw_and_collect_metadata(
 
         # It doesn't matter if we run this under predispatch or not because it is
         # only for figuring out metadata
-        mode = FunctionalTensorMode(_allow_token_discovery=True, export=is_export)
-        suppress_pending = contextlib.nullcontext()
-        fake_mode = detect_fake_mode()
-        if fake_mode and (shape_env := fake_mode.shape_env):
-            suppress_pending = shape_env.ignore_fresh_unbacked_symbols()
-        with disable_above, mode, suppress_pending:
+        mode = FunctionalTensorMode(_allow_token_discovery=True)
+        with disable_above, mode:
             # precondition: The passed in function already handles unflattening inputs + flattening outputs
             flat_f_args = pytree.tree_map(_to_fun, flat_args)
             flat_f_outs = f(*flat_f_args)
-            # We didn't do any tracing, so we don't need to process the
-            # unbacked symbols, they will just disappear into the ether.
-            # Also, prevent memoization from applying.
-            if fake_mode:
-                fake_mode.epoch += 1
-                fake_mode.reset_nt_tensor_id_counter()
 
         if prior_autocast_states != _get_autocast_states():
             raise RuntimeError(
@@ -219,6 +127,20 @@ def run_functionalized_fw_and_collect_metadata(
             # tensors. This is a problem as the inner tensor stride change may not be reflected
             # correctly in the outer tensor, so disallow this for now.
             mutates_data = has_data_mutation(f_arg)
+            if (
+                mutates_data
+                and not arg.is_contiguous()
+                and is_traceable_wrapper_subclass(arg)
+            ):
+                raise RuntimeError(
+                    "Mutations on non-contiguous inputs are currently not allowed on "
+                    "tensor subclasses"
+                )
+
+            if not isinstance(arg, Tensor):
+                new_arg = arg
+            else:
+                new_arg = from_fun(f_arg)
             mutates_metadata = has_metadata_mutation(
                 f_arg, arg, check_only_storage_mutation=False
             )
@@ -236,8 +158,21 @@ def run_functionalized_fw_and_collect_metadata(
                 mutates_data
                 and are_all_mutations_under_no_grad_or_inference_mode(f_arg)
             )
-            mutation_inductor_storage_resize = was_inductor_storage_resized(f_arg)
 
+            # Here, we're saying that if an input experienced a set call, inp.set_(other),
+            # then we can effectively not have to worry about whether its data was mutated.
+            # There are 3 cases:
+            # (1) We mutate inp *after* the set_() call. other is a graph intermediate.
+            #     In this case, we're not really mutating the input storage of "inp";
+            #     we're mutating the storage of an intermdiate value (other),
+            #     and slamming that storage into the input tensor. So no data mutation is necessary.
+            # (2) We mutate inp *after* the set_() call. other is a graph *input*.
+            #     In this case, the data mutation will be properly handled in the runtime
+            #     epilogue during the processing of "other"
+            # (3) We mutate inp *before* the set_() call.
+            #     This case is *not* currently handled.
+            #     TODO: discuss this in the PR. Both supporting this, and detecting + erroring out,
+            #     seem painful to get working.
             if mutates_storage_metadata:
                 mutates_data = False
 
@@ -251,7 +186,6 @@ def run_functionalized_fw_and_collect_metadata(
                     mutations_hidden_from_autograd=mutations_hidden_from_autograd,
                     mutates_storage_metadata=mutates_storage_metadata,
                     mutations_under_no_grad_or_inference_mode=mutations_under_no_grad_or_inference_mode,
-                    mutation_inductor_storage_resize=mutation_inductor_storage_resize,
                     requires_grad=requires_grad,
                     keep_input_mutations=keep_input_mutations,
                 )
@@ -276,18 +210,13 @@ def run_functionalized_fw_and_collect_metadata(
         out_tensor_ids = {id(o): i for i, o in enumerate(flat_f_outs)}
 
         # Keep track of which outputs alias other outputs
-        out_tensor_alias_counts: collections.defaultdict = collections.defaultdict(int)
+        out_tensor_alias_counts: DefaultDict = collections.defaultdict(int)
         # This tells us, for a given group of outputs that alias each other,
         # whether they e.g. all came from an unbind call
-        num_aliased_tensors_that_are_multi_output_views: collections.defaultdict = (
+        num_aliased_tensors_that_are_multi_output_views: DefaultDict = (
             collections.defaultdict(int)
         )
-
-        out_storage_to_metadata_key_to_tensors: collections.defaultdict[
-            Optional[StorageWeakRef],
-            collections.defaultdict[MetadataKey, set[torch.Tensor]],
-        ] = collections.defaultdict(lambda: collections.defaultdict(set))
-
+        out_storage_to_tensors: DefaultDict = collections.defaultdict(set)
         curr_storage = None
         for o in flat_f_outs:
             if isinstance(o, torch.Tensor):
@@ -378,14 +307,11 @@ def run_functionalized_fw_and_collect_metadata(
                 )
                 if is_cur_tensor_multi_out_view:
                     num_aliased_tensors_that_are_multi_output_views[curr_storage] += 1
-                if o.requires_grad:
-                    out_storage_to_metadata_key_to_tensors[curr_storage][
-                        MetadataKey.make(o)
-                    ].add(o)
+                out_storage_to_tensors[curr_storage].add(o)
 
         # maps the id of an intermediate base to its index in the output of the compiled forward
-        intermediate_base_tensor_id_to_output_idx: dict[int, int] = {}
-        intermediate_bases: list[torch.Tensor] = []
+        intermediate_base_tensor_id_to_output_idx: Dict[int, int] = {}
+        intermediate_bases: List[torch.Tensor] = []
         # Why Do We Care If Storage Changed?
         # It's important to understand the implications of storage changes in complex scenarios. Take this example:
         #
@@ -426,10 +352,10 @@ def run_functionalized_fw_and_collect_metadata(
                 if not isinstance(o, Tensor)
                 else [
                     curr
-                    for curr in out_storage_to_metadata_key_to_tensors[curr_storage][
-                        MetadataKey.make(o)
-                    ]
-                    if o is not curr
+                    for curr in out_storage_to_tensors[curr_storage]
+                    if has_same_metadata(o, curr)
+                    and curr.requires_grad
+                    and o is not curr
                 ]
             )
 
@@ -497,12 +423,6 @@ alias each other from a multi-output view call"
                     output_type = OutputType.is_input
                 else:
                     output_type = OutputType.alias_of_input
-            elif functional_tensor_storage_changed and id(o) in inp_tensor_ids:
-                # When there is a set_() on an input, we cannot rely on checking storages
-                # to detect if we are returning an input (since the inputs storage is different)
-                assert curr_storage is not None
-                base_idx = inp_storage_refs[curr_storage]
-                output_type = OutputType.is_input
 
             # We only need to handle the intermediate base case when both
             # the intermediate base and the output require gradients.
@@ -582,6 +502,7 @@ from a multi-output view call"
                 and len(outs_with_identical_metadata_that_require_grad) > 0
                 and not o.requires_grad
             ):
+                assert len(outs_with_identical_metadata_that_require_grad) > 0
                 # In theory we could use any of these tensors to regenerate the aliased outputs from,
                 # since they all alias each other and have identical metatadata
                 out_alias = outs_with_identical_metadata_that_require_grad[0]
@@ -598,55 +519,12 @@ from a multi-output view call"
                 }
             else:
                 dynamic_dims = None
-
-            # Save the current FunctionalTensor output.
-            #
-            # This will be used at runtime for reconstructing output views from
-            # their respective base tensors.
-            #
-            # The FunctionalTensor will be saved if one of the 2 conditions below
-            # is true:
-            functional_tensor = None
-            if (
-                # 1. If the output_type is either of:
-                #    (i) alias_of_intermediate;
-                #    (ii) alias_of_intermediate_save_as_output; or
-                #    (iii) alias_of_intermediate_base_is_user_output.
-                #
-                # No need to worry about in-place view operations here, since
-                # this functionalization step elimitates mutations.
-                #
-                # i.e. we have access to the actual base tensor, before the
-                # in-place operation was applied.
-                output_type
-                in (
-                    OutputType.alias_of_intermediate,
-                    OutputType.alias_of_intermediate_save_as_output,
-                    OutputType.alias_of_intermediate_base_is_user_output,
-                )
-            ) or (
-                # 2. If the output_type is alias_of_input, and no in-place view
-                #    operationthe was run on the input (base tensor).
-                #
-                # In this case, we need to check for metadata mutation because
-                # the runtime explicitly reconstructs the inputs, before actually
-                # reconstructing the outputs. Due to in-place view operations, the
-                # fully reconstructed input may not be this output base tensor
-                # anymore.
-                output_type == OutputType.alias_of_input
-                and base_idx is not None
-                and not input_info[base_idx].mutates_metadata
-            ):
-                if isinstance(o, FunctionalTensor):
-                    functional_tensor = FunctionalTensorMetadataEq(o.elem)
-
             out_info = OutputAliasInfo(
                 output_type=output_type,
                 raw_type=type(o),
                 base_idx=base_idx,
                 dynamic_dims=dynamic_dims,
                 requires_grad=isinstance(o, torch.Tensor) and o.requires_grad,
-                functional_tensor=functional_tensor,
             )
             output_info.append(out_info)
 
@@ -663,53 +541,8 @@ from a multi-output view call"
         # This analysis function returns *only* the outputs that are meant to be tangents to the backwards.
         # Anything that aliases (inputs returned in the fw due to metadata mutations, or outputs that alias inputs/intermediates)
         # are *regenerated* later, and not used directly in the autograd graph
-        def _plain_fake_tensor_like_subclass(x):
-            with detect_fake_mode():
-                return torch.empty(
-                    x.shape, dtype=x.dtype, device=x.device, layout=x.layout
-                )
-
-        def _is_subclass_mutated_input_tangent_always_subclass(inp):
-            return (
-                isinstance(inp, torch.nested._internal.nested_tensor.NestedTensor)
-                or torch._functorch.config.disable_guess_zero_tangent_for_mutated_input_subclass
-            )
-
         f_input_tangents = [
-            # Note: [AOTAutograd Tangent Subclassness for mutated inputs]
-            # Generally when creating tangents to trace with, we assume that tangents will have
-            # the same subclass-ness as their forward outs
-            # however: for tangents that correspond to input mutations, in practice it is more likely
-            # that these tangents will be plain tensors of zeros at runtime, so we tweak our guess
-            # to assume that these tangents should always be plaint tensors.
-            # Example:
-            #  def f(x):
-            #      x.mul_(2)
-            #      return x + 1
-            #  out = f(x)
-            #  out.sum().backward()
-            # In the above code, we will have a tangent "x_updated_tangent",
-            # which will be a plain tensor of zeros, *unless* x is used in some compute after executing f
-            #
-            # However, there are exceptions to this logic. If a view is created from mutated input and is used in backward,
-            # The tangent for this subclass input will be a subclass tensor.
-            # Example:
-            #  def f(a, b):
-            #      a.mul_(2)
-            #      b.mul_(3)
-            #      return b.view(b.shape), a + b
-            # a_out, b_out = f(..., Subclass)
-            # (a * b).sum().backward()
-            #
-            # We can not deduce it easily now, so introducing a debug config to be able to turn off this for specific cases.
-            # NJT gurantees to have its tangent as NJT, because it has dedicated integration in Autograd
-            # See torch/csrc/autograd/python_function.cpp, use_zeros_like.
-            (
-                _plain_fake_tensor_like_subclass(inp)
-                if is_traceable_wrapper_subclass(inp)
-                and not _is_subclass_mutated_input_tangent_always_subclass(inp)
-                else inp
-            )
+            inp
             for inp, info in zip(flat_f_args, input_info)
             if info.mutation_type == MutationType.MUTATED_OUT_GRAPH
             and info.mutates_data
@@ -733,24 +566,7 @@ from a multi-output view call"
         traced_tangents = pytree.tree_map(
             view_avoid_dupes_with_primals, traced_tangents
         )
-
-        traced_tangents = [
-            coerce_tangent_and_suggest_memory_format(tt)[0]
-            for i, tt in enumerate(traced_tangents)
-        ]
-        nonlocal static_input_indices
-        static_input_indices = static_input_indices or []
-        if torch._dynamo.compiled_autograd.in_compiled_autograd_region:
-            passed_indices = set(static_input_indices)
-            static_input_indices = [
-                i
-                for i, arg in enumerate(flat_args)
-                if (isinstance(arg, torch.nn.Parameter) or i in passed_indices)
-            ]
-
-        static_input_logger.debug(
-            "static input indices metadata analysis: %s", static_input_indices
-        )
+        user_outs = pytree.tree_map(from_fun, f_output_tangents)
 
         f_mutated_inputs = [
             inp
@@ -800,12 +616,9 @@ from a multi-output view call"
             traced_tangents=traced_tangents,
             subclass_inp_meta=create_subclass_meta(flat_args),
             subclass_fw_graph_out_meta=create_subclass_meta(fw_graph_outs),
-            subclass_tangent_meta=create_subclass_meta(
-                traced_tangents, count_symints=False, with_memory_format=True
-            ),
+            subclass_tangent_meta=create_subclass_meta(traced_tangents),
             is_train=is_train,
             grad_enabled_mutation=grad_enabled_mutation,
-            static_input_indices=static_input_indices,
             tokens=mode._tokens,
         )
         return metadata

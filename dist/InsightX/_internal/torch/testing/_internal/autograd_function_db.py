@@ -68,7 +68,7 @@ class CubeGenVmap(torch.autograd.Function):
 
     @staticmethod
     def backward(ctx, grad_output, grad_saved):
-        _input, dinput = ctx.saved_tensors
+        input, dinput = ctx.saved_tensors
         result = grad_output * dinput + 6 * dinput
         return result
 
@@ -142,9 +142,6 @@ def sample_inputs_numpy_mul(opinfo, device, dtype, requires_grad, **kwargs):
     # Broadcasting
     yield SampleInput(make_arg(4, low=0.9, high=2), args=(make_arg(3, 4, low=0.9, high=2),))
 
-def sample_inputs_numpy_mul_scalar(opinfo, device, dtype, requires_grad, **kwargs):
-    make_arg = partial(make_tensor, device=device, dtype=dtype, requires_grad=requires_grad)
-    yield SampleInput(make_arg(4, low=0.9, high=2), args=(), kwargs={"scalar": 3.14})
 
 class MulGenVmap(torch.autograd.Function):
     generate_vmap_rule = True
@@ -213,6 +210,7 @@ class NumpySort(torch.autograd.Function):
         x = to_numpy(x)
         ind = np.argsort(x, axis=dim)
         ind_inv = np.argsort(ind, axis=dim)
+        result = np.take_along_axis(x, ind, axis=dim)
         return (
             torch.tensor(x, device=device),
             torch.tensor(ind, device=device),
@@ -221,7 +219,7 @@ class NumpySort(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx, inputs, output):
-        _x, dim = inputs
+        x, dim = inputs
         _, ind, ind_inv = output
         ctx.mark_non_differentiable(ind, ind_inv)
         ctx.save_for_backward(ind, ind_inv)
@@ -251,6 +249,7 @@ class SortGenVmap(torch.autograd.Function):
 
     @staticmethod
     def forward(x, dim):
+        device = x.device
         ind = torch.argsort(x, dim=dim)
         ind_inv = torch.argsort(ind, axis=dim)
         result = torch.take_along_dim(x, ind, dim=dim)
@@ -299,7 +298,7 @@ class NumpyTake(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx, inputs, output):
-        _x, ind, ind_inv, dim = inputs
+        x, ind, ind_inv, dim = inputs
         ctx.save_for_backward(ind, ind_inv)
         ctx.save_for_forward(ind, ind_inv)
         ctx.dim = dim
@@ -345,7 +344,7 @@ class TakeGenVmap(torch.autograd.Function):
 
     @staticmethod
     def setup_context(ctx, inputs, outputs):
-        _x, ind, ind_inv, dim = inputs
+        x, ind, ind_inv, dim = inputs
         ctx.save_for_backward(ind, ind_inv)
         ctx.save_for_forward(ind, ind_inv)
         ctx.dim = dim

@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import ast
 import inspect
 import textwrap
@@ -39,7 +38,7 @@ class AttributeTypeIsSupportedChecker(ast.NodeVisitor):
                 def fn(self):
                     return []
 
-                def __init__(self) -> None:
+                def __init__(self):
                     super().__init__()
                     self.x: List[int] = []
 
@@ -157,7 +156,7 @@ class AttributeTypeIsSupportedChecker(ast.NodeVisitor):
         # cannot be reassigned later to a non-empty tuple. Same
         # deal with `NamedTuple`
 
-        containers = {"List", "list", "Dict", "dict", "Optional"}
+        containers = {"List", "Dict", "Optional"}
 
         # If we're not evaluating one of the specified problem types
         try:

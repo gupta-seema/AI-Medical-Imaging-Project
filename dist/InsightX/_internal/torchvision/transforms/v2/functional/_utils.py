@@ -1,12 +1,11 @@
 import functools
-from collections.abc import Sequence
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union
 
 import torch
 from torchvision import tv_tensors
 
 _FillType = Union[int, float, Sequence[int], Sequence[float], None]
-_FillTypeJIT = Optional[list[float]]
+_FillTypeJIT = Optional[List[float]]
 
 
 def is_pure_tensor(inpt: Any) -> bool:
@@ -14,7 +13,7 @@ def is_pure_tensor(inpt: Any) -> bool:
 
 
 # {functional: {input_type: type_specific_kernel}}
-_KERNEL_REGISTRY: dict[Callable, dict[type, Callable]] = {}
+_KERNEL_REGISTRY: Dict[Callable, Dict[Type, Callable]] = {}
 
 
 def _kernel_tv_tensor_wrapper(kernel):

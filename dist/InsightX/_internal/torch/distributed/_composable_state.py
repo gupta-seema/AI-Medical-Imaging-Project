@@ -1,5 +1,4 @@
-import weakref
-from typing import cast, Optional
+from typing import cast, Dict, Optional
 
 import torch.nn as nn
 
@@ -8,15 +7,13 @@ class _State:
     pass
 
 
-_module_state_mapping: weakref.WeakKeyDictionary[
-    nn.Module, weakref.ReferenceType[_State]
-] = weakref.WeakKeyDictionary()
+_module_state_mapping: Dict[nn.Module, _State] = {}
 
 
 def _insert_module_state(module: nn.Module, state: _State) -> None:
     global _module_state_mapping
     assert module not in _module_state_mapping, f"Inserting {module} more than once."
-    _module_state_mapping[module] = weakref.ref(state)
+    _module_state_mapping[module] = state
 
 
 def _get_module_state(module: nn.Module) -> Optional[_State]:
@@ -35,10 +32,6 @@ def _get_module_state(module: nn.Module) -> Optional[_State]:
     else:
         # https://github.com/pytorch/pytorch/issues/107054
         if module in _module_state_mapping:
-            state_ref = _module_state_mapping[module]
-            state = state_ref()
-            if state is None:
-                raise AssertionError("State has already been garbage collected")
-            return state
+            return _module_state_mapping[module]
         else:
             return None

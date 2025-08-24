@@ -2,13 +2,15 @@
 #include <c10/core/ScalarType.h>
 #include <memory>
 
-namespace torch::jit::tensorexpr {
+namespace torch {
+namespace jit {
+namespace tensorexpr {
 
 template <typename Node>
 using NodePtr = std::shared_ptr<Node>;
 
 template <typename To, typename From>
-NodePtr<To> to(const NodePtr<From>& x) {
+NodePtr<To> to(NodePtr<From> x) {
   return std::dynamic_pointer_cast<To>(x);
 }
 
@@ -119,7 +121,9 @@ using SyncThreadsPtr = NodePtr<SyncThreads>;
 #define IMM_DECLARE(Type, Name) \
   class Name##Imm;              \
   using Name##ImmPtr = NodePtr<Name##Imm>;
-AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, IMM_DECLARE)
+AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, IMM_DECLARE);
 #undef IMM_DECLARE
 
-} // namespace torch::jit::tensorexpr
+} // namespace tensorexpr
+} // namespace jit
+} // namespace torch

@@ -34,12 +34,8 @@ using tensor_list = std::vector<at::Tensor>;
 using variable_list = std::vector<Variable>;
 using edge_list = std::vector<Edge>;
 using saved_variable_list = std::vector<SavedVariable>;
-using ivalue_list = std::vector<c10::IValue>;
-using functional_apply_t = std::function<
-    variable_list(const variable_list&, const std::vector<c10::IValue>&)>;
 using IndexRange = std::pair<size_t, size_t>;
 using torch::dynamo::autograd::CompiledNodeArgs;
-using torch::dynamo::autograd::PackedArgs;
 using torch::dynamo::autograd::SwapSavedVariables;
 
 // Custom deleter to prevent stack overflows.
@@ -67,7 +63,7 @@ TORCH_API std::shared_ptr<Node> get_current_node();
 // or more input `Variable`s and producing zero or more output `Variable`s. All
 // functions in PyTorch's autograd machinery derive from this class and
 // override its `apply` method. Instances of such subclasses will then be
-// invocable via the call operator.
+// invokable via the call operator.
 //
 //                    Nodes in the Autograd Graph
 //~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -243,34 +239,17 @@ struct TORCH_API Node : std::enable_shared_from_this<Node> {
    * elements are on different devices (across multiple GPUs, for example)
    * they may have different streams.
    */
-  std::optional<c10::Stream> stream() {
+  c10::optional<c10::Stream> stream() {
     auto opt_device_type = at::getAccelerator();
     if (!opt_device_type.has_value()) {
-      return std::nullopt;
+      return c10::nullopt;
     }
     for (const auto& metadata : input_metadata_) {
       if (metadata.device().type() == opt_device_type.value())
         return metadata.stream();
     }
 
-    return std::nullopt;
-  }
-
-  // Used by the engine to determine what device thread to run on
-  at::Device device() {
-    // Since we pick the first non-CPU tensor, this won't work with
-    // mixed device-type operations (e.g., an op that is both CUDA
-    // and XLA).  This is *incredibly* unlikely, so we don't worry
-    // about it.
-    for (const auto& metadata : input_metadata_) {
-      auto device = metadata.device();
-      if (device.type() != at::kCPU) {
-        return device;
-      }
-    }
-    // Only report to the CPU thread if there really were no tensors
-    // from other devices.
-    return at::kCPU;
+    return c10::nullopt;
   }
 
   void clear_input_metadata() {
@@ -545,8 +524,8 @@ struct TORCH_API Node : std::enable_shared_from_this<Node> {
     return tensor_pre_hooks_;
   }
 
-  virtual std::unique_ptr<PostAccumulateGradHook>& tensor_post_acc_grad_hooks()
-      const noexcept {
+  virtual std::unique_ptr<PostAccumulateGradHook>&
+  tensor_post_acc_grad_hooks() noexcept {
     static std::unique_ptr<PostAccumulateGradHook> empty = nullptr;
     return empty;
   }
@@ -592,10 +571,10 @@ struct TORCH_API Node : std::enable_shared_from_this<Node> {
   //   1) Extract tensors/symint args
   //   2) Collect node information for specialization and caching
   // Implementations in subclasses should call args.collect() with all node
-  // attrs. These functions are only called during backward.
-  virtual void compiled_args(CompiledNodeArgs& args) const {
-    TORCH_CHECK_NOT_IMPLEMENTED(
-        false, std::string("compiled_args not implemented: ") + name());
+  // attrs. These functions are only called durring backward.
+  virtual void compiled_args(CompiledNodeArgs& args) {
+    throw std::runtime_error(
+        std::string("compiled_args not implemented: ") + name());
   }
 
   // Used by compiled autograd to call apply() with different saved tensors
@@ -604,14 +583,8 @@ struct TORCH_API Node : std::enable_shared_from_this<Node> {
   virtual variable_list apply_with_saved(
       const variable_list& inputs,
       SwapSavedVariables& saved) {
-    TORCH_CHECK_NOT_IMPLEMENTED(
-        false, std::string("apply_with_saved not implemented: ") + name());
-  }
-
-  // If this node is the AOTBackward node produced by torch.compile.
-  // Compiled Autograd special-cases on this information.
-  virtual bool is_aot_backward() const {
-    return false;
+    throw std::runtime_error(
+        std::string("apply_with_saved not implemented: ") + name());
   }
 
  protected:
@@ -730,7 +703,7 @@ struct MakeNextFunctionList : IterArgs<MakeNextFunctionList> {
   void operator()(const Variable* variable) {
     operator()(*variable);
   }
-  void operator()(const std::optional<Variable>& variable) {
+  void operator()(const c10::optional<Variable>& variable) {
     if (variable.has_value()) {
       operator()(*variable);
     } else {
@@ -776,7 +749,7 @@ edge_list collect_next_edges(Variables&&... variables) {
 }
 
 struct TypeAndSize {
-  TypeAndSize() = default;
+  TypeAndSize() : options(at::TensorOptions()) {}
   /* implicit */
   TypeAndSize(const at::Tensor& t)
       : sym_sizes(t.sym_sizes().vec()), options(t.options()) {}

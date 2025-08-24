@@ -1,13 +1,10 @@
-# mypy: allow-untyped-defs
 from __future__ import annotations
 
-from typing import Callable, cast, Generic, Optional, TypeVar, Union
+from typing import cast, Callable, Generic, List, Optional, Type, TypeVar, Union
 
 import torch
 
-
-__all__ = ["Future", "collect_all", "wait_all"]
-
+__all__ = ['Future', 'collect_all', 'wait_all']
 
 T = TypeVar("T")
 S = TypeVar("S")
@@ -26,9 +23,7 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
     .. warning:: GPU support is a beta feature, subject to changes.
     """
 
-    def __init__(
-        self, *, devices: Optional[list[Union[int, str, torch.device]]] = None
-    ):
+    def __init__(self, *, devices: Optional[List[Union[int, str, torch.device]]] = None):
         r"""
         Create an empty unset ``Future``. If the future is intended to hold
         values containing CUDA tensors, (a superset of) their CUDA devices must
@@ -149,7 +144,6 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
             on those futures independently.
 
         Example::
-
             >>> # xdoctest: +REQUIRES(env:TORCH_DOCTEST_FUTURES)
             >>> def callback(fut):
             ...     print(f"RPC return value is {fut.wait()}.")
@@ -198,7 +192,6 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
             for handling completion/waiting on those futures independently.
 
         Example::
-
             >>> # xdoctest: +REQUIRES(env:TORCH_DOCTEST_FUTURES)
             >>> def callback(fut):
             ...     print("This will run after the future has finished.")
@@ -232,7 +225,6 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
             result (object): the result object of this ``Future``.
 
         Example::
-
             >>> # xdoctest: +REQUIRES(env:TORCH_DOCTEST_FUTURES)
             >>> import threading
             >>> import time
@@ -262,7 +254,6 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
             result (BaseException): the exception for this ``Future``.
 
         Example::
-
             >>> # xdoctest: +REQUIRES(env:TORCH_DOCTEST_FUTURES)
             >>> fut = torch.futures.Future()
             >>> fut.set_exception(ValueError("foo"))
@@ -271,9 +262,7 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
             ...
             ValueError: foo
         """
-        assert isinstance(result, Exception), (
-            f"{result} is of type {type(result)}, not an Exception."
-        )
+        assert isinstance(result, Exception), f"{result} is of type {type(result)}, not an Exception."
 
         def raise_error(fut_result):
             raise fut_result
@@ -282,7 +271,7 @@ class Future(torch._C.Future, Generic[T], metaclass=_PyFutureMeta):
         self.set_result(result)  # type: ignore[arg-type]
 
 
-def collect_all(futures: list[Future]) -> Future[list[Future]]:
+def collect_all(futures: List[Future]) -> Future[List[Future]]:
     r"""
     Collects the provided :class:`~torch.futures.Future` objects into a single
     combined :class:`~torch.futures.Future` that is completed when all of the
@@ -308,13 +297,10 @@ def collect_all(futures: list[Future]) -> Future[list[Future]]:
         >>> print(f"fut1 result = {fut_list[1].wait()}")
         fut1 result = 1
     """
-    return cast(
-        Future[list[Future]],
-        torch._C._collect_all(cast(list[torch._C.Future], futures)),
-    )
+    return cast(Future[List[Future]], torch._C._collect_all(cast(List[torch._C.Future], futures)))
 
 
-def wait_all(futures: list[Future]) -> list:
+def wait_all(futures: List[Future]) -> List:
     r"""
     Waits for all provided futures to be complete, and returns
     the list of completed values. If any of the futures encounters an error,
@@ -329,7 +315,4 @@ def wait_all(futures: list[Future]) -> list:
         method will throw an error if ``wait`` on any
         :class:`~torch.futures.Future` throws.
     """
-    return [
-        fut.wait()
-        for fut in torch._C._collect_all(cast(list[torch._C.Future], futures)).wait()
-    ]
+    return [fut.wait() for fut in torch._C._collect_all(cast(List[torch._C.Future], futures)).wait()]

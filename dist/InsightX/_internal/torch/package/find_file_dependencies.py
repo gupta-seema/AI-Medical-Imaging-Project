@@ -1,6 +1,5 @@
-# mypy: allow-untyped-defs
 import ast
-from typing import Optional
+from typing import List, Optional, Tuple
 
 from ._importlib import _resolve_name
 
@@ -11,7 +10,7 @@ class _ExtractModuleReferences(ast.NodeVisitor):
     """
 
     @classmethod
-    def run(cls, src: str, package: str) -> list[tuple[str, Optional[str]]]:
+    def run(cls, src: str, package: str) -> List[Tuple[str, Optional[str]]]:
         visitor = cls(package)
         tree = ast.parse(src)
         visitor.visit(tree)
@@ -53,16 +52,16 @@ class _ExtractModuleReferences(ast.NodeVisitor):
         if hasattr(node.func, "id") and node.func.id == "__import__":
             try:
                 name = self._grab_node_str(node.args[0])
-                fromlist: list[str] = []
+                fromlist = []
                 level = 0
                 if len(node.args) > 3:
-                    fromlist.extend(self._grab_node_str(v) for v in node.args[3].elts)
+                    for v in node.args[3].elts:
+                        fromlist.append(self._grab_node_str(v))
                 elif hasattr(node, "keywords"):
                     for keyword in node.keywords:
                         if keyword.arg == "fromlist":
-                            fromlist.extend(
-                                self._grab_node_str(v) for v in keyword.value.elts
-                            )
+                            for v in keyword.value.elts:
+                                fromlist.append(self._grab_node_str(v))
                 if len(node.args) > 4:
                     level = self._grab_node_int(node.args[4])
                 elif hasattr(node, "keywords"):
@@ -89,7 +88,7 @@ class _ExtractModuleReferences(ast.NodeVisitor):
                             self.references[(name, alias)] = True
                         else:
                             self.references[(name, None)] = True
-            except Exception:
+            except Exception as e:
                 return
 
 

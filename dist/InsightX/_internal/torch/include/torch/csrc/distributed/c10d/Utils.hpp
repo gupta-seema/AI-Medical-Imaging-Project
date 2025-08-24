@@ -3,8 +3,6 @@
 #include <ATen/ATen.h>
 #include <c10/util/Exception.h>
 #include <c10/util/accumulate.h>
-#include <c10/util/env.h>
-#include <c10/util/error.h>
 #include <c10/util/irange.h>
 #include <torch/csrc/distributed/c10d/Types.hpp>
 
@@ -23,10 +21,14 @@ typedef SSIZE_T ssize_t;
 
 #include <sys/types.h>
 
+#include <chrono>
 #include <cstdint>
 #include <cstdlib>
 #include <functional>
+#include <limits>
 #include <string>
+#include <system_error>
+#include <tuple>
 #include <vector>
 
 namespace c10d {
@@ -39,11 +41,6 @@ TORCH_API std::vector<at::Tensor> getTensorShapes(
 
 // Use -2 to represent unset state of env vars
 #define C10D_ENV_NOT_SET -2
-
-#define WARN_ENV_VAR_ONCE(deprecated_env, new_env)                        \
-  TORCH_WARN_ONCE(                                                        \
-      "Environment variable " + deprecated_env + " is deprecated; use " + \
-      new_env + " instead");
 
 // Turns at::IntArrayRef into "(1, 2, 3, 4)".
 inline std::string toString(at::IntArrayRef l) {
@@ -73,7 +70,6 @@ inline void assertSameType(
       const std::string expected = type.toString();
       const std::string actual = tensors[i].toString();
       throw std::invalid_argument(
-          // NOLINTNEXTLINE(performance-inefficient-string-concatenation)
           "mixed types (" + expected + " and " + actual + ")");
     }
   }
@@ -94,7 +90,7 @@ inline std::vector<std::string> split(
 inline std::string getCvarString(
     const std::vector<std::string>& env,
     const char* def) {
-  std::string ret(def);
+  const char* ret = def;
 
   if (env.empty()) {
     TORCH_CHECK(false, "No environment variables passed");
@@ -104,15 +100,17 @@ inline std::string getCvarString(
   /* parse environment variable in reverse order, so the early
    * versions of a variable get higher priority than the latter
    * versions of the same variable */
-  for (ssize_t i = static_cast<ssize_t>(env.size()) - 1; i >= 0; i--) {
-    auto val = c10::utils::get_env(env[i].c_str());
-    if (!val.has_value()) {
+  for (int i = env.size() - 1; i >= 0; i--) {
+    const char* val = std::getenv(env[i].c_str());
+    if (val == nullptr) {
       continue;
     } else if (i) {
-      WARN_ENV_VAR_ONCE(env[i], env[0]);
+      TORCH_WARN(
+          "Environment variable " + env[i] + " is deprecated; use " + env[0] +
+          " instead");
     }
 
-    ret = val.value();
+    ret = val;
   }
 
   return ret;
@@ -129,17 +127,19 @@ inline int getCvarInt(const std::vector<std::string>& env, int def) {
   /* parse environment variable in reverse order, so the early
    * versions of a variable get higher priority than the latter
    * versions of the same variable */
-  for (ssize_t i = static_cast<ssize_t>(env.size()) - 1; i >= 0; i--) {
-    const auto val = c10::utils::get_env(env[i].c_str());
-    if (!val.has_value()) {
+  for (int i = env.size() - 1; i >= 0; i--) {
+    char* val = std::getenv(env[i].c_str());
+    if (val == nullptr) {
       continue;
     } else if (i) {
-      WARN_ENV_VAR_ONCE(env[i], env[0]);
+      TORCH_WARN(
+          "Environment variable " + env[i] + " is deprecated; use " + env[0] +
+          " instead");
     }
 
     try {
-      ret = std::stoi(val.value());
-    } catch (std::exception&) {
+      ret = std::stoi(val);
+    } catch (std::exception& e) {
       TORCH_CHECK(false, "Invalid value for environment variable: " + env[i]);
     }
   }
@@ -158,16 +158,18 @@ inline bool getCvarBool(const std::vector<std::string>& env, bool def) {
   /* parse environment variable in reverse order, so the early
    * versions of a variable get higher priority than the latter
    * versions of the same variable */
-  for (ssize_t i = static_cast<ssize_t>(env.size()) - 1; i >= 0; i--) {
-    auto val = c10::utils::get_env(env[i].c_str());
-    if (!val.has_value()) {
+  for (int i = env.size() - 1; i >= 0; i--) {
+    char* val_ = std::getenv(env[i].c_str());
+    if (val_ == nullptr) {
       continue;
     } else if (i) {
-      WARN_ENV_VAR_ONCE(env[i], env[0]);
+      TORCH_WARN(
+          "Environment variable " + env[i] + " is deprecated; use " + env[0] +
+          " instead");
     }
 
-    for (auto& x : val.value()) {
-      // NOLINTNEXTLINE(*-narrowing-conversions)
+    std::string val = std::string(val_);
+    for (auto& x : val) {
       x = std::tolower(x);
     }
 
@@ -195,7 +197,6 @@ inline void assertSameSizes(
       const auto expected = toString(sizes);
       const auto actual = toString(tensors[i].sizes());
       throw std::invalid_argument(
-          // NOLINTNEXTLINE(performance-inefficient-string-concatenation)
           "mixed sizes (" + expected + " and " + actual + ")");
     }
   }
@@ -215,7 +216,6 @@ inline void assertSameSizeAndType(const std::vector<at::Tensor>& tensors) {
       const auto expected = toString(options);
       const auto actual = toString(tensors[i].options());
       throw std::invalid_argument(
-          // NOLINTNEXTLINE(performance-inefficient-string-concatenation)
           "argument contains mixed types (" + expected + " and " + actual +
           ")");
     }
@@ -223,15 +223,14 @@ inline void assertSameSizeAndType(const std::vector<at::Tensor>& tensors) {
       const auto expected = toString(sizes);
       const auto actual = toString(tensors[i].sizes());
       throw std::invalid_argument(
-          // NOLINTNEXTLINE(performance-inefficient-string-concatenation)
-          "argument contains mixed types (" + expected + " and " + actual +
+          "argument contains mixed sizes (" + expected + " and " + actual +
           ")");
     }
   }
 }
 
 inline void assertTypeMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::DeprecatedTypeProperties& type,
     const at::ArrayRef<at::Tensor> tensors,
     size_t index) {
@@ -242,7 +241,7 @@ inline void assertTypeMatch(
 }
 
 inline void assertTypeMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::TensorOptions& options,
     const at::ArrayRef<at::Tensor> tensors,
     size_t index) {
@@ -253,7 +252,7 @@ inline void assertTypeMatch(
 }
 
 inline void assertSizesMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::IntArrayRef& sizes,
     const at::ArrayRef<at::Tensor> tensors,
     size_t index) {
@@ -264,7 +263,7 @@ inline void assertSizesMatch(
 }
 
 inline void assertLayoutMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const c10::Layout& expected,
     const at::ArrayRef<at::Tensor> tensors,
     size_t index) {
@@ -276,7 +275,7 @@ inline void assertLayoutMatch(
 }
 
 inline void assertLayoutMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   const auto& layout = tensors[0].layout();
   for (const auto i : c10::irange(1, tensors.size())) {
@@ -285,7 +284,7 @@ inline void assertLayoutMatch(
 }
 
 inline void assertNonEmpty(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   if (tensors.empty()) {
     fn("requires non-empty tensor list");
@@ -293,7 +292,7 @@ inline void assertNonEmpty(
 }
 
 inline void assertSingleElement(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   if (tensors.size() != 1) {
     fn("requires a single-element tensor list");
@@ -301,7 +300,7 @@ inline void assertSingleElement(
 }
 
 inline void assertSingleElementInput(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   if (tensors.size() != 1) {
     fn("requires a single-element input tensor list");
@@ -309,7 +308,7 @@ inline void assertSingleElementInput(
 }
 
 inline void assertSingleElementOutput(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   if (tensors.size() != 1) {
     fn("requires a single-element output tensor list");
@@ -317,25 +316,25 @@ inline void assertSingleElementOutput(
 }
 
 inline void assertRootRank(
-    const std::function<void(const std::string&)>& fn,
-    int64_t rank,
-    int64_t size) {
+    std::function<void(const std::string&)> fn,
+    int rank,
+    int size) {
   if (rank < 0 || rank >= size) {
     fn("invalid root rank: " + std::to_string(rank));
   }
 }
 
 inline void assertRootTensor(
-    const std::function<void(const std::string&)>& fn,
-    int64_t rank,
-    int64_t size) {
+    std::function<void(const std::string&)> fn,
+    int rank,
+    int size) {
   if (rank < 0 || rank >= size) {
     fn("invalid root tensor: " + std::to_string(rank));
   }
 }
 
 inline void assertDense(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   const auto& layout = tensors[0].layout();
   if (layout != at::kStrided) {
@@ -344,7 +343,7 @@ inline void assertDense(
 }
 
 inline void assertCPU(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   const auto& device = tensors[0].device();
   if (device.type() != at::kCPU) {
@@ -353,7 +352,7 @@ inline void assertCPU(
 }
 
 inline void assertSameDevice(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   if (tensors.size() < 2) {
     return;
@@ -367,7 +366,7 @@ inline void assertSameDevice(
 }
 
 inline void assertTypeAndSizesMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors,
     const at::DeprecatedTypeProperties& type,
     const at::IntArrayRef& sizes) {
@@ -378,7 +377,7 @@ inline void assertTypeAndSizesMatch(
 }
 
 inline void assertTypeAndSizesMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors,
     const at::TensorOptions& options,
     const at::IntArrayRef& sizes) {
@@ -389,7 +388,7 @@ inline void assertTypeAndSizesMatch(
 }
 
 inline void assertTypeAndSizesMatch(
-    const std::function<void(const std::string&)>& fn,
+    std::function<void(const std::string&)> fn,
     const at::ArrayRef<at::Tensor> tensors) {
   const auto& options = tensors[0].options();
   const auto sizes = tensors[0].sizes();
@@ -441,7 +440,7 @@ inline at::Tensor newLikeFlat(
   sizes.insert(sizes.end(), t.sizes().begin(), t.sizes().end());
   strides.insert(strides.end(), t.strides().begin(), t.strides().end());
   return at::empty_strided(
-      sizes, strides, t.options().memory_format(std::nullopt));
+      sizes, strides, t.options().memory_format(c10::nullopt));
 }
 
 inline at::Tensor newLikeFlat(std::vector<at::Tensor>& tensors) {
@@ -468,7 +467,6 @@ inline std::vector<int> getDevices(const std::vector<at::Tensor>& tensors) {
   std::vector<int> devices(tensors.size(), -1);
   if (tensors[0].device().is_cuda()) {
     for (const auto i : c10::irange(tensors.size())) {
-      // NOLINTNEXTLINE(bugprone-signed-char-misuse)
       devices[i] = tensors[i].storage().device().index();
     }
   }
@@ -558,13 +556,6 @@ size_t computeLengthsAndOffsets(
   return offset;
 }
 
-// Get the start and stride of the global rank from a list of global ranks
-// If the global ranks do not follow the consecutive rule, the stride will be -1
-void TORCH_API getGlobalRankStartAndStride(
-    const std::vector<uint64_t>& globalRanksInGroup,
-    int& globalRankStart,
-    int& globalRankStride);
-
 using RankType = uint32_t;
 using SizeType = uint64_t;
 
@@ -573,44 +564,44 @@ using SizeType = uint64_t;
 // (https://stackoverflow.com/a/20295079), and thus `errno` should really only
 // be inspected if an error occurred.
 //
-// `success_cond` is an expression used to check if an error has happened. So
-// for `fork()`, we can use `SYSCHECK(pid = fork(), pid != -1)`. The function
-// output is stored in variable `__output` and may be used in `success_cond`.
+// `success_cond` is an expression used to check if an error has happend. So for
+// `fork()`, we can use `SYSCHECK(pid = fork(), pid != -1)`. The function output
+// is stored in variable `__output` and may be used in `success_cond`.
 #ifdef _WIN32
-#define SYSCHECK(expr, success_cond)                                           \
-  while (true) {                                                               \
-    auto __output = (expr);                                                    \
-    auto errno_local = WSAGetLastError();                                      \
-    (void)__output;                                                            \
-    if (!(success_cond)) {                                                     \
-      if (errno == EINTR) {                                                    \
-        continue;                                                              \
-      } else if (                                                              \
-          errno_local == WSAETIMEDOUT || errno_local == WSAEWOULDBLOCK) {      \
-        C10_THROW_ERROR(DistNetworkError, "Socket Timeout");                   \
-      } else {                                                                 \
-        C10_THROW_ERROR(DistNetworkError, c10::utils::str_error(errno_local)); \
-      }                                                                        \
-    } else {                                                                   \
-      break;                                                                   \
-    }                                                                          \
+#define SYSCHECK(expr, success_cond)                                      \
+  while (true) {                                                          \
+    auto __output = (expr);                                               \
+    auto errno_local = WSAGetLastError();                                 \
+    (void)__output;                                                       \
+    if (!(success_cond)) {                                                \
+      if (errno == EINTR) {                                               \
+        continue;                                                         \
+      } else if (                                                         \
+          errno_local == WSAETIMEDOUT || errno_local == WSAEWOULDBLOCK) { \
+        C10_THROW_ERROR(DistNetworkError, "Socket Timeout");              \
+      } else {                                                            \
+        C10_THROW_ERROR(DistNetworkError, std::strerror(errno_local));    \
+      }                                                                   \
+    } else {                                                              \
+      break;                                                              \
+    }                                                                     \
   }
 #else
-#define SYSCHECK(expr, success_cond)                                     \
-  while (true) {                                                         \
-    auto __output = (expr);                                              \
-    (void)__output;                                                      \
-    if (!(success_cond)) {                                               \
-      if (errno == EINTR) {                                              \
-        continue;                                                        \
-      } else if (errno == EAGAIN || errno == EWOULDBLOCK) {              \
-        C10_THROW_ERROR(DistNetworkError, "Socket Timeout");             \
-      } else {                                                           \
-        C10_THROW_ERROR(DistNetworkError, c10::utils::str_error(errno)); \
-      }                                                                  \
-    } else {                                                             \
-      break;                                                             \
-    }                                                                    \
+#define SYSCHECK(expr, success_cond)                             \
+  while (true) {                                                 \
+    auto __output = (expr);                                      \
+    (void)__output;                                              \
+    if (!(success_cond)) {                                       \
+      if (errno == EINTR) {                                      \
+        continue;                                                \
+      } else if (errno == EAGAIN || errno == EWOULDBLOCK) {      \
+        C10_THROW_ERROR(DistNetworkError, "Socket Timeout");     \
+      } else {                                                   \
+        C10_THROW_ERROR(DistNetworkError, std::strerror(errno)); \
+      }                                                          \
+    } else {                                                     \
+      break;                                                     \
+    }                                                            \
   }
 #endif
 
@@ -633,7 +624,8 @@ void sendBytes(
     return;
   }
 
-  auto currentBytes = reinterpret_cast<const char*>(buffer);
+  auto bytes = reinterpret_cast<const uint8_t*>(buffer);
+  uint8_t* currentBytes = const_cast<uint8_t*>(bytes);
 
   int flags = 0;
 
@@ -649,15 +641,12 @@ void sendBytes(
 #endif
 
   while (bytesToSend > 0) {
-    ssize_t bytesSent = 0;
+    ssize_t bytesSent;
     SYSCHECK_ERR_RETURN_NEG1(
-        bytesSent = ::send(socket, currentBytes, bytesToSend, flags))
+        bytesSent =
+            ::send(socket, (const char*)currentBytes, bytesToSend, flags))
     if (bytesSent == 0) {
-      C10_THROW_ERROR(
-          DistNetworkError,
-          "Failed to send, sent 0 bytes. "
-          "Connection was likely closed. "
-          "Did the remote server shutdown or crash?");
+      C10_THROW_ERROR(DistNetworkError, std::strerror(ECONNRESET));
     }
 
     bytesToSend -= bytesSent;
@@ -672,18 +661,15 @@ void recvBytes(int socket, T* buffer, size_t length) {
     return;
   }
 
-  auto currentBytes = reinterpret_cast<char*>(buffer);
+  auto bytes = reinterpret_cast<uint8_t*>(buffer);
+  uint8_t* currentBytes = bytes;
 
   while (bytesToReceive > 0) {
-    ssize_t bytesReceived = 0;
+    ssize_t bytesReceived;
     SYSCHECK_ERR_RETURN_NEG1(
-        bytesReceived = recv(socket, currentBytes, bytesToReceive, 0))
+        bytesReceived = recv(socket, (char*)currentBytes, bytesToReceive, 0))
     if (bytesReceived == 0) {
-      C10_THROW_ERROR(
-          DistNetworkError,
-          "Failed to recv, got 0 bytes. "
-          "Connection was likely closed. "
-          "Did the remote server shutdown or crash?");
+      C10_THROW_ERROR(DistNetworkError, std::strerror(ECONNRESET));
     }
 
     bytesToReceive -= bytesReceived;
@@ -702,7 +688,7 @@ void sendVector(int socket, const std::vector<T>& vec, bool moreData = false) {
 // receive a vector as sent in sendVector
 template <typename T>
 std::vector<T> recvVector(int socket) {
-  SizeType valueSize = 0;
+  SizeType valueSize;
   recvBytes<SizeType>(socket, &valueSize, 1);
   std::vector<T> value(valueSize);
   recvBytes<T>(socket, value.data(), value.size());
@@ -734,7 +720,7 @@ inline void sendString(
 
 // receive a string as sent in sendString
 inline std::string recvString(int socket) {
-  SizeType valueSize = 0;
+  SizeType valueSize;
   recvBytes<SizeType>(socket, &valueSize, 1);
   std::vector<char> value(valueSize);
   recvBytes<char>(socket, value.data(), value.size());

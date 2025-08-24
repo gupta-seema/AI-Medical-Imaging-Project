@@ -36,6 +36,7 @@ struct ArgumentInfo {
     return requires_grad_;
   }
   int dim() const {
+    // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
     return dim_;
   }
   at::ScalarType type() const {
@@ -46,7 +47,7 @@ struct ArgumentInfo {
       return TensorType::get();
 
     return TensorType::create(
-        type(), device(), std::optional<size_t>(dim()), requires_grad());
+        type(), device(), c10::optional<size_t>(dim()), requires_grad());
   }
   operator TypePtr() const {
     return toType();
@@ -64,7 +65,7 @@ struct ArgumentInfo {
 };
 
 static_assert(
-    std::is_standard_layout_v<ArgumentInfo>,
+    std::is_standard_layout<ArgumentInfo>::value,
     "ArgumentInfo is to be a POD struct");
 static_assert(
     sizeof(ArgumentInfo) == sizeof(ArgumentInfo::plain_data_type),
@@ -101,12 +102,13 @@ struct ArgumentSpec {
     const at::Tensor* t = reinterpret_cast<const at::Tensor*>(&input);
     arg.defined_ = t->defined();
     if (arg.defined_) {
-      arg.requires_grad_ = with_grad && t->requires_grad();
+      arg.requires_grad_ = with_grad && autograd::Variable(*t).requires_grad();
       arg.dim_ = t->dim();
+      // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
       at::Device device = t->device();
       arg.dev_type_ =
           // NOLINTNEXTLINE(bugprone-signed-char-misuse)
-          static_cast<std::underlying_type_t<DeviceType>>(device.type());
+          static_cast<std::underlying_type<DeviceType>::type>(device.type());
       // NOLINTNEXTLINE(bugprone-signed-char-misuse)
       arg.device_ = device.index();
       arg.type_ = static_cast<unsigned>(t->scalar_type());
@@ -115,7 +117,8 @@ struct ArgumentSpec {
   }
 
   void combineHash(const ArgumentInfo& arg) {
-    ArgumentInfo::plain_data_type arg_data = 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+    ArgumentInfo::plain_data_type arg_data;
     std::memcpy(&arg_data, &arg, sizeof(ArgumentInfo));
     hash_code = c10::hash_combine(hash_code, arg_data);
   }
@@ -239,10 +242,12 @@ static_assert(
 struct CompleteArgumentInfo;
 
 struct CompleteArgumentSpec {
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   CompleteArgumentSpec(bool with_grad, at::ArrayRef<IValue> inputs)
-      : ninputs(inputs.size()) {
-    int64_t all_dims = 0;
-    const auto num_inputs = inputs.size();
+      : hash_code(0), ninputs(inputs.size()) {
+    int32_t all_dims = 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+    const int32_t num_inputs = inputs.size();
     for (const auto i : c10::irange(num_inputs)) {
       if (!inputs[i].isTensor())
         continue;
@@ -253,6 +258,7 @@ struct CompleteArgumentSpec {
     data.resize(ninputs + all_dims * 2);
 
     // and reinterpret our data array as these structs
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
     auto* pods = reinterpret_cast<CompleteArgumentInfoPOD*>(data.data());
     int64_t* next_dim = sizes_strides();
     int32_t total_dims = 0;
@@ -264,10 +270,11 @@ struct CompleteArgumentSpec {
         pod.defined = t.defined();
         if (pod.defined) {
           pod.type = static_cast<int>(t.scalar_type());
+          // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
           at::Device device = t.device();
           // NOLINTNEXTLINE(bugprone-signed-char-misuse)
-          pod.dev_type =
-              static_cast<std::underlying_type_t<DeviceType>>(device.type());
+          pod.dev_type = static_cast<std::underlying_type<DeviceType>::type>(
+              device.type());
           // NOLINTNEXTLINE(bugprone-signed-char-misuse)
           pod.device = device.index();
           pod.requires_grad = with_grad && t.requires_grad();
@@ -325,7 +332,7 @@ struct CompleteArgumentSpec {
   int64_t* sizes_strides() {
     return data.data() + ninputs;
   }
-  size_t hash_code{0}; // precomputed on construction
+  size_t hash_code; // precomputed on construction
   size_t ninputs;
   // layout is ninputs of TensorPOD (each 64-bit) followed by their size and
   // stride info for 3 tensors:
@@ -387,6 +394,7 @@ struct CompleteArgumentInfo {
   int sizes_strides_offset(int j) const {
     if (j == 0)
       return 0;
+    // NOLINTNEXTLINE(cppcoreguidelines-narrowing-conversions,bugprone-narrowing-conversions)
     return 2 * pod(j - 1).total_dims;
   }
   const CompleteArgumentInfoPOD& pod(int j) const {
@@ -452,10 +460,10 @@ inline CompleteArgumentInfo CompleteArgumentSpec::at(size_t i) const {
   return CompleteArgumentInfo(*this, i);
 }
 
-inline std::optional<int8_t> convertOptional(
-    std::optional<c10::ScalarType> const& from) {
-  return (from) ? std::optional<int8_t>(static_cast<int8_t>(*from))
-                : std::optional<int8_t>{};
+inline c10::optional<int8_t> convertOptional(
+    c10::optional<c10::ScalarType> const& from) {
+  return (from) ? c10::optional<int8_t>(static_cast<int8_t>(*from))
+                : c10::optional<int8_t>{};
 }
 
 } // namespace torch::jit
@@ -467,7 +475,7 @@ struct hash<c10::VaryingShape<T>> {
   size_t operator()(const c10::VaryingShape<T>& vs) const {
     return c10::get_hash(
         vs.size(),
-        vs.size() ? vs.sizes().value() : std::vector<std::optional<T>>());
+        vs.size() ? vs.sizes().value() : std::vector<c10::optional<T>>());
   }
 };
 
@@ -475,10 +483,10 @@ template <>
 struct hash<c10::TensorType> {
   size_t operator()(const c10::TensorType& ptt) const {
     return c10::get_hash<
-        std::optional<int8_t>,
+        c10::optional<int8_t>,
         c10::VaryingShape<int64_t>,
         c10::VaryingShape<int64_t>,
-        std::optional<bool>>(
+        c10::optional<bool>>(
         torch::jit::convertOptional(ptt.scalarType()),
         ptt.sizes(),
         ptt.strides(),

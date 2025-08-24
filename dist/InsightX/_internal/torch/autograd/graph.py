@@ -1,31 +1,31 @@
 import abc
+import collections
 import contextlib
 import functools
 import logging
 import threading
-from collections import defaultdict, deque
-from collections.abc import Generator, Iterable, Iterator, MutableMapping, Sequence
+import weakref
+from collections import defaultdict, namedtuple
 from typing import (
     Any,
     Callable,
     cast,
-    Literal,
-    NamedTuple,
+    Deque,
+    Dict,
+    List,
     Optional,
-    TYPE_CHECKING,
+    Sequence,
+    Set,
+    Tuple,
     Union,
 )
-from typing_extensions import TypeAlias
-from weakref import WeakKeyDictionary, WeakValueDictionary
 
 import torch
 from torch.autograd.variable import Variable
 from torch.utils._python_dispatch import TorchDispatchMode
 from torch.utils.hooks import RemovableHandle
 
-
-if TYPE_CHECKING:
-    from torch._ops import OpOverload
+log = logging.getLogger(__name__)
 
 
 __all__ = [
@@ -39,9 +39,6 @@ __all__ = [
     "get_gradient_edge",
     "increment_version",
 ]
-
-
-log = logging.getLogger(__name__)
 
 
 class Node(abc.ABC):
@@ -58,26 +55,21 @@ class Node(abc.ABC):
             >>> print(b.grad_fn.name())
             CloneBackward0
         """
-        raise NotImplementedError
+        ...
 
     @property
     @abc.abstractmethod
-    def next_functions(self) -> tuple[tuple[Optional["Node"], int], ...]:
-        raise NotImplementedError
+    def next_functions(self) -> Tuple[Tuple[Optional["Node"], int], ...]:
+        ...
 
     @abc.abstractmethod
     def metadata(self) -> dict:
         r"""Return the metadata."""
-        raise NotImplementedError
-
-    @property
-    @abc.abstractmethod
-    def _input_metadata(self) -> list[Any]:
-        raise NotImplementedError
+        ...
 
     @abc.abstractmethod
     def _register_hook_dict(self, tensor: torch.Tensor) -> None:
-        raise NotImplementedError
+        ...
 
     @abc.abstractmethod
     def register_hook(self, fn: Callable[..., Any]) -> RemovableHandle:
@@ -99,13 +91,6 @@ class Node(abc.ABC):
             See :ref:`backward-hooks-execution` for more information on how when this hook
             is executed, and how its execution is ordered relative to other hooks.
 
-        .. note::
-            In the rare case where the hook is registered while the Node has already
-            begun execution, there is no longer any guarantee on :attr:`grad_outputs`
-            content (it might be as usual or empty depending on other factors). The
-            hook can still optionally return a new gradient to be used in place of
-            :attr:`grad_inputs` independent of :attr:`grad_outputs`.
-
         Example::
 
             >>> import torch
@@ -122,7 +107,7 @@ class Node(abc.ABC):
             >>> print(a.grad)
             tensor([1., 1., 1.])
         """
-        raise NotImplementedError
+        ...
 
     @abc.abstractmethod
     def register_prehook(self, fn: Callable[..., Any]) -> RemovableHandle:
@@ -158,45 +143,34 @@ class Node(abc.ABC):
             >>> print(a.grad)
             tensor([1., 1., 1.])
         """
-        raise NotImplementedError
+        ...
 
     @classmethod
-    def __subclasshook__(cls, subclass: type) -> bool:
-        if cls is Node and (
-            (
-                subclass is not None
-                and subclass is getattr(torch._C._functions, subclass.__name__, None)
-            )
-            or issubclass(subclass, torch.autograd.function.BackwardCFunction)
-        ):
-            return True
+    def __subclasshook__(cls, C):
+        if cls is Node:
+            if (
+                C is not None and C is getattr(torch._C._functions, C.__name__, None)
+            ) or issubclass(C, torch.autograd.function.BackwardCFunction):
+                return True
         return NotImplemented
 
 
-def _get_grad_fn_or_grad_acc(t: Union[torch.Tensor, "GradientEdge"]) -> Node:
-    if isinstance(t, GradientEdge):
-        return t.node
+def _get_grad_fn_or_grad_acc(t):
     if t.requires_grad and t.grad_fn is None:
-        with torch.enable_grad():
-            node = t.view_as(t).grad_fn.next_functions[0][0]  # type: ignore[union-attr]
+        return t.view_as(t).grad_fn.next_functions[0][0]
     else:
-        node = t.grad_fn
-    assert node is not None
-    return node
+        return t.grad_fn
 
 
-class GradientEdge(NamedTuple):
-    """Object representing a given gradient edge within the autograd graph.
-
-    To get the gradient edge where a given Tensor gradient will be computed,
-    you can do ``edge = autograd.graph.get_gradient_edge(tensor)``.
-    """
-
-    node: Node
-    output_nr: int
+GradientEdge = namedtuple("GradientEdge", ("node output_nr"))
+GradientEdge.__doc__ = """\
+Object representing a given gradient edge within the autograd graph.
+To get the gradient edge where a given Tensor gradient will be computed,
+you can do ``edge = autograd.graph.get_gradient_edge(tensor)``.
+"""
 
 
-def get_gradient_edge(tensor: torch.Tensor) -> GradientEdge:
+def get_gradient_edge(tensor):
     """Get the gradient edge for computing the gradient of the given Tensor.
 
     In particular, it is equivalent to call
@@ -204,8 +178,7 @@ def get_gradient_edge(tensor: torch.Tensor) -> GradientEdge:
     """
     if not tensor.requires_grad:
         raise RuntimeError(
-            "It is not possible to get the gradient edge for a Tensor "
-            "that does not require gradients",
+            "It is not possible to get the gradient edge for a Tensor that does not require gradients"
         )
     grad_fn = _get_grad_fn_or_grad_acc(tensor)
 
@@ -214,7 +187,7 @@ def get_gradient_edge(tensor: torch.Tensor) -> GradientEdge:
     return GradientEdge(grad_fn, tensor.output_nr)
 
 
-def increment_version(tensor: Union[torch.Tensor, Iterable[torch.Tensor]]) -> None:
+def increment_version(tensor):
     """Update autograd metadata tracking whether the given Tensor was modified in place.
 
     This is to enable more accurate error checking within the autograd engine.
@@ -222,16 +195,11 @@ def increment_version(tensor: Union[torch.Tensor, Iterable[torch.Tensor]]) -> No
     when mark_dirty() is called appropriately so you only need to call this explicitly
     if you are doing inplace operation on the Tensor data in a way that Pytorch doesn't
     know about. For example a custom kernel that reads the Tensor data_ptr and modifies
-    the memory inplace based on this pointer. Can accept either a tensor, or a list of tensors.
+    the memory inplace based on this pointer.
 
     Note that incrementing the version counter multiple times for a single inplace operation
     is not problematic.
-
-    Note that if you pass in tensor constructed under torch.inference_mode(),
-    we will not bump its version counter (because your tensor does not have one).
     """
-    if isinstance(tensor, torch.Tensor):
-        tensor = (tensor,)
     torch._C._increment_version(tensor)
 
 
@@ -272,7 +240,7 @@ class saved_tensors_hooks:
         >>> # xdoctest: +REQUIRES(env:TORCH_DOCTEST_AUTOGRAD)
         >>> def pack_hook(x):
         ...     print("Packing", x)
-        ...     return x.detach()
+        ...     return x
         >>>
         >>> def unpack_hook(x):
         ...     print("Unpacking", x)
@@ -295,27 +263,22 @@ class saved_tensors_hooks:
     .. warning ::
         Only one pair of hooks is allowed at a time. When recursively nesting this
         context-manager, only the inner-most pair of hooks will be applied.
-
-    .. warning ::
-        To avoid reference cycle, the return value of ``pack_hook`` cannot hold a
-        reference to the input tensor. For example, use `lambda x: x.detach()`
-        instead of `lambda x: x` as the pack hook.
     """
 
     def __init__(
         self,
         pack_hook: Callable[[torch.Tensor], Any],
         unpack_hook: Callable[[Any], torch.Tensor],
-    ) -> None:
+    ):
         self.pack_hook = pack_hook
         self.unpack_hook = unpack_hook
 
-    def __enter__(self) -> None:
+    def __enter__(self):
         torch._C._autograd._push_saved_tensors_default_hooks(
             self.pack_hook, self.unpack_hook
         )
 
-    def __exit__(self, *args: object) -> None:
+    def __exit__(self, *args: object):
         torch._C._autograd._pop_saved_tensors_default_hooks()
 
 
@@ -358,12 +321,13 @@ class save_on_cpu(saved_tensors_hooks):
         >>> # the content of prod_1 and c only live on CPU
         >>> y.sum().backward()  # all CPU tensors are moved back to GPU, for backward
         >>> # all intermediary tensors are released (deleted) after the call to backward
+
     """
 
-    def __init__(self, pin_memory: bool = False, device_type: str = "cuda") -> None:
+    def __init__(self, pin_memory=False, device_type="cuda"):
         device_module = getattr(torch, device_type, torch.cuda)
 
-        def pack_to_cpu(tensor: torch.Tensor) -> tuple[torch.device, torch.Tensor]:
+        def pack_to_cpu(tensor):
             if not pin_memory:
                 return (tensor.device, tensor.cpu())
             packed = torch.empty(
@@ -375,7 +339,7 @@ class save_on_cpu(saved_tensors_hooks):
             packed.copy_(tensor)
             return (tensor.device, packed)
 
-        def unpack_from_cpu(packed: tuple[torch.device, torch.Tensor]) -> torch.Tensor:
+        def unpack_from_cpu(packed):
             device, tensor = packed
             return tensor.to(device, non_blocking=pin_memory)
 
@@ -383,7 +347,7 @@ class save_on_cpu(saved_tensors_hooks):
 
 
 @contextlib.contextmanager
-def disable_saved_tensors_hooks(error_message: str) -> Generator[None, None, None]:
+def disable_saved_tensors_hooks(error_message):
     """Context-manager that disables the saved tensors default hooks feature.
 
     Useful for if you are creating a feature that does not work with saved
@@ -402,8 +366,8 @@ def disable_saved_tensors_hooks(error_message: str) -> Generator[None, None, Non
         ...     # Raises RuntimeError: saved tensors default hooks are disabled
         ...     with torch.autograd.graph.save_on_cpu():
         ...         pass
+
     """
-    maybe_prev_message = None
     try:
         maybe_prev_message = (
             torch._C._autograd._saved_tensors_hooks_get_disabled_error_message()
@@ -418,23 +382,6 @@ def disable_saved_tensors_hooks(error_message: str) -> Generator[None, None, Non
             torch._C._autograd._saved_tensors_hooks_disable(maybe_prev_message)
 
 
-class _MultiHandle(RemovableHandle):
-    handles: tuple[RemovableHandle, ...]
-
-    def __init__(self, handles: tuple[RemovableHandle, ...]) -> None:
-        self.handles = handles
-
-    def remove(self) -> None:
-        for handle in self.handles:
-            handle.remove()
-
-    def __getstate__(self) -> tuple[RemovableHandle, ...]:
-        return self.handles
-
-    def __setstate__(self, state: tuple[RemovableHandle, ...]) -> None:
-        self.handles = state
-
-
 def register_multi_grad_hook(
     tensors: Sequence[torch.Tensor],
     fn: Union[
@@ -442,8 +389,8 @@ def register_multi_grad_hook(
         Callable[[torch.Tensor], None],
     ],
     *,
-    mode: Literal["all", "any"] = "all",
-) -> RemovableHandle:
+    mode: str = "all",
+):
     r"""Register a multi-grad backward hook.
 
     There are two supported modes: ``"all"`` and ``"any"``.
@@ -492,21 +439,35 @@ def register_multi_grad_hook(
         >>>
     """
     supported_modes = ("all", "any")
-    lock = threading.Lock()
-
     if mode not in supported_modes:
         raise ValueError(f"Expects mode to be one of {supported_modes} but got {mode}")
 
+    class Handle(RemovableHandle):
+        handles: Tuple[RemovableHandle, ...]
+
+        def __init__(self, handles: Tuple[RemovableHandle, ...]):
+            self.handles = handles
+
+        def remove(self):
+            for handle in self.handles:
+                handle.remove()
+
+        def __getstate__(self):
+            return self.handles
+
+        def __setstate__(self, state):
+            self.handles = state
+
     if mode == "all":
-        count: dict[int, int] = {}
+        count: Dict[int, int] = dict()
         nb_calls = None
-        buffer: dict[int, list[Optional[torch.Tensor]]] = {}
+        buffer: Dict[int, List[Optional[torch.Tensor]]] = dict()
 
         grad_fns = list(map(_get_grad_fn_or_grad_acc, tensors))
         len_tensors = len(tensors)
 
-        def get_inner_hook(idx: int) -> Callable[[torch.Tensor], None]:
-            def inner_hook(grad: torch.Tensor) -> None:
+        def get_inner_hook(idx):
+            def inner_hook(grad: torch.Tensor):
                 nonlocal count, nb_calls, buffer, fn
                 id = torch._C._current_graph_task_id()
                 assert (
@@ -515,19 +476,14 @@ def register_multi_grad_hook(
                 count[id] = count.get(id, 0)
                 buffer[id] = buffer.get(id, [None] * len_tensors)
 
-                with lock:
-                    curr_count, count[id] = count[id], count[id] + 1
-
-                    if curr_count == 0:
-                        # On the first call, compute the actual nb_calls and buffer
-                        nb_calls = sum(
-                            map(torch._C._will_engine_execute_node, grad_fns)
-                        )
+                if count[id] == 0:
+                    # On the first call, compute the actual nb_calls and buffer
+                    nb_calls = sum(torch._C._will_engine_execute_node(g) for g in grad_fns)  # type: ignore[attr-defined]
 
                 buffer[id][idx] = grad
+                count[id] += 1
 
-                assert nb_calls is not None
-                if curr_count == nb_calls - 1:
+                if count[id] == nb_calls:
                     fn = cast(Callable[[Sequence[Optional[torch.Tensor]]], None], fn)
                     fn(buffer[id])
                     del count[id]
@@ -535,15 +491,16 @@ def register_multi_grad_hook(
 
             return inner_hook
 
-        handles = tuple(
+        handles: Tuple[RemovableHandle] = tuple(
             t.register_hook(get_inner_hook(i)) for i, t in enumerate(tensors)
         )
     elif mode == "any":
         fn = cast(Callable[[torch.Tensor], None], fn)
-        ran_hook: dict[int, bool] = defaultdict(bool)
+        lock = threading.Lock()
+        ran_hook: Dict[int, bool] = defaultdict(bool)
 
         @functools.wraps(fn)
-        def wrapped_fn(grad: torch.Tensor) -> None:
+        def wrapped_fn(grad: torch.Tensor):
             nonlocal ran_hook
             id = torch._C._current_graph_task_id()
             assert id != -1, "expected this hook to be called inside a backward call"
@@ -559,7 +516,7 @@ def register_multi_grad_hook(
             if tensor.requires_grad
         )
 
-    return _MultiHandle(handles)  # type: ignore[possibly-undefined]
+    return Handle(handles)  # type: ignore[possibly-undefined]
 
 
 # NOTE [Allow mutation on tensors saved for backward]
@@ -575,41 +532,15 @@ def register_multi_grad_hook(
 #      - delete the reference to the original
 # 3. during backward
 #    - if the clone exists, the tensor must've been modified in-place
-_allow_mutation_on_saved_tensors_enabled: bool = False
+_allow_mutation_on_saved_tensors_enabled = False
 
 
-_TID: TypeAlias = tuple[int, int, int]
-_SID: TypeAlias = tuple[int, int]
+def _get_tid(t) -> Tuple[int, int, int]:
+    return (id(t), t.data_ptr(), t._version)
 
 
-def _get_tid(tensor: torch.Tensor) -> _TID:
-    # FIXME: This is almost definitely a bug.
-    if isinstance(
-        tensor,
-        (
-            torch._subclasses.fake_tensor.FakeTensor,
-            torch._subclasses.functional_tensor.FunctionalTensor,
-        ),
-    ):
-        data_ptr = 0
-    else:
-        data_ptr = tensor.data_ptr()
-    return (id(tensor), data_ptr, tensor._version)
-
-
-def _get_sid(tensor: torch.Tensor) -> _SID:
-    # FIXME: This is almost definitely a bug.
-    if isinstance(
-        tensor,
-        (
-            torch._subclasses.fake_tensor.FakeTensor,
-            torch._subclasses.functional_tensor.FunctionalTensor,
-        ),
-    ):
-        data_ptr = 0
-    else:
-        data_ptr = tensor.data_ptr()
-    return (data_ptr, tensor._version)
+def _get_sid(t) -> Tuple[int, int]:
+    return (t.data_ptr(), t._version)
 
 
 class _Handle:
@@ -617,10 +548,10 @@ class _Handle:
 
 
 class _swap_with_cloned(saved_tensors_hooks):
-    def __init__(self, ctx: "_AllowMutationOnSavedContext") -> None:
-        def pack_hook(tensor: torch.Tensor) -> _Handle:
-            tid = _get_tid(tensor)
-            sid = _get_sid(tensor)
+    def __init__(self, ctx):
+        def pack_hook(t):
+            tid = _get_tid(t)
+            sid = _get_sid(t)
             # Tensors saved for backward have an entry in _tid_to_weakhandle
             handle: Optional[_Handle] = None
 
@@ -631,13 +562,14 @@ class _swap_with_cloned(saved_tensors_hooks):
             if tid not in ctx.tid_to_weakhandle:
                 handle = _Handle()
                 ctx.tid_to_weakhandle[tid] = handle
-                ctx.original[handle] = tensor
+                ctx.original[handle] = t
             else:
                 # Store an additional strong reference to the handle
                 handle = ctx.tid_to_weakhandle[tid]
             return handle
 
-        def unpack_hook(handle: _Handle) -> torch.Tensor:
+        def unpack_hook(tup):
+            handle = tup
             error_msg = (
                 "Trying to backward outside of the 'allow_mutation_on_saved_tensors' context"
                 "in which the graph was originally recorded."
@@ -654,65 +586,54 @@ class _swap_with_cloned(saved_tensors_hooks):
 
 
 class _CloneArgBeforeMutateMode(TorchDispatchMode):
-    def __init__(self, ctx: "_AllowMutationOnSavedContext") -> None:
+    def __init__(self, ctx):
         self.ctx = ctx
 
-    def __torch_dispatch__(
-        self,
-        func: "OpOverload",
-        types: Iterable[type],
-        args: tuple[Any, ...] = (),
-        kwargs: Optional[dict[Any, Any]] = None,
-    ) -> Any:
+    def __torch_dispatch__(self, func, types, args=(), kwargs=None):
         kwargs = kwargs or {}
-
-        def maybe_clone(t: torch.Tensor) -> None:
-            tid = _get_tid(t)
-            sid = _get_sid(t)
-            ctx = self.ctx
-            if sid in ctx.sid_to_tid:
-                for tid in ctx.sid_to_tid[sid]:
-                    if tid not in ctx.tid_to_weakhandle:
-                        # We know that if tid is in sid_to_tid, then it must also be in
-                        # tid_to_weakhandle. However, it is possible for the tensor to be
-                        # saved at one point, but cleared by backward before it is modified
-                        # in-place. Consider the following example:
-                        #
-                        # >>> a = torch.randn(2, 3, requires_grad=True).clone()
-                        # >>> out = (a**2).sum()
-                        # >>> out.backward()
-                        # >>> a.sin_()
-                        continue
-                    handle = ctx.tid_to_weakhandle[tid]
-                    if handle in ctx.cloned:
-                        # The same exact tensor has been cloned already
-                        continue
-                    ctx.cloned[handle] = ctx.original[handle].clone()
-                    del ctx.original[handle]
 
         for idx, arg in enumerate(func._schema.arguments):
             if arg.alias_info is not None and arg.alias_info.is_write:
-                if arg.is_out:
-                    maybe_clone(kwargs["out"])
-                elif isinstance(args[idx], list):
-                    # Foreach case. (Possible optimization: if most of the
-                    # tensors need to be cloned, use a for each clone?)
-                    for t in args[idx]:
-                        maybe_clone(t)
-                else:
-                    maybe_clone(args[idx])
+                t = kwargs["out"] if arg.is_out else args[idx]
+                tid = _get_tid(t)
+                sid = _get_sid(t)
+                ctx = self.ctx
+                if sid in ctx.sid_to_tid:
+                    for tid in ctx.sid_to_tid[sid]:
+                        if tid not in ctx.tid_to_weakhandle:
+                            # We know that if tid is in sid_to_tid, then it must also be in
+                            # tid_to_weakhandle. However, it is possible for the tensor to be
+                            # saved at one point, but cleared by backward before it is modified
+                            # in-place. Consider the following example:
+                            #
+                            # >>> a = torch.randn(2, 3, requires_grad=True).clone()
+                            # >>> out = (a**2).sum()
+                            # >>> out.backward()
+                            # >>> a.sin_()
+                            continue
+                        handle = ctx.tid_to_weakhandle[tid]
+                        if handle in ctx.cloned:
+                            # The same exact tensor has been cloned already
+                            continue
+                        ctx.cloned[handle] = ctx.original[handle].clone()
+                        del ctx.original[handle]
 
-        return func(*args, **kwargs)
+        rs = func(*args, **kwargs)
+        return rs
 
 
 class _AllowMutationOnSavedContext:
-    def __init__(self) -> None:
-        self.cloned: MutableMapping[_Handle, torch.Tensor] = WeakKeyDictionary()
-        self.original: MutableMapping[_Handle, torch.Tensor] = WeakKeyDictionary()
-        self.tid_to_weakhandle: MutableMapping[_TID, _Handle] = WeakValueDictionary()
-        self.sid_to_tid: dict[_SID, set[_TID]] = defaultdict(set)
+    def __init__(self):
+        self.cloned: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+        self.original: weakref.WeakKeyDictionary = weakref.WeakKeyDictionary()
+        self.tid_to_weakhandle: weakref.WeakValueDictionary = (
+            weakref.WeakValueDictionary()
+        )
+        self.sid_to_tid: Dict[Tuple[int, int], Set[Tuple[int, int, int]]] = defaultdict(
+            set
+        )
 
-    def clear(self) -> None:
+    def clear(self):
         self.cloned.clear()
         self.original.clear()
         self.tid_to_weakhandle.clear()
@@ -720,9 +641,7 @@ class _AllowMutationOnSavedContext:
 
 
 @contextlib.contextmanager
-def allow_mutation_on_saved_tensors() -> (
-    Generator[_AllowMutationOnSavedContext, None, None]
-):
+def allow_mutation_on_saved_tensors():
     """Context manager under which mutating tensors saved for backward is allowed.
 
     Under this context manager, tensors saved for backward are cloned on mutation,
@@ -732,7 +651,7 @@ def allow_mutation_on_saved_tensors() -> (
     To ensure the correct behavior, both the forward and backward should be run under
     the same context manager.
 
-    Returns:
+    returns:
         An _AllowMutationOnSavedContext object storing the state managed by this
         context manager. This object can be useful for debugging purposes. The state
         managed by the context manager is automatically cleared upon exiting.
@@ -769,16 +688,14 @@ def allow_mutation_on_saved_tensors() -> (
             _allow_mutation_on_saved_tensors_enabled = False
 
 
-def _register_logging_hooks_on_whole_graph(
-    t_outputs: Sequence[Union[torch.Tensor, GradientEdge]],
-) -> Callable[[], None]:
+def _register_logging_hooks_on_whole_graph(t_outputs: List[torch.Tensor]):
     grad_fns = list(map(_get_grad_fn_or_grad_acc, t_outputs))
 
-    def iter_graph(roots: list[Node]) -> Iterator[Node]:
+    def iter_graph(roots):
         if not roots:
             return
-        seen: set[Node] = set()
-        q: deque[Node] = deque()
+        seen = set()
+        q: Deque = collections.deque()
         for node in roots:
             if node is not None:
                 seen.add(node)
@@ -786,7 +703,7 @@ def _register_logging_hooks_on_whole_graph(
 
         while q:
             node = q.popleft()
-            for fn, _ in node.next_functions:
+            for fn, _idx in node.next_functions:
                 if fn in seen or fn is None:
                     continue
                 seen.add(fn)
@@ -794,34 +711,32 @@ def _register_logging_hooks_on_whole_graph(
 
             yield node
 
-    def fmt(t: Optional[torch.Tensor]) -> str:
+    def fmt(t):
         # Avoid circular import
-        from torch.utils._dtype_abbrs import dtype_abbrs
+        from torch.testing._internal.common_utils import dtype_abbrs
 
         if t is None:
             return "None"
         return f"{dtype_abbrs[t.dtype]}[{', '.join(map(str, t.shape))}]"
 
-    def prehook(grad_outputs: Sequence[Optional[torch.Tensor]]) -> None:
+    def prehook(grad_outputs):
         node = torch._C._current_autograd_node()
         grad_outputs_str = f"[{','.join(fmt(t) for t in grad_outputs)}]"
         log_str = f"Executing: {node} with grad_outputs: {grad_outputs_str}"
         log.debug(log_str)
 
-    handles = [node.register_prehook(prehook) for node in iter_graph(grad_fns)]
+    handles = []
+    for node in iter_graph(grad_fns):
+        handles.append(node.register_prehook(prehook))
 
-    def unregister_hooks() -> None:
+    def unregister_hooks():
         for handle in handles:
             handle.remove()
 
     return unregister_hooks
 
 
-def _engine_run_backward(
-    t_outputs: Sequence[Union[torch.Tensor, GradientEdge]],
-    *args: Any,
-    **kwargs: Any,
-) -> tuple[torch.Tensor, ...]:
+def _engine_run_backward(t_outputs, *args, **kwargs):
     attach_logging_hooks = log.getEffectiveLevel() <= logging.DEBUG
     if attach_logging_hooks:
         unregister_hooks = _register_logging_hooks_on_whole_graph(t_outputs)

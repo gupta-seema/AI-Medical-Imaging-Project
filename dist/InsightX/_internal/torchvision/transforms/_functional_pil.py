@@ -1,12 +1,9 @@
 import numbers
-from collections.abc import Sequence
-from typing import Any, Literal, Optional, Union
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 import numpy as np
 import torch
 from PIL import Image, ImageEnhance, ImageOps
-
-from ..utils import _Image_fromarray
 
 try:
     import accimage
@@ -23,7 +20,7 @@ def _is_pil_image(img: Any) -> bool:
 
 
 @torch.jit.unused
-def get_dimensions(img: Any) -> list[int]:
+def get_dimensions(img: Any) -> List[int]:
     if _is_pil_image(img):
         if hasattr(img, "getbands"):
             channels = len(img.getbands())
@@ -35,7 +32,7 @@ def get_dimensions(img: Any) -> list[int]:
 
 
 @torch.jit.unused
-def get_image_size(img: Any) -> list[int]:
+def get_image_size(img: Any) -> List[int]:
     if _is_pil_image(img):
         return list(img.size)
     raise TypeError(f"Unexpected type {type(img)}")
@@ -112,10 +109,10 @@ def adjust_hue(img: Image.Image, hue_factor: float) -> Image.Image:
     h, s, v = img.convert("HSV").split()
 
     np_h = np.array(h, dtype=np.uint8)
-    # This will over/underflow, as desired
-    np_h += np.int32(hue_factor * 255).astype(np.uint8)
-
-    h = _Image_fromarray(np_h, "L")
+    # uint8 addition take cares of rotation across boundaries
+    with np.errstate(over="ignore"):
+        np_h += np.uint8(hue_factor * 255)
+    h = Image.fromarray(np_h, "L")
 
     img = Image.merge("HSV", (h, s, v)).convert(input_mode)
     return img
@@ -146,8 +143,8 @@ def adjust_gamma(
 @torch.jit.unused
 def pad(
     img: Image.Image,
-    padding: Union[int, list[int], tuple[int, ...]],
-    fill: Optional[Union[float, list[float], tuple[float, ...]]] = 0,
+    padding: Union[int, List[int], Tuple[int, ...]],
+    fill: Optional[Union[float, List[float], Tuple[float, ...]]] = 0,
     padding_mode: Literal["constant", "edge", "reflect", "symmetric"] = "constant",
 ) -> Image.Image:
 
@@ -241,7 +238,7 @@ def crop(
 @torch.jit.unused
 def resize(
     img: Image.Image,
-    size: Union[list[int], int],
+    size: Union[List[int], int],
     interpolation: int = Image.BILINEAR,
 ) -> Image.Image:
 
@@ -255,10 +252,10 @@ def resize(
 
 @torch.jit.unused
 def _parse_fill(
-    fill: Optional[Union[float, list[float], tuple[float, ...]]],
+    fill: Optional[Union[float, List[float], Tuple[float, ...]]],
     img: Image.Image,
     name: str = "fillcolor",
-) -> dict[str, Optional[Union[float, list[float], tuple[float, ...]]]]:
+) -> Dict[str, Optional[Union[float, List[float], Tuple[float, ...]]]]:
 
     # Process fill color for affine transforms
     num_channels = get_image_num_channels(img)
@@ -287,7 +284,7 @@ def _parse_fill(
 @torch.jit.unused
 def affine(
     img: Image.Image,
-    matrix: list[float],
+    matrix: List[float],
     interpolation: int = Image.NEAREST,
     fill: Optional[Union[int, float, Sequence[int], Sequence[float]]] = None,
 ) -> Image.Image:
@@ -306,7 +303,7 @@ def rotate(
     angle: float,
     interpolation: int = Image.NEAREST,
     expand: bool = False,
-    center: Optional[tuple[int, int]] = None,
+    center: Optional[Tuple[int, int]] = None,
     fill: Optional[Union[int, float, Sequence[int], Sequence[float]]] = None,
 ) -> Image.Image:
 
@@ -320,7 +317,7 @@ def rotate(
 @torch.jit.unused
 def perspective(
     img: Image.Image,
-    perspective_coeffs: list[float],
+    perspective_coeffs: List[float],
     interpolation: int = Image.BICUBIC,
     fill: Optional[Union[int, float, Sequence[int], Sequence[float]]] = None,
 ) -> Image.Image:
@@ -344,7 +341,7 @@ def to_grayscale(img: Image.Image, num_output_channels: int) -> Image.Image:
         img = img.convert("L")
         np_img = np.array(img, dtype=np.uint8)
         np_img = np.dstack([np_img, np_img, np_img])
-        img = _Image_fromarray(np_img, "RGB")
+        img = Image.fromarray(np_img, "RGB")
     else:
         raise ValueError("num_output_channels should be either 1 or 3")
 

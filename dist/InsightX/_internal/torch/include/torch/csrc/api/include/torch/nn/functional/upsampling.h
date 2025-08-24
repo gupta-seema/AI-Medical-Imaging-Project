@@ -7,24 +7,25 @@
 #include <cmath>
 #include <utility>
 
-namespace torch::nn::functional {
+namespace torch {
+namespace nn {
+namespace functional {
 
 inline std::vector<int64_t> _interp_output_size(
     int64_t dim,
     std::tuple<
         Tensor,
-        std::optional<std::vector<int64_t>>,
-        std::optional<std::vector<double>>,
-        std::optional<bool>> closed_over_args) {
-  auto [input, size, scale_factor, recompute_scale_factor] =
-      std::move(closed_over_args);
-  if (size == std::nullopt && scale_factor == std::nullopt) {
+        c10::optional<std::vector<int64_t>>,
+        c10::optional<std::vector<double>>,
+        c10::optional<bool>> closed_over_args) {
+  auto [input, size, scale_factor, recompute_scale_factor] = closed_over_args;
+  if (size == c10::nullopt && scale_factor == c10::nullopt) {
     TORCH_CHECK(false, "either size or scale_factor should be defined");
   }
-  if (size != std::nullopt && scale_factor != std::nullopt) {
+  if (size != c10::nullopt && scale_factor != c10::nullopt) {
     TORCH_CHECK(false, "only one of size or scale_factor should be defined");
   }
-  if (scale_factor != std::nullopt) {
+  if (scale_factor != c10::nullopt) {
     if (static_cast<int64_t>(scale_factor.value().size()) != dim) {
       TORCH_CHECK(
           false,
@@ -35,14 +36,14 @@ inline std::vector<int64_t> _interp_output_size(
           torch::ArrayRef<double>(*scale_factor));
     }
   }
-  if (size != std::nullopt) {
+  if (size != c10::nullopt) {
     return *size;
   }
 
-  TORCH_INTERNAL_ASSERT(scale_factor != std::nullopt);
+  TORCH_INTERNAL_ASSERT(scale_factor != c10::nullopt);
   auto scale_factors = *scale_factor;
 
-  if (recompute_scale_factor == std::nullopt) {
+  if (recompute_scale_factor == c10::nullopt) {
     // only warn when the scales have floating values since
     // the result for ints is the same with/without recompute_scale_factor
     bool is_float_scale_factor = false;
@@ -74,22 +75,22 @@ inline std::vector<int64_t> _interp_output_size(
 namespace detail {
 inline Tensor interpolate(
     const Tensor& input,
-    const std::optional<std::vector<int64_t>>& size,
-    const std::optional<std::vector<double>>& scale_factor,
+    const c10::optional<std::vector<int64_t>>& size,
+    const c10::optional<std::vector<double>>& scale_factor,
     InterpolateFuncOptions::mode_t mode,
-    std::optional<bool> align_corners,
-    std::optional<bool> recompute_scale_factor,
+    c10::optional<bool> align_corners,
+    c10::optional<bool> recompute_scale_factor,
     bool antialias) {
   if (std::holds_alternative<enumtype::kNearest>(mode) ||
       std::get_if<enumtype::kArea>(&mode)) {
-    if (align_corners != std::nullopt) {
+    if (align_corners != c10::nullopt) {
       TORCH_CHECK(
           false,
           "align_corners option can only be set with the "
           "interpolating modes: linear | bilinear | bicubic | trilinear");
     }
   } else {
-    if (align_corners == std::nullopt) {
+    if (align_corners == c10::nullopt) {
       TORCH_WARN(
           "Default upsampling behavior when mode=",
           enumtype::get_enum_name(mode),
@@ -112,9 +113,9 @@ inline Tensor interpolate(
       ")");
 
   auto scale_factor_len = input.dim() - 2;
-  std::vector<std::optional<double>> scale_factor_list(
-      scale_factor_len, std::nullopt);
-  if (scale_factor != std::nullopt && !recompute_scale_factor.value_or(false)) {
+  std::vector<c10::optional<double>> scale_factor_list(
+      scale_factor_len, c10::nullopt);
+  if (scale_factor != c10::nullopt && !recompute_scale_factor.value_or(false)) {
     auto _scale_factor_repeated = *scale_factor;
     scale_factor_list = {};
     for (const auto& elem : _scale_factor_repeated) {
@@ -180,7 +181,7 @@ inline Tensor interpolate(
         input, _interp_output_size(3, std::move(closed_over_args)));
   } else if (input.dim() == 3 && std::get_if<enumtype::kLinear>(&mode)) {
     TORCH_CHECK(
-        align_corners != std::nullopt, "align_corners should be specified.");
+        align_corners != c10::nullopt, "align_corners should be specified.");
     return torch::upsample_linear1d(
         input,
         _interp_output_size(1, std::move(closed_over_args)),
@@ -194,7 +195,7 @@ inline Tensor interpolate(
     TORCH_CHECK(false, "Got 4D input, but linear mode needs 3D input");
   } else if (input.dim() == 4 && std::get_if<enumtype::kBilinear>(&mode)) {
     TORCH_CHECK(
-        align_corners != std::nullopt, "align_corners should be specified.");
+        align_corners != c10::nullopt, "align_corners should be specified.");
     if (antialias) {
       return torch::_upsample_bilinear2d_aa(
           input,
@@ -217,7 +218,7 @@ inline Tensor interpolate(
     TORCH_CHECK(false, "Got 5D input, but bilinear mode needs 4D input");
   } else if (input.dim() == 5 && std::get_if<enumtype::kTrilinear>(&mode)) {
     TORCH_CHECK(
-        align_corners != std::nullopt, "align_corners should be specified.");
+        align_corners != c10::nullopt, "align_corners should be specified.");
     return torch::upsample_trilinear3d(
         input,
         _interp_output_size(3, std::move(closed_over_args)),
@@ -227,7 +228,7 @@ inline Tensor interpolate(
         scale_factor_list.at(2));
   } else if (input.dim() == 4 && std::get_if<enumtype::kBicubic>(&mode)) {
     TORCH_CHECK(
-        align_corners != std::nullopt, "align_corners should be specified.");
+        align_corners != c10::nullopt, "align_corners should be specified.");
     if (antialias) {
       return torch::_upsample_bicubic2d_aa(
           input,
@@ -258,7 +259,7 @@ inline Tensor interpolate(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.interpolate
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.interpolate
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::InterpolateFuncOptions`
@@ -283,4 +284,6 @@ inline Tensor interpolate(
       options.antialias());
 }
 
-} // namespace torch::nn::functional
+} // namespace functional
+} // namespace nn
+} // namespace torch

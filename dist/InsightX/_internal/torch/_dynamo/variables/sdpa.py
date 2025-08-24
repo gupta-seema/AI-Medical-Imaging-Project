@@ -1,19 +1,10 @@
 # mypy: ignore-errors
 
 from inspect import getattr_static
-from typing import TYPE_CHECKING
 
 from ..bytecode_transformation import create_call_function
 from ..exc import Unsupported
-from ..source import AttrSource
 from .base import VariableTracker
-
-
-if TYPE_CHECKING:
-    from torch._dynamo.codegen import PyCodegen
-    from torch._dynamo.symbolic_convert import InstructionTranslator
-
-PARAM_NAMES = "query key value attn_mask dropout is_causal enable_gqa".split()
 
 
 class SDPAParamsVariable(VariableTracker):
@@ -21,37 +12,52 @@ class SDPAParamsVariable(VariableTracker):
     This is a read-only container."""
 
     @staticmethod
-    def create(tx: "InstructionTranslator", value, source):
+    def create(tx, value, source):
         from torch.backends.cuda import SDPAParams
-
+        from ..source import AttrSource
+        from .builder import VariableBuilder
         from .torch import TorchInGraphFunctionVariable
 
-        params = [
-            VariableTracker.build(tx, getattr(value, p), AttrSource(source, p))
-            for p in PARAM_NAMES
+        query_var = VariableBuilder(tx, AttrSource(source, "query"))(value.query)
+        key_var = VariableBuilder(tx, AttrSource(source, "key"))(value.key)
+        value_var = VariableBuilder(tx, AttrSource(source, "value"))(value.value)
+        attn_mask_var = VariableBuilder(tx, AttrSource(source, "attn_mask"))(
+            value.attn_mask
+        )
+        dropout_var = VariableBuilder(tx, AttrSource(source, "dropout"))(value.dropout)
+        is_causal_var = VariableBuilder(tx, AttrSource(source, "is_causal"))(
+            value.is_causal
+        )
+        param_vars = [
+            query_var,
+            key_var,
+            value_var,
+            attn_mask_var,
+            dropout_var,
+            is_causal_var,
         ]
-        return TorchInGraphFunctionVariable(SDPAParams).call_function(tx, params, {})
+        return TorchInGraphFunctionVariable(SDPAParams).call_function(
+            tx, param_vars, {}
+        )
 
-    def __init__(self, proxy, param_vars, **kwargs) -> None:
+    def __init__(self, proxy, param_vars, **kwargs):
         self.proxy = proxy
         self.param_vars = param_vars
         super().__init__(**kwargs)
 
-    def reconstruct(self, codegen: "PyCodegen"):
+    def reconstruct(self, codegen):
         assert self.source is None
         assert self.param_vars is not None
-        codegen.add_push_null(
-            lambda: codegen.load_import_from("torch._C", "_SDPAParams")
-        )
+        codegen.load_import_from("torch._C", "_SDPAParams")
         codegen.foreach(self.param_vars)
-        codegen.extend_output(create_call_function(len(self.param_vars), False))
+        codegen.extend_output(create_call_function(len(self.param_vars), True))
 
     def as_proxy(self):
         return self.proxy
 
-    def var_getattr(self, tx: "InstructionTranslator", name: str) -> VariableTracker:
+    def var_getattr(self, tx, name: str) -> VariableTracker:
         import torch._C
-
+        from ..source import AttrSource
         from .builder import wrap_fx_proxy
         from .misc import GetAttrVariable
 
@@ -59,9 +65,9 @@ class SDPAParamsVariable(VariableTracker):
             getattr_static(torch._C._SDPAParams, name)
         except AttributeError:
             # Using raise from is too verbose here
-            raise Unsupported(
+            raise Unsupported(  # noqa: TRY200
                 f"Unsupported torch._C._SDPAParams attribute {name}"
-            ) from None
+            )
 
         proxy = GetAttrVariable.create_getattr_proxy(self.as_proxy(), name)
         if self.source is not None:

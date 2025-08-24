@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# mypy: allow-untyped-defs
 
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
@@ -9,21 +8,14 @@
 
 import datetime
 import logging
-from typing import cast, Optional
+from typing import Tuple, cast, Optional
 
-from torch.distributed import PrefixStore, Store, TCPStore
-from torch.distributed.elastic.rendezvous import (
-    RendezvousHandler,
-    RendezvousInfo,
-    RendezvousParameters,
-    RendezvousStoreInfo,
-)
+# pyre-ignore[21]: Could not find name `Store` in `torch.distributed`.
+from torch.distributed import Store, TCPStore, PrefixStore
+from torch.distributed.elastic.rendezvous import RendezvousHandler, RendezvousParameters
 from torch.distributed.elastic.rendezvous.utils import parse_rendezvous_endpoint
 
-
-__all__ = ["StaticTCPRendezvous", "create_rdzv_handler"]
-
-logger = logging.getLogger(__name__)
+log = logging.getLogger(__name__)
 
 _default_timeout_seconds = 600
 
@@ -56,14 +48,10 @@ class StaticTCPRendezvous(RendezvousHandler):
     def get_backend(self) -> str:
         return "static"
 
-    @property
-    def use_agent_store(self) -> bool:
-        return True
-
-    def next_rendezvous(self) -> RendezvousInfo:
-        logger.info("Creating TCPStore as the c10d::Store implementation")
-        is_master = self.rank == 0
+    def next_rendezvous(self) -> Tuple[Store, int, int]:
+        log.info("Creating TCPStore as the c10d::Store implementation")
         if not self._store:
+            is_master = self.rank == 0
             self._store = TCPStore(  # type: ignore[call-arg]
                 self.master_addr,
                 self.master_port,
@@ -73,14 +61,7 @@ class StaticTCPRendezvous(RendezvousHandler):
                 multi_tenant=True,
             )
         store = PrefixStore(self.run_id, self._store)
-        # TCPStore server instance is used by trainer code
-        bootstrap_store_info = RendezvousStoreInfo(self.master_addr, self.master_port)
-        return RendezvousInfo(
-            store,
-            self.rank,
-            self.world_size,
-            bootstrap_store_info,
-        )
+        return store, self.rank, self.world_size
 
     def is_closed(self):
         return False
@@ -122,7 +103,6 @@ def create_rdzv_handler(params: RendezvousParameters) -> RendezvousHandler:
         timeout = int(params.config["timeout"])
     else:
         timeout = _default_timeout_seconds
-
     return StaticTCPRendezvous(
         master_addr, master_port, rank, world_size, run_id, timeout
     )

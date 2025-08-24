@@ -1,6 +1,5 @@
 import warnings
-from collections.abc import Sequence
-from typing import Callable, Optional, Union
+from typing import Callable, List, Optional, Sequence, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -39,9 +38,9 @@ class FrozenBatchNorm2d(torch.nn.Module):
         prefix: str,
         local_metadata: dict,
         strict: bool,
-        missing_keys: list[str],
-        unexpected_keys: list[str],
-        error_msgs: list[str],
+        missing_keys: List[str],
+        unexpected_keys: List[str],
+        error_msgs: List[str],
     ):
         num_batches_tracked_key = prefix + "num_batches_tracked"
         if num_batches_tracked_key in state_dict:
@@ -71,13 +70,13 @@ class ConvNormActivation(torch.nn.Sequential):
         self,
         in_channels: int,
         out_channels: int,
-        kernel_size: Union[int, tuple[int, ...]] = 3,
-        stride: Union[int, tuple[int, ...]] = 1,
-        padding: Optional[Union[int, tuple[int, ...], str]] = None,
+        kernel_size: Union[int, Tuple[int, ...]] = 3,
+        stride: Union[int, Tuple[int, ...]] = 1,
+        padding: Optional[Union[int, Tuple[int, ...], str]] = None,
         groups: int = 1,
         norm_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.BatchNorm2d,
         activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
-        dilation: Union[int, tuple[int, ...]] = 1,
+        dilation: Union[int, Tuple[int, ...]] = 1,
         inplace: Optional[bool] = True,
         bias: Optional[bool] = None,
         conv_layer: Callable[..., torch.nn.Module] = torch.nn.Conv2d,
@@ -146,13 +145,13 @@ class Conv2dNormActivation(ConvNormActivation):
         self,
         in_channels: int,
         out_channels: int,
-        kernel_size: Union[int, tuple[int, int]] = 3,
-        stride: Union[int, tuple[int, int]] = 1,
-        padding: Optional[Union[int, tuple[int, int], str]] = None,
+        kernel_size: Union[int, Tuple[int, int]] = 3,
+        stride: Union[int, Tuple[int, int]] = 1,
+        padding: Optional[Union[int, Tuple[int, int], str]] = None,
         groups: int = 1,
         norm_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.BatchNorm2d,
         activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
-        dilation: Union[int, tuple[int, int]] = 1,
+        dilation: Union[int, Tuple[int, int]] = 1,
         inplace: Optional[bool] = True,
         bias: Optional[bool] = None,
     ) -> None:
@@ -195,13 +194,13 @@ class Conv3dNormActivation(ConvNormActivation):
         self,
         in_channels: int,
         out_channels: int,
-        kernel_size: Union[int, tuple[int, int, int]] = 3,
-        stride: Union[int, tuple[int, int, int]] = 1,
-        padding: Optional[Union[int, tuple[int, int, int], str]] = None,
+        kernel_size: Union[int, Tuple[int, int, int]] = 3,
+        stride: Union[int, Tuple[int, int, int]] = 1,
+        padding: Optional[Union[int, Tuple[int, int, int], str]] = None,
         groups: int = 1,
         norm_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.BatchNorm3d,
         activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
-        dilation: Union[int, tuple[int, int, int]] = 1,
+        dilation: Union[int, Tuple[int, int, int]] = 1,
         inplace: Optional[bool] = True,
         bias: Optional[bool] = None,
     ) -> None:
@@ -278,7 +277,7 @@ class MLP(torch.nn.Sequential):
     def __init__(
         self,
         in_channels: int,
-        hidden_channels: list[int],
+        hidden_channels: List[int],
         norm_layer: Optional[Callable[..., torch.nn.Module]] = None,
         activation_layer: Optional[Callable[..., torch.nn.Module]] = torch.nn.ReLU,
         inplace: Optional[bool] = None,
@@ -313,7 +312,7 @@ class Permute(torch.nn.Module):
         dims (List[int]): The desired ordering of dimensions
     """
 
-    def __init__(self, dims: list[int]):
+    def __init__(self, dims: List[int]):
         super().__init__()
         self.dims = dims
 

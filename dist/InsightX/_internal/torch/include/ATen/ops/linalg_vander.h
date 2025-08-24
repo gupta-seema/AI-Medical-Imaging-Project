@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,23 +23,23 @@ namespace at {
 
 
 // aten::linalg_vander(Tensor x, *, SymInt? N=None) -> Tensor
-inline at::Tensor linalg_vander(const at::Tensor & x, ::std::optional<int64_t> N=::std::nullopt) {
-    return at::_ops::linalg_vander::call(x, N.has_value() ? ::std::make_optional(c10::SymInt(*N)) : ::std::nullopt);
+inline at::Tensor linalg_vander(const at::Tensor & x, c10::optional<int64_t> N=c10::nullopt) {
+    return at::_ops::linalg_vander::call(x, N.has_value() ? c10::make_optional(c10::SymInt(*N)) : c10::nullopt);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor linalg_vander(const at::Tensor & x, ::std::optional<int64_t> N=::std::nullopt) {
-    return at::_ops::linalg_vander::call(x, N.has_value() ? ::std::make_optional(c10::SymInt(*N)) : ::std::nullopt);
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
+  at::Tensor linalg_vander(const at::Tensor & x, c10::optional<int64_t> N=c10::nullopt) {
+    return at::_ops::linalg_vander::call(x, N.has_value() ? c10::make_optional(c10::SymInt(*N)) : c10::nullopt);
   }
 }
 
 // aten::linalg_vander(Tensor x, *, SymInt? N=None) -> Tensor
-inline at::Tensor linalg_vander_symint(const at::Tensor & x, ::std::optional<c10::SymInt> N=::std::nullopt) {
+inline at::Tensor linalg_vander_symint(const at::Tensor & x, c10::optional<c10::SymInt> N=c10::nullopt) {
     return at::_ops::linalg_vander::call(x, N);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor linalg_vander(const at::Tensor & x, ::std::optional<c10::SymInt> N=::std::nullopt) {
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
+  at::Tensor linalg_vander(const at::Tensor & x, c10::optional<c10::SymInt> N=c10::nullopt) {
     return at::_ops::linalg_vander::call(x, N);
   }
 }

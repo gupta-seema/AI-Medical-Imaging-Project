@@ -1,27 +1,36 @@
 #!/usr/bin/python3
-# mypy: allow-untyped-defs
 import collections
 import io
 import sys
 import types
-from collections.abc import Iterator, Mapping
-from typing import Any, Callable, Optional, TypeVar, Union
-from typing_extensions import Self
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterator,
+    List,
+    Mapping,
+    Optional,
+    Set,
+    Tuple,
+    Type,
+    TypeVar,
+    Union,
+)
 
 import torch
 import torch.distributed.rpc as rpc
-from torch import device, dtype, nn, Tensor
-from torch.distributed import _remote_device
+from torch import Tensor, device, dtype, nn
 from torch.distributed.nn.jit import instantiator
+from torch.distributed import _remote_device
 from torch.distributed.rpc.internal import _internal_rpc_pickler
 from torch.nn import Module
 from torch.nn.parameter import Parameter
 from torch.utils.hooks import RemovableHandle
 
-
 __all__ = ["RemoteModule"]
 
-_grad_t = Union[tuple[Tensor, ...], Tensor]
+_grad_t = Union[Tuple[Tensor, ...], Tensor]
 # See https://mypy.readthedocs.io/en/latest/generics.html#generic-methods-and-generic-self for the use
 # of `T` to annotate `self`. Many methods of `Module` return `self` and we want those return values to be
 # the type of the subclass, not the looser type of `Module`.
@@ -40,10 +49,7 @@ _REMOTE_MODULE_PICKLED_ATTRIBUTES = (
     "module_rref",
 )
 
-_SerializedRemoteModule = collections.namedtuple(  # type: ignore[misc]
-    "_SerializedRemoteModule",
-    _REMOTE_MODULE_PICKLED_ATTRIBUTES,
-)
+_SerializedRemoteModule = collections.namedtuple("_SerializedRemoteModule", _REMOTE_MODULE_PICKLED_ATTRIBUTES)  # type: ignore[misc]
 
 # These attributes are mostly from RemoteModule's parent class and are intentionally not pickled.
 # A new attribute of RemoteModule should be either in _REMOTE_MODULE_PICKLED_ATTRIBUTES
@@ -101,10 +107,10 @@ def _create_module_with_interface(
     return rpc.RRef(module, module_interface_cls)
 
 
-def _param_rrefs(module_rref, recurse) -> list[rpc.RRef[Parameter]]:
-    ret: list[rpc.RRef[Parameter]] = [
-        rpc.RRef(param) for param in module_rref.local_value().parameters(recurse)
-    ]
+def _param_rrefs(module_rref, recurse) -> List[rpc.RRef[Parameter]]:
+    ret: List[rpc.RRef[Parameter]] = []
+    for param in module_rref.local_value().parameters(recurse):
+        ret.append(rpc.RRef(param))
     return ret
 
 
@@ -113,6 +119,7 @@ def _raise_not_supported(name: str) -> None:
 
 
 class _RemoteModule(nn.Module):
+
     def __new__(cls, *args, **kwargs):
         # Use __new__ for logging purposes.
         torch._C._log_api_usage_once("torch.distributed.nn.api.remote_module")
@@ -121,9 +128,9 @@ class _RemoteModule(nn.Module):
     def __init__(
         self,
         remote_device: str,
-        module_cls: type[nn.Module],
-        args: Optional[tuple] = None,
-        kwargs: Optional[dict[str, Any]] = None,
+        module_cls: Type[nn.Module],
+        args: Optional[Tuple] = None,
+        kwargs: Optional[Dict[str, Any]] = None,
         _module_interface_cls: Any = None,
     ):
         """
@@ -148,7 +155,7 @@ class _RemoteModule(nn.Module):
         created outside of remote modules, rather than as submodules of any remote module (by calling ``add_module``).
         Hybrid Example:
                 >>> class HybridModel(nn.Module):
-                >>>     def __init__(self) -> None:
+                >>>     def __init__(self):
                 >>>         nn.Module.__init__(self)
                 >>>         self.remote_embedding = RemoteModule(...)
                 >>>         self.local_linear = nn.Linear(...)
@@ -274,7 +281,7 @@ class _RemoteModule(nn.Module):
         self._install_generated_methods()
         self._check_attribute_picklability()
 
-    def remote_parameters(self, recurse: bool = True) -> list[rpc.RRef[Parameter]]:
+    def remote_parameters(self, recurse: bool = True) -> List[rpc.RRef[Parameter]]:
         """
         Return a list of :class:`~torch.distributed.rpc.RRef` pointing to the remote module's parameters.
 
@@ -320,34 +327,34 @@ class _RemoteModule(nn.Module):
     def add_module(self, name: str, module: Optional[Module]) -> None:
         _raise_not_supported(self.add_module.__name__)
 
-    def apply(self, fn: Callable[[Module], None]) -> Self:  # type: ignore[return]
+    def apply(self: T, fn: Callable[[Module], None]) -> T:  # type: ignore[return]
         _raise_not_supported(self.apply.__name__)
 
-    def cuda(self, device: Optional[Union[int, device]] = None) -> Self:  # type: ignore[return]
+    def cuda(self: T, device: Optional[Union[int, device]] = None) -> T:  # type: ignore[return]
         _raise_not_supported(self.cuda.__name__)
 
-    def ipu(self, device: Optional[Union[int, device]] = None) -> Self:  # type: ignore[return]
+    def ipu(self: T, device: Optional[Union[int, device]] = None) -> T:  # type: ignore[return]
         _raise_not_supported(self.ipu.__name__)
 
-    def xpu(self, device: Optional[Union[int, device]] = None) -> Self:  # type: ignore[return]
+    def xpu(self: T, device: Optional[Union[int, device]] = None) -> T:  # type: ignore[return]
         _raise_not_supported(self.xpu.__name__)
 
-    def cpu(self) -> Self:  # type: ignore[return]
+    def cpu(self: T) -> T:  # type: ignore[return]
         _raise_not_supported(self.cpu.__name__)
 
-    def type(self, dst_type: Union[dtype, str]) -> Self:  # type: ignore[return]
+    def type(self: T, dst_type: Union[dtype, str]) -> T:  # type: ignore[return]
         _raise_not_supported(self.type.__name__)
 
-    def float(self) -> Self:  # type: ignore[return]
+    def float(self: T) -> T:  # type: ignore[return]
         _raise_not_supported(self.float.__name__)
 
-    def double(self) -> Self:  # type: ignore[return]
+    def double(self: T) -> T:  # type: ignore[return]
         _raise_not_supported(self.double.__name__)
 
-    def half(self) -> Self:  # type: ignore[return]
+    def half(self: T) -> T:  # type: ignore[return]
         _raise_not_supported(self.half.__name__)
 
-    def bfloat16(self) -> Self:  # type: ignore[return]
+    def bfloat16(self: T) -> T:  # type: ignore[return]
         _raise_not_supported(self.bfloat16.__name__)
 
     def to(self, *args, **kwargs) -> T:  # type: ignore[misc, return, type-var]
@@ -361,11 +368,8 @@ class _RemoteModule(nn.Module):
     def register_forward_pre_hook(  # type: ignore[return]
         self,
         hook: Union[
-            Callable[[T, tuple[Any, ...]], Optional[Any]],
-            Callable[
-                [T, tuple[Any, ...], dict[str, Any]],
-                Optional[tuple[Any, dict[str, Any]]],
-            ],
+            Callable[[T, Tuple[Any, ...]], Optional[Any]],
+            Callable[[T, Tuple[Any, ...], Dict[str, Any]], Optional[Tuple[Any, Dict[str, Any]]]],
         ],
         prepend: bool = False,
         with_kwargs: bool = False,
@@ -375,8 +379,8 @@ class _RemoteModule(nn.Module):
     def register_forward_hook(  # type: ignore[return, override]
         self,
         hook: Union[
-            Callable[[T, tuple[Any, ...], Any], Optional[Any]],
-            Callable[[T, tuple[Any, ...], dict[str, Any], Any], Optional[Any]],
+            Callable[[T, Tuple[Any, ...], Any], Optional[Any]],
+            Callable[[T, Tuple[Any, ...], Dict[str, Any], Any], Optional[Any]],
         ],
         prepend: bool = False,
         with_kwargs: bool = False,
@@ -400,22 +404,28 @@ class _RemoteModule(nn.Module):
         )
 
     def named_parameters(  # type: ignore[return]
-        self, prefix: str = "", recurse: bool = True, remove_duplicate: bool = True
-    ) -> Iterator[tuple[str, Parameter]]:
+        self,
+        prefix: str = "",
+        recurse: bool = True,
+        remove_duplicate: bool = True
+    ) -> Iterator[Tuple[str, Parameter]]:
         _raise_not_supported(self.named_parameters.__name__)
 
     def buffers(self, recurse: bool = True) -> Iterator[Tensor]:  # type: ignore[return]
         _raise_not_supported(self.buffers.__name__)
 
     def named_buffers(  # type: ignore[return]
-        self, prefix: str = "", recurse: bool = True, remove_duplicate: bool = True
-    ) -> Iterator[tuple[str, Tensor]]:
+        self,
+        prefix: str = "",
+        recurse: bool = True,
+        remove_duplicate: bool = True
+    ) -> Iterator[Tuple[str, Tensor]]:
         _raise_not_supported(self.named_buffers.__name__)
 
     def children(self) -> Iterator[Module]:  # type: ignore[return]
         _raise_not_supported(self.children.__name__)
 
-    def named_children(self) -> Iterator[tuple[str, Module]]:  # type: ignore[return]
+    def named_children(self) -> Iterator[Tuple[str, Module]]:  # type: ignore[return]
         _raise_not_supported(self.named_children.__name__)
 
     def modules(self) -> Iterator[Module]:  # type: ignore[return]
@@ -423,25 +433,25 @@ class _RemoteModule(nn.Module):
 
     def named_modules(
         self,
-        memo: Optional[set[Module]] = None,
+        memo: Optional[Set[Module]] = None,
         prefix: str = "",
         remove_duplicate: bool = True,
     ):
         _raise_not_supported(self.named_modules.__name__)
 
-    def train(self, mode: bool = True) -> Self:
+    def train(self: T, mode: bool = True) -> T:
         return self.module_rref.rpc_sync().train()  # type: ignore[operator, union-attr]
 
-    def eval(self) -> Self:
+    def eval(self: T) -> T:
         return self.module_rref.rpc_sync().eval()  # type: ignore[operator, union-attr]
 
-    def requires_grad_(self, requires_grad: bool = True) -> Self:  # type: ignore[return]
+    def requires_grad_(self: T, requires_grad: bool = True) -> T:  # type: ignore[return]
         _raise_not_supported(self.requires_grad_.__name__)
 
     def zero_grad(self, set_to_none: bool = True) -> None:
         _raise_not_supported(self.zero_grad.__name__)
 
-    def share_memory(self) -> Self:  # type: ignore[return]
+    def share_memory(self: T) -> T:  # type: ignore[return]
         _raise_not_supported(self.share_memory.__name__)
 
     def extra_repr(self) -> str:  # type: ignore[return]
@@ -453,11 +463,7 @@ class _RemoteModule(nn.Module):
         assert rpc._is_current_rpc_agent_set(), "RemoteModule only works in RPC."
 
         remote_device = _remote_device(remote_device_str)
-        self.on = (
-            remote_device.worker_name()
-            if remote_device.worker_name() is not None
-            else remote_device.rank()
-        )
+        self.on = remote_device.worker_name() if remote_device.worker_name() is not None else remote_device.rank()
         self.device = str(remote_device.device())
         agent = rpc._get_current_rpc_agent()
         # If the device map of the remote worker is set,
@@ -673,9 +679,9 @@ class RemoteModule(_RemoteModule):
     def __init__(
         self,
         remote_device: str,
-        module_cls: type[nn.Module],
-        args: Optional[tuple] = None,
-        kwargs: Optional[dict[str, Any]] = None,
+        module_cls: Type[nn.Module],
+        args: Optional[Tuple] = None,
+        kwargs: Optional[Dict[str, Any]] = None,
     ):
         super().__init__(remote_device, module_cls, args, kwargs)
 

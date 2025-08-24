@@ -1,6 +1,5 @@
 #pragma once
 
-#include <c10/core/SafePyObject.h>
 #include <torch/csrc/Export.h>
 #include <torch/csrc/autograd/forward_grad.h>
 #include <torch/csrc/autograd/saved_variable_hooks.h>
@@ -27,12 +26,10 @@ class TORCH_API SavedVariable {
       bool is_output,
       bool is_inplace_on_view = false);
   SavedVariable(
-      const std::optional<Variable>& variable,
+      const c10::optional<Variable>& variable,
       bool is_output,
       bool is_inplace_on_view = false);
-  SavedVariable(const SavedVariable&) = delete;
   SavedVariable(SavedVariable&&) = default;
-  SavedVariable& operator=(const SavedVariable&) = delete;
   SavedVariable& operator=(SavedVariable&&) = default;
   ~SavedVariable() {
     if (fw_grad_) {
@@ -52,15 +49,6 @@ class TORCH_API SavedVariable {
 
   bool has_hooks() const {
     return (bool)hooks_;
-  }
-
-  // Used by compiled autograd
-  std::optional<std::pair<c10::SafePyObject, c10::SafePyObject>>
-  retrieve_unpack_hook_data() const {
-    if (!hooks_) {
-      return std::nullopt;
-    }
-    return hooks_->retrieve_unpack_hook_data();
   }
 
  private:
@@ -98,6 +86,7 @@ class TORCH_API SavedVariable {
   // In that case, the grad_fn passed in to the unpack function at unwrapping
   // time is unused.
   std::weak_ptr<Node> weak_grad_fn_;
+  c10::VariableVersion version_counter_;
 
   uint32_t saved_version_ = 0;
   uint32_t output_nr_ = 0;

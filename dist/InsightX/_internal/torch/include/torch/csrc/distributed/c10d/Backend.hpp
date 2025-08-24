@@ -1,11 +1,14 @@
 #pragma once
 
+#include <condition_variable>
 #include <memory>
+#include <mutex>
+#include <stdexcept>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
 #include <ATen/ATen.h>
-#include <c10/core/Allocator.h>
 #include <c10/macros/Macros.h>
 
 #include <torch/csrc/distributed/c10d/Types.hpp>
@@ -17,16 +20,6 @@ constexpr auto kBackendDefaultTimeout =
     std::chrono::milliseconds(30 * 60 * 1000);
 
 namespace c10d {
-
-enum class ErrorType {
-  SUCCESS = 0,
-  TIMEOUT = 1,
-  // e.g., NCCL error, etc
-  COMM_ERROR = 2,
-  // TODO, do we need to distinguish between remote timeout or remote COMM
-  // errors?
-  REMOTE_ERROR = 3
-};
 
 class TORCH_API Backend : public torch::CustomClassHolder {
  public:
@@ -44,7 +37,6 @@ class TORCH_API Backend : public torch::CustomClassHolder {
     std::chrono::milliseconds timeout;
 
     // backend name
-    // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
     const std::string backend;
   };
 
@@ -69,14 +61,6 @@ class TORCH_API Backend : public torch::CustomClassHolder {
     return false;
   }
 
-  virtual bool supportsCoalescing() const {
-    return false;
-  }
-
-  virtual bool supportsTimeEstimation() const {
-    return false;
-  }
-
   virtual void startCoalescing() {
     TORCH_CHECK(
         false,
@@ -96,7 +80,7 @@ class TORCH_API Backend : public torch::CustomClassHolder {
   // Subclasses must override this method to return the backend name
   virtual const std::string getBackendName() const {
     TORCH_INTERNAL_ASSERT(false, "getBackendName is not implemented.");
-  }
+  };
 
   virtual c10::intrusive_ptr<Work> broadcast(
       std::vector<at::Tensor>& /* tensors */,
@@ -377,24 +361,16 @@ class TORCH_API Backend : public torch::CustomClassHolder {
   }
 
   // Do not call this directly, use ProcessGroup::setGroupName instead.
-  void setGroupUid(const std::string& pg_uid) {
-    pg_uid_ = pg_uid;
+  void setGroupName(const std::string& name) {
+    pg_name_ = name;
   }
 
-  const std::string& getGroupUid() const {
-    return pg_uid_;
-  }
-
-  void setGroupDesc(const std::string& desc) {
-    pg_desc_ = desc;
-  }
-
-  const std::string& getGroupDesc() const {
-    return pg_desc_;
+  const std::string& getGroupName() const {
+    return pg_name_;
   }
 
   // See similar functions in ProcessGroup.hpp for context.
-  std::optional<at::Device> getBoundDeviceId() const {
+  c10::optional<at::Device> getBoundDeviceId() const {
     return bound_device_id_;
   }
 
@@ -405,67 +381,28 @@ class TORCH_API Backend : public torch::CustomClassHolder {
     // backends may perform
   }
 
-  void setBoundDeviceId(std::optional<at::Device> device) {
+  void setBoundDeviceId(c10::optional<at::Device> device) {
     if (device) {
       TORCH_CHECK(device->has_index(), "setBoundDeviceId must have an index");
     }
     bound_device_id_ = device;
   }
 
-  virtual ErrorType getError() {
-    TORCH_CHECK(
-        false,
-        c10::str("Backend ", getBackendName(), " does not support getError"));
-  }
-
-  virtual std::shared_ptr<c10::Allocator> getMemAllocator() {
-    TORCH_CHECK(
-        false,
-        c10::str(
-            "Backend ", getBackendName(), " does not support getMemAllocator"));
-  }
-
-  // Allocate tensor (aten::empty) from backend's communication-optimized memory
-  // pool
-  virtual at::Tensor allocateTensor(long size, at::TensorOptions options = {}) {
-    TORCH_CHECK(
-        false,
-        c10::str(
-            "Backend ", getBackendName(), " does not support allocateTensor"));
-  }
-
-  // Returns true if backend supports tensor allocation
-  virtual bool supportsTensorAlloc(c10::DeviceIndex deviceIdx) {
-    // Change to true in concrete backend if supported
-    return false;
-  }
-
-  // Aborts all pending operations and connections in the backend if the backend
-  // supports it.
-  virtual void abort() {}
-
-  // Shutdown the backend if the backend supports it. This should be used for
-  // normal shutdown.
-  virtual void shutdown() {}
-
  protected:
   // Implementations of this interface need to call this to setup
   // appropriate logging etc.
   void init();
 
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const int rank_;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const int size_;
   // Debug level setting. It is parsed once when ProcessGroup is constructed and
   // remains the same across use of this process group.
   DebugLevel dist_debug_level_;
-  std::string pg_uid_;
-  std::string pg_desc_;
+  std::string pg_name_;
 
   std::function<void(std::shared_ptr<WorkInfo>)> onCompletionHook_;
 
-  std::optional<at::Device> bound_device_id_;
+  c10::optional<at::Device> bound_device_id_;
 };
 
 } // namespace c10d

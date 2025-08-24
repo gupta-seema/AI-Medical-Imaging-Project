@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -23,9 +22,9 @@
 namespace at {
 
 
-// aten::_validate_sparse_coo_tensor_args(Tensor indices, Tensor values, int[] size, bool? is_coalesced=None, bool? check_pinning=None) -> ()
-inline void _validate_sparse_coo_tensor_args(const at::Tensor & indices, const at::Tensor & values, at::IntArrayRef size, ::std::optional<bool> is_coalesced=::std::nullopt, ::std::optional<bool> check_pinning=::std::nullopt) {
-    return at::_ops::_validate_sparse_coo_tensor_args::call(indices, values, size, is_coalesced, check_pinning);
+// aten::_validate_sparse_coo_tensor_args(Tensor indices, Tensor values, int[] size, bool? is_coalesced=None) -> ()
+inline void _validate_sparse_coo_tensor_args(const at::Tensor & indices, const at::Tensor & values, at::IntArrayRef size, c10::optional<bool> is_coalesced=c10::nullopt) {
+    return at::_ops::_validate_sparse_coo_tensor_args::call(indices, values, size, is_coalesced);
 }
 
 }

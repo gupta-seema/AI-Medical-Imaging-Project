@@ -1,28 +1,28 @@
-# mypy: allow-untyped-defs
 from __future__ import annotations
 
 import operator
-import typing
 import warnings
-from collections.abc import Sequence
+import weakref
+
 from contextlib import nullcontext
 from enum import Enum
-from functools import reduce
+from functools import cmp_to_key, reduce
 from typing import (
     Any,
     Callable,
     cast,
+    List,
     NamedTuple,
     Optional,
     overload,
+    Sequence,
+    Tuple,
+    Type,
     TYPE_CHECKING,
-    TypeVar,
     Union,
 )
-from typing_extensions import deprecated, TypeAlias
 
-import torch
-from torch import sym_float, sym_int, sym_max
+from typing_extensions import TypeAlias
 
 
 if TYPE_CHECKING:
@@ -32,40 +32,27 @@ if TYPE_CHECKING:
 
     import sympy
 
-    class _WorksWithInt(typing.Protocol):
-        def __add__(self, other: Any) -> typing.Self:
-            ...
-
-        def __radd__(self, other: Any) -> typing.Self:
-            ...
-
-        def __mul__(self, other: Any) -> typing.Self:
-            ...
-
-        def __rmul__(self, other: Any) -> typing.Self:
-            ...
-
-    _IntLikeT = TypeVar("_IntLikeT", bound=_WorksWithInt)
+import torch
+from torch import sym_float, sym_int, sym_max
 
 
-ShapeType: TypeAlias = Union[torch.Size, list[int], tuple[int, ...]]
-StrideType: TypeAlias = Union[list[int], tuple[int, ...]]
-DimsType: TypeAlias = Union[int, list[int], tuple[int, ...]]
-DimsSequenceType: TypeAlias = Union[list[int], tuple[int, ...]]
+ShapeType: TypeAlias = Union[torch.Size, List[int], Tuple[int, ...]]
+StrideType: TypeAlias = Union[List[int], Tuple[int, ...]]
+DimsType: TypeAlias = Union[int, List[int], Tuple[int, ...]]
+DimsSequenceType: TypeAlias = Union[List[int], Tuple[int, ...]]
 # TODO: Type[torch.SymInt], Type[torch.SymFloat]
-NumberTypeType: TypeAlias = Union[type[bool], type[int], type[float], type[complex]]
+NumberTypeType: TypeAlias = Union[Type[bool], Type[int], Type[float], Type[complex]]
 # TODO: This needs a lot more type annotations
 # NumberType = Union[bool, int, float, complex, torch.SymInt, torch.SymFloat]
 NumberType: TypeAlias = Union[bool, int, float, complex]
 RealNumberType: TypeAlias = Union[bool, int, float]
 
-Number = (bool, int, float, complex, torch.SymInt, torch.SymFloat, torch.SymBool)
+Number = (bool, int, float, complex, torch.SymInt, torch.SymFloat)
 # I don't call it Integral because numbers.Integral includes bool, but IntLike
 # does not
 Dim = int
 IntLike = (int, torch.SymInt)
 FloatLike = (float, torch.SymFloat)
-BoolLike = (bool, torch.SymBool)
 IntWithoutSymInt = int
 FloatWithoutSymFloat = float
 DeviceLikeType: TypeAlias = Union[str, torch.device, int]
@@ -98,13 +85,12 @@ torch_function_passthrough = {
     torch.Tensor.__format__,
     torch.Tensor.__repr__,
     torch.Tensor.requires_grad.__get__,  # type: ignore[attr-defined]
-    torch.Tensor.__getitem__,
 }
 
 
 TensorLikeType = torch.Tensor
 TensorLike = torch.Tensor
-TensorSequenceType: TypeAlias = Union[list[TensorLikeType], tuple[TensorLikeType, ...]]
+TensorSequenceType: TypeAlias = Union[List[TensorLikeType], Tuple[TensorLikeType, ...]]
 TensorOrNumberLikeType: TypeAlias = Union[TensorLikeType, NumberType]
 
 CustomOutParamAnnotation = "__custom_out_param__"
@@ -150,7 +136,6 @@ def _maybe_get_pytype(t):
 def compare_tensor_meta(
     a: TensorLikeType,
     b: TensorLikeType,
-    check_sizes=True,
     check_strides=False,
     *,
     allow_rhs_unbacked=False,
@@ -163,20 +148,16 @@ def compare_tensor_meta(
     In the future this will validate additional metadata, like
     strides.
     """
-    from torch._subclasses.fake_tensor import MetadataMismatchError
-
     assert isinstance(a, TensorLike)
     assert isinstance(b, TensorLike)
 
-    if check_sizes and not same_shape(
-        a.shape, b.shape, allow_rhs_unbacked=allow_rhs_unbacked
-    ):
+    if not same_shape(a.shape, b.shape, allow_rhs_unbacked=allow_rhs_unbacked):
         msg = f"Shapes {a.shape} and {b.shape} are not equal!"
-        raise MetadataMismatchError(msg)
+        raise AssertionError(msg)
 
     if a.dtype != b.dtype:
         msg = f"Dtypes {a.dtype} and {b.dtype} are not equal!"
-        raise MetadataMismatchError(msg)
+        raise AssertionError(msg)
 
     if a.device != b.device:
         # Handles special cuda:0 vs cuda case
@@ -187,41 +168,34 @@ def compare_tensor_meta(
             pass
         else:
             msg = f"Devices {a.device} and {b.device} are not equal!"
-            raise MetadataMismatchError(msg)
+            raise AssertionError(msg)
 
     # Stride checking is currently disabled, see https://github.com/pytorch/pytorch/issues/78050
     if check_strides:
-        same_strides, idx = check_significant_strides(
-            a, b, allow_rhs_unbacked=allow_rhs_unbacked
-        )
+        same_strides, idx = check_significant_strides(a, b)
         if not same_strides:
             msg = f"Stride mismatch! Strides are {a.stride()} and {b.stride()} (mismatched at {idx})!"
-            raise MetadataMismatchError(msg)
+            raise RuntimeError(msg)
 
         if a.storage_offset() != b.storage_offset():
             msg = f"Storage offset mismatch! Storage offsets are {a.storage_offset()} and {b.storage_offset()}!"
-            raise MetadataMismatchError(msg)
+            raise RuntimeError(msg)
 
     if check_conj:
         if a.is_conj() != b.is_conj():
-            raise MetadataMismatchError(
+            raise RuntimeError(
                 f"Conj mismatch! is_conj is set to {a.is_conj()} and {b.is_conj()}"
             )
 
     if a.is_neg() != b.is_neg():
-        raise MetadataMismatchError(
+        raise RuntimeError(
             f"Neg mismatch! is_neg is set to {a.is_neg()} and {b.is_neg()}"
         )
 
 
 def _check_strides_helper(
-    a: TensorLikeType,
-    b: TensorLikeType,
-    *,
-    only_cuda=True,
-    significant_only=True,
-    allow_rhs_unbacked=False,
-) -> tuple[bool, Optional[int]]:
+    a: TensorLikeType, b: TensorLikeType, *, only_cuda=True, significant_only=True
+) -> Tuple[bool, Optional[int]]:
     # NOTE: only on CUDA because CPU elementwise strides are incorrect in PyTorch
     # See https://github.com/pytorch/pytorch/issues/77553
     # Only compares strides that are "meaningful" -- strides for dimensions with length > 1
@@ -231,9 +205,6 @@ def _check_strides_helper(
     ) and a.numel() > 0:
         for idx in range(a.ndim):
             check = not significant_only or a.shape[idx] > 1
-            # TODO: Check the symbols are consistent with each other
-            if isinstance(b.stride()[idx], torch.SymInt):
-                continue
             if a.stride()[idx] != b.stride()[idx] and check:
                 return False, idx
 
@@ -241,87 +212,57 @@ def _check_strides_helper(
 
 
 def check_significant_strides(
-    a: TensorLikeType, b: TensorLikeType, *, only_cuda=True, allow_rhs_unbacked=False
-) -> tuple[bool, Optional[int]]:
-    return _check_strides_helper(
-        a,
-        b,
-        only_cuda=only_cuda,
-        significant_only=True,
-        allow_rhs_unbacked=allow_rhs_unbacked,
-    )
+    a: TensorLikeType, b: TensorLikeType, *, only_cuda=True
+) -> Tuple[bool, Optional[int]]:
+    return _check_strides_helper(a, b, only_cuda=only_cuda, significant_only=True)
 
 
 def check_all_strides(
     a: TensorLikeType, b: TensorLikeType, *, only_cuda=True
-) -> tuple[bool, Optional[int]]:
+) -> Tuple[bool, Optional[int]]:
     return _check_strides_helper(a, b, only_cuda=only_cuda, significant_only=False)
 
 
 # This function is equivalent to compute_contiguous() from TensorImpl.cpp
-def is_contiguous(a: TensorLikeType, false_if_dde=False) -> bool:
+def is_contiguous(a: TensorLikeType) -> bool:
     """
     Tests whether a tensor is contiguous or not.
 
     Tensors are contiguous when they have no elements,
     one element, or when they have "nested" strides.
     """
-    from torch.fx.experimental.symbolic_shapes import (
-        guard_or_false,
-        guard_or_true,
-        guard_size_oblivious,
-        is_nested_int,
-    )
+    from torch.fx.experimental.symbolic_shapes import guard_size_oblivious
 
-    maybe_guard_or_false = guard_or_false if false_if_dde else guard_size_oblivious
-    maybe_guard_or_true = guard_or_true if false_if_dde else guard_size_oblivious
-
-    if maybe_guard_or_false(a.numel() < 2):
+    if guard_size_oblivious(a.numel() < 2):
         return True
 
     expected_stride = 1
     for x, y in reversed(tuple(zip(a.shape, a.stride()))):
-        # Skips checking strides when a dimension has length 1.
-        if maybe_guard_or_false(x == 1):
+        # Skips checking strides when a dimension has length 1
+        if guard_size_oblivious(x == 1):
             continue
 
-        if maybe_guard_or_true(y != expected_stride):
+        if y != expected_stride:
             return False
-
-        # if x is 0 then a is contiguous anyway. So in the check above for non-contiguity condition we can
-        # can assume x is not 0 in expected_stride equation. This make the check consistent with
-        # make_contiguous_strides_for. If we make a tensor and used strides from make_contiguous_strides_for
-        # and then called definitely_contiguous we should get True.
-        expected_stride *= (
-            x if is_nested_int(x) else sym_max(x, 1)
-        )  # type:ignore[assignment]
+        expected_stride = expected_stride * x
 
     return True
 
 
 # This function is equivalent to compute_channels_last_contiguous_2d() in TensorImpl.cpp
-def is_channels_last_contiguous_2d(a: Tensor, false_if_dde=False) -> bool:
+def is_channels_last_contiguous_2d(a: Tensor) -> bool:
     # NHWC or not channels last 2D contiguous
     if a.ndim != 4:
         return False
 
-    from torch.fx.experimental.symbolic_shapes import (
-        guard_or_false,
-        guard_or_true,
-        guard_size_oblivious,
-    )
-
-    maybe_guard_or_false = guard_or_false if false_if_dde else guard_size_oblivious
-    maybe_guard_or_true = guard_or_true if false_if_dde else guard_size_oblivious
-
     expected_stride = 1
     for idx in (1, 3, 2, 0):
         length = a.shape[idx]
-        if maybe_guard_or_false(length == 1):
+        if length == 1:
             continue
 
         stride = a.stride()[idx]
-        if maybe_guard_or_true(stride != expected_stride):
+        if stride != expected_stride:
             return False
 
         expected_stride *= length
@@ -329,28 +270,19 @@ def is_channels_last_contiguous_2d(a: Tensor, false_if_dde=False) -> bool:
     return True
 
 
-def is_channels_last_contiguous_3d(a: Tensor, false_if_dde=False) -> bool:
+def is_channels_last_contiguous_3d(a: Tensor) -> bool:
     # NDHWC or not channels last 3D contiguous
     if a.ndim != 5:
         return False
 
-    from torch.fx.experimental.symbolic_shapes import (
-        guard_or_false,
-        guard_or_true,
-        guard_size_oblivious,
-    )
-
-    maybe_guard_or_false = guard_or_false if false_if_dde else guard_size_oblivious
-    maybe_guard_or_true = guard_or_true if false_if_dde else guard_size_oblivious
-
     expected_stride = 1
     for idx in (1, 4, 3, 2, 0):
         length = a.shape[idx]
-        if maybe_guard_or_false(length == 1):
+        if length == 1:
             continue
 
         stride = a.stride()[idx]
-        if maybe_guard_or_true(stride != expected_stride):
+        if stride != expected_stride:
             return False
 
         expected_stride *= length
@@ -374,43 +306,20 @@ def validate_memory_format(memory_format: torch.memory_format):
 
 
 def is_contiguous_for_memory_format(  # type: ignore[return]
-    a: Tensor, *, memory_format: torch.memory_format, false_if_dde=False
+    a: Tensor, *, memory_format: torch.memory_format
 ) -> bool:
     validate_memory_format(memory_format)
 
     if memory_format == torch.contiguous_format:
-        return is_contiguous(a, false_if_dde)
+        return is_contiguous(a)
     if memory_format == torch.channels_last:
-        return is_channels_last_contiguous_2d(a, false_if_dde)
+        return is_channels_last_contiguous_2d(a)
     if memory_format == torch.channels_last_3d:
-        return is_channels_last_contiguous_3d(a, false_if_dde)
+        return is_channels_last_contiguous_3d(a)
 
     torch._check(
         False,
         lambda: f"is_contiguous received unsupported memory format {memory_format}",
-    )
-
-
-def definitely_contiguous(a: TensorLikeType) -> bool:
-    return is_contiguous(a, false_if_dde=True)
-
-
-# similar to is_channels_last_contiguous_2d but return false on data dependency.
-def definitely_channels_last_contiguous_2d(a: Tensor) -> bool:
-    return is_channels_last_contiguous_2d(a, false_if_dde=True)
-
-
-# similar to is_channels_last_contiguous_3d but return false on data dependency.
-def definitely_channels_last_contiguous_3d(a: Tensor) -> bool:
-    return is_channels_last_contiguous_3d(a, false_if_dde=True)
-
-
-# similar to is_contiguous_for_memory_format but return false on data dependency.
-def definitely_contiguous_for_memory_format(  # type: ignore[return]
-    a: Tensor, *, memory_format: torch.memory_format
-) -> bool:
-    return is_contiguous_for_memory_format(
-        a, memory_format=memory_format, false_if_dde=True
     )
 
 
@@ -431,13 +340,6 @@ def is_channels_last_contiguous(a: Tensor) -> bool:
     return is_channels_last_contiguous_2d(a) or is_channels_last_contiguous_3d(a)
 
 
-# similar to is_channels_last_contiguous but return false on data dependency.
-def definitely_channels_last_contiguous(a: Tensor) -> bool:
-    return definitely_channels_last_contiguous_2d(
-        a
-    ) or definitely_channels_last_contiguous_3d(a)
-
-
 def is_non_overlapping_and_dense(a: Tensor) -> bool:
     """
     True when a tensor is non-overlapping and dense.
@@ -452,7 +354,7 @@ def is_non_overlapping_and_dense(a: Tensor) -> bool:
         return False
 
     # Short-circuits if the tensor is already contiguous or channels-last contiguous
-    if definitely_contiguous(a) or definitely_channels_last_contiguous(a):
+    if is_contiguous(a) or is_channels_last_contiguous(a):
         return True
 
     # The following is equivalent to compute_non_overlapping_and_dense in TensorImpl.cpp
@@ -494,7 +396,7 @@ def is_non_overlapping_and_dense(a: Tensor) -> bool:
         if guard_size_oblivious(length == 1):
             continue
 
-        if guard_size_oblivious(stride != expected_stride):
+        if stride != expected_stride:
             return False
 
         expected_stride *= length
@@ -512,7 +414,7 @@ def is_non_overlapping_and_dense(a: Tensor) -> bool:
 # short-circuit, which can cause different strides.
 def compute_elementwise_output_logical_to_physical_perm(
     *tensors, _skip_checks=False
-) -> list[int]:
+) -> List[int]:
     from torch.fx.experimental.symbolic_shapes import guard_size_oblivious
 
     if not _skip_checks and len(tensors) == 0:
@@ -542,23 +444,17 @@ def compute_elementwise_output_logical_to_physical_perm(
     if ndim == 1:
         return [0]
 
-    # Short-circuits if contiguous or channels last, following the fake fast path.
+    # Short-circuits if contiguous, following the fake fast path.
     # This reduces the number of guards we end up making
+    # TODO: do channels last too
     is_contiguous = True
-    is_channels_last = True
     for t in tensors:
-        is_contiguous = is_contiguous and definitely_contiguous_for_memory_format(
-            t, memory_format=torch.contiguous_format
-        )
-        is_channels_last = is_channels_last and definitely_contiguous_for_memory_format(
-            t, memory_format=torch.channels_last
+        is_contiguous = is_contiguous and t.is_contiguous(
+            memory_format=torch.contiguous_format
         )
 
-    if is_contiguous and not is_channels_last:
+    if is_contiguous:
         return list(range(ndim))
-
-    if is_channels_last and not is_contiguous:
-        return [0, *list(range(2, ndim)), 1]
 
     shape = tensors[0].shape
 
@@ -607,7 +503,7 @@ def compute_elementwise_output_logical_to_physical_perm(
     return list(reversed(perm))
 
 
-def compute_elementwise_output_strides(*tensors) -> tuple[int, ...]:
+def compute_elementwise_output_strides(*tensors) -> Tuple[int, ...]:
     """
     Computes the output strides for elementwise operations.
     """
@@ -766,7 +662,7 @@ def canonicalize_dim(rank: int, idx: int, wrap_scalar: bool = True) -> int:
 @overload
 def canonicalize_dims(
     rank: int, indices: Sequence[int], wrap_scalar: bool = True
-) -> tuple[int, ...]:
+) -> Tuple[int, ...]:
     pass
 
 
@@ -787,7 +683,13 @@ def is_valid_permutation(rank: int, perm: DimsSequenceType) -> bool:
     Validates that perm is a permutation of length rank.
     """
 
-    return isinstance(perm, Sequence) and sorted(perm) == list(range(rank))
+    if not isinstance(perm, Sequence):
+        return False
+
+    if not (tuple(sorted(perm)) == tuple(range(0, rank))):
+        return False
+
+    return True
 
 
 def is_same_shape(a: Sequence, b: Sequence) -> bool:
@@ -912,20 +814,20 @@ def extract_shape(*args, allow_cpu_scalar_tensors: bool) -> Optional[ShapeType]:
 # Extracts dimensions that might be passed either as a list/tuple or as varargs.
 # A typical case is Tensor.permute .
 def extract_dims_from_varargs(
-    dims: Union[DimsSequenceType, tuple[DimsSequenceType, ...]]
+    dims: Union[DimsSequenceType, Tuple[DimsSequenceType, ...]]
 ) -> DimsSequenceType:
     if dims and isinstance(dims[0], Sequence):
         assert len(dims) == 1
-        dims = cast(tuple[DimsSequenceType], dims)
+        dims = cast(Tuple[DimsSequenceType], dims)
         return dims[0]
     else:
         return cast(DimsSequenceType, dims)
 
 
 def extract_shape_from_varargs(
-    shape: Union[ShapeType, tuple[ShapeType]],
+    shape: Union[ShapeType, Tuple[ShapeType]],
     validate=True,
-) -> tuple[int, ...]:
+) -> Tuple[int, ...]:
     """
     Returns a shape from varargs.
 
@@ -953,7 +855,7 @@ def extract_shape_from_varargs(
     return shape  # type: ignore[return-value]
 
 
-def infer_size_shapes(a: ShapeType, b: ShapeType) -> tuple[int, ...]:
+def infer_size_shapes(a: ShapeType, b: ShapeType) -> Tuple[int, ...]:
     ndim = max(len(a), len(b))
     expandedSizes = [0] * ndim
 
@@ -978,40 +880,35 @@ def infer_size_shapes(a: ShapeType, b: ShapeType) -> tuple[int, ...]:
     return tuple(expandedSizes)
 
 
-def infer_size(shape: ShapeType, numel: int) -> tuple[int, ...]:
+def infer_size(shape: ShapeType, numel: int) -> Tuple[int, ...]:
     """
     Infers the size of a dim with size -1, if it exists.
     Also checks that new shape is compatible with the number of elements.
     """
-    from torch.fx.experimental.symbolic_shapes import guard_or_false
-
     dim = None
     newsize = 1
     for i, d in enumerate(shape):
-        if guard_or_false(d == -1):
+        if d == -1:
             torch._check(dim is None, lambda: "only one dimension can be inferred")
             dim = i
-        else:
-            torch._check(
-                d >= 0,
-                lambda: (
-                    f"invalid shape dimension {d}. If this was symbolic, it was assumed to not be -1."
-                    "If this was meant to be inferred, please explicitly pass in -1."
-                ),
-            )
+        elif d >= 0:
             newsize *= d
+        else:
+            torch._check(False, lambda: f"invalid shape dimension {d}")
     if dim is None:
         torch._check(
             numel == newsize,
             lambda: f"shape '{list(shape)}' is invalid for input of size {numel}",
         )
     else:
+        from torch.fx.experimental.symbolic_shapes import definitely_true
+
         torch._check(
             newsize != 0,
             lambda: (
                 f"cannot reshape tensor of 0 elements into shape {list(shape)} because the "
                 f"unspecified dimension size -1 can be any value and is ambiguous"
-                if guard_or_false(numel == 0)
+                if definitely_true(numel == 0)
                 else f"shape '{list(shape)}' is invalid for input of size {numel}"
             ),
         )
@@ -1147,17 +1044,17 @@ def type_to_dtype(typ: type) -> torch.dtype:
 
     assert isinstance(typ, type)
 
-    if typ in (bool, torch.SymBool):
+    if typ is bool:
         return torch.bool
-    if typ in (int, torch.SymInt):
+    if typ in [int, torch.SymInt]:
         return torch.long
-    if typ in (float, torch.SymFloat):
+    if typ in [float, torch.SymFloat]:
         return torch.get_default_dtype()
     # TODO: sym_complex_float?
     if typ is complex:
         return corresponding_complex_dtype(torch.get_default_dtype())
 
-    raise ValueError(f"Invalid type {typ}!")
+    raise ValueError("Invalid type!")
 
 
 def get_dtype(x: Union[torch.Tensor, NumberType]):
@@ -1447,29 +1344,20 @@ class RETURN_TYPE(Enum):
     NEW = (0,)
     VIEW = (1,)
     INPLACE = (2,)
-    NONE = (3,)
 
 
 # TODO: when NumberType contains the sym types, can simplify this
-def number_type(
-    x: Union[NumberType, torch.SymInt, torch.SymFloat, torch.SymBool]
-) -> type:
+def number_type(x: Union[NumberType, torch.SymInt, torch.SymFloat]) -> Type:
     if isinstance(x, torch.SymInt):
         return int
     elif isinstance(x, torch.SymFloat):
         return float
-    elif isinstance(x, torch.SymBool):
-        return bool
     else:
         return type(x)
 
 
-def expr_type(x: sympy.Basic) -> type:
-    import sympy
-
-    if x.kind is sympy.core.kind.BooleanKind:
-        return bool
-    elif x.is_integer:  # type: ignore[attr-defined]
+def expr_type(x: sympy.Expr) -> Type:
+    if x.is_integer:  # type: ignore[attr-defined]
         return int
     else:
         # NB: Not strictly correct, but we don't support SymPy complex or bool.
@@ -1480,7 +1368,7 @@ def expr_type(x: sympy.Basic) -> type:
 def elementwise_dtypes(
     *_args,
     type_promotion_kind: ELEMENTWISE_TYPE_PROMOTION_KIND,
-) -> tuple[torch.dtype, torch.dtype]:
+) -> Tuple[torch.dtype, torch.dtype]:
     """
     Computes the computation and result dtypes for elementwise type promotion
     on the given arguments and with the given elementwise type promotion kind.
@@ -1576,13 +1464,13 @@ def elementwise_dtypes(
     import sympy
 
     for x in args:
-        if not isinstance(x, (Number, TensorLike, sympy.Basic)):
+        if not isinstance(x, (Number, TensorLike, sympy.Expr)):
             msg = f"Unexpected type {str(type(x))} when computing elementwise type promotion!"
             raise ValueError(msg)
 
         if isinstance(x, Number):
             highest_type = get_higher_type(highest_type, number_type(x))
-        elif isinstance(x, sympy.Basic):
+        elif isinstance(x, sympy.Expr):
             highest_type = get_higher_type(highest_type, expr_type(x))
         else:
             # x is a TensorLike
@@ -1664,7 +1552,7 @@ def reduction_dtypes(
     arg,
     output_dtype_kind: REDUCTION_OUTPUT_TYPE_KIND,
     dtype: Optional[torch.dtype] = None,
-) -> tuple[torch.dtype, Optional[torch.dtype]]:
+) -> Tuple[torch.dtype, Optional[torch.dtype]]:
     # even though some reductions, like amin or amax, don't strictly require type promotion,
     # all the math ops (including comparisons) are still defined only for a computation type,
     # so promotion will still happen. We are doing it explicitly here
@@ -1691,7 +1579,7 @@ def reduction_dtypes(
 # batched_matrix_contiguous_strides and contiguous_strides
 def make_contiguous_strides_for(
     shape: ShapeType, row_major: bool = True
-) -> tuple[Union[_IntLikeT, int], ...]:
+) -> Tuple[int, ...]:
     """
     Returns the strides of a contiguous tensor if row_major
     If row_major=True, it returns the strides of a contiguous batch of Fortran-contiguous matrices
@@ -1704,13 +1592,11 @@ def make_contiguous_strides_for(
 
     from torch.fx.experimental.symbolic_shapes import is_nested_int
 
-    multiplier: Union[_IntLikeT, int] = 1
+    multiplier = 1
     strides = []
     for l in reversed(shape):
         strides.append(multiplier)
-        multiplier *= (
-            l if is_nested_int(l) else sym_max(l, 1)
-        )  # type:ignore[assignment]
+        multiplier *= l if is_nested_int(l) else sym_max(l, 1)
 
     result = tuple(reversed(strides))
 
@@ -1723,16 +1609,14 @@ def make_contiguous_strides_for(
         return result[:-2] + (1, max(shape[-2], 1))
 
 
-def make_channels_last_1d_strides_for(
-    shape: Sequence[_IntLikeT],
-) -> tuple[Union[_IntLikeT, int], ...]:
+def make_channels_last_1d_strides_for(shape: ShapeType) -> Tuple[int, ...]:
     torch._check(
         len(shape) == 3,
         lambda: "Only tensors of rank 3 can use the channels_last_1d memory format",
     )
 
-    multiplier: Union[_IntLikeT, int] = 1
-    strides: list[Union[_IntLikeT, int]] = [0] * 3
+    multiplier = 1
+    strides = [0] * 3
     for idx in (1, -1, 0):
         # NOTE: intentionally divergence from make_contiguous_strides_for
         # This is consistent with eager
@@ -1742,17 +1626,15 @@ def make_channels_last_1d_strides_for(
     return tuple(strides)
 
 
-def make_channels_last_2d_strides_for(
-    shape: Sequence[_IntLikeT],
-) -> tuple[Union[_IntLikeT, int], ...]:
+def make_channels_last_2d_strides_for(shape: ShapeType) -> Tuple[int, ...]:
     # TODO: maybe inform the user of channels_last_3d if rank of the tensor is 5?
     torch._check(
         len(shape) == 4,
         lambda: "Only tensors of rank 4 can use the channels_last memory format",
     )
 
-    multiplier: Union[_IntLikeT, int] = 1
-    strides: list[Union[_IntLikeT, int]] = [0] * 4
+    multiplier = 1
+    strides = [0] * 4
     for idx in (1, -1, -2, 0):
         # NOTE: intentionally divergence from make_contiguous_strides_for
         # This is consistent with eager
@@ -1762,16 +1644,14 @@ def make_channels_last_2d_strides_for(
     return tuple(strides)
 
 
-def make_channels_last_3d_strides_for(
-    shape: Sequence[_IntLikeT],
-) -> tuple[Union[_IntLikeT, int], ...]:
+def make_channels_last_3d_strides_for(shape: ShapeType) -> Tuple[int, ...]:
     torch._check(
         len(shape) == 5,
         lambda: "Only tensors of rank 5 can use the channels_last_3d memory format",
     )
 
-    multiplier: Union[_IntLikeT, int] = 1
-    strides: list[Union[_IntLikeT, int]] = [0] * 5
+    multiplier = 1
+    strides = [0] * 5
     for idx in (1, -1, -2, -3, 0):
         # NOTE: intentionally divergence from make_contiguous_strides_for
         # This is consistent with eager
@@ -1781,9 +1661,7 @@ def make_channels_last_3d_strides_for(
     return tuple(strides)
 
 
-def make_channels_last_strides_for(
-    shape: Sequence[_IntLikeT],
-) -> tuple[Union[_IntLikeT, int], ...]:
+def make_channels_last_strides_for(shape: ShapeType) -> Tuple[int, ...]:
     ndim = len(shape) if isinstance(shape, Sequence) else 1
     if ndim == 3:
         return make_channels_last_1d_strides_for(shape)
@@ -1799,7 +1677,7 @@ def make_channels_last_strides_for(
 
 def compute_reduction_output_shape(
     shape: ShapeType, dimensions: Sequence
-) -> tuple[int, ...]:
+) -> Tuple[int, ...]:
     for idx in dimensions:
         validate_idx(len(shape), idx)
 
@@ -1818,7 +1696,7 @@ def validate_no_repeating_dims(dims: Sequence):
         raise RuntimeError("duplicate value in the list of dims")
 
 
-def reduction_dims(shape: ShapeType, dims: Optional[Sequence]) -> tuple[int, ...]:
+def reduction_dims(shape: ShapeType, dims: Optional[Sequence]) -> Tuple[int, ...]:
     if dims is None:
         return tuple(range(len(shape)))
     dims = tuple(canonicalize_dim(len(shape), idx) for idx in dims)
@@ -1895,9 +1773,10 @@ def check_in_bounds_for_storage(
     required_length = compute_required_storage_length(shape, strides, storage_offset)
     if a.size() < required_length:
         msg = (
-            f"Can't view a storage of size {a.size()} with an offset of {storage_offset}, "
-            f"shape of {str(shape)}, and strides of {str(strides)}, "
-            f"which requires a storage of size {required_length}"
+            "Can't view a storage of size {} with an offset of {}, shape of {}, and strides of {}, "
+            "which requires a storage of size {}".format(
+                a.size(), storage_offset, str(shape), str(strides), required_length
+            )
         )
         raise ValueError(msg)
 
@@ -1905,13 +1784,8 @@ def check_in_bounds_for_storage(
 # NOTE: This function should ideally be removed, but some Meta internal models
 # packaged with `torch.package` are using it, so it will have to be removed
 # at some point in the future when those models no longer use this function.
-@deprecated(
-    "`torch._prims_common.check` is deprecated and will be removed in the future. "
-    "Please use `torch._check*` functions instead.",
-    category=FutureWarning,
-)
 def check(
-    b: bool, s: Callable[[], str], exc_type: type[Exception] = RuntimeError
+    b: bool, s: Callable[[], str], exc_type: Type[Exception] = RuntimeError
 ) -> None:
     """
     Helper function for raising an error_type (default: RuntimeError) if a boolean condition fails.
@@ -1922,6 +1796,12 @@ def check(
     .. note:: This function is planned for removal in the future. Please use
         `torch._check*` functions instead.
     """
+    warnings.warn(
+        DeprecationWarning(
+            "'torch._prims_common.check' will be removed in the future. Please use "
+            "'torch._check*' functions instead"
+        )
+    )
     torch._check_with(exc_type, b, s)
 
 
@@ -1930,8 +1810,6 @@ def check(
 def are_strides_like_channels_last(
     shape: Sequence[int], strides: Sequence[int]
 ) -> bool:
-    from torch.fx.experimental.symbolic_shapes import guard_size_oblivious
-
     ndim = len(shape)
 
     if ndim == 4:
@@ -1943,19 +1821,19 @@ def are_strides_like_channels_last(
     else:
         return False
 
-    if guard_size_oblivious(strides[1] == 0):
+    if strides[1] == 0:
         return False
 
     min = 0
     for d in dim_order:
-        if guard_size_oblivious(shape[d] == 0):
+        if shape[d] == 0:
             return False
-        if guard_size_oblivious(strides[d] < min):
+        if strides[d] < min:
             return False
         if d == 0 and min == strides[1]:
             return False
         min = strides[d]
-        if guard_size_oblivious(strides[d] > 1):
+        if strides[d] > 1:
             min *= shape[d]
     return True
 

@@ -5,7 +5,8 @@
 #include <ATen/TensorUtils.h>
 
 namespace at::native {
-  inline void multilabel_margin_loss_shape_check(
+namespace {
+  static C10_UNUSED void multilabel_margin_loss_shape_check(
     int64_t& nframe,
     int64_t& dim,
     const int64_t& ndims,
@@ -34,13 +35,13 @@ namespace at::native {
     }
   }
 
-  inline void multi_margin_loss_shape_check(
+  static C10_UNUSED void multi_margin_loss_shape_check(
     int64_t& nframe,
     int64_t& dim,
     const int64_t& ndims,
     const Tensor& input,
     const Tensor& target,
-    const std::optional<Tensor>& weight) {
+    const c10::optional<Tensor>& weight) {
     TORCH_CHECK(
         (ndims == 2 && input.size(1) != 0) || (ndims == 1 && input.size(0) != 0) || ndims == 0,
         "Expected non-empty vector or matrix with optional 0-dim batch size, but got: ",
@@ -66,4 +67,6 @@ namespace at::native {
     }
 }
 
+
+}  // anonymous namespace
 } // namespace at::native

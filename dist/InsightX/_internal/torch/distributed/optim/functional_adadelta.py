@@ -1,16 +1,11 @@
-# mypy: allow-untyped-defs
-from typing import Optional
+from typing import Dict, List, Optional
 
 import torch
 import torch.optim._functional as F
+
 from torch import Tensor
-from torch.distributed.optim._deprecation_warning import (
-    _scripted_functional_optimizer_deprecation_warning,
-)
 
-
-__all__: list[str] = []
-
+__all__: List[str] = []
 
 # Define a TorchScript compatible Functional Adadelta Optimizer
 # where we use these optimizer in a functional way.
@@ -25,7 +20,7 @@ __all__: list[str] = []
 class _FunctionalAdadelta:
     def __init__(
         self,
-        params: list[Tensor],
+        params: List[Tensor],
         lr: float = 1.0,
         rho: float = 0.9,
         eps: float = 1e-6,
@@ -34,7 +29,6 @@ class _FunctionalAdadelta:
         maximize: bool = False,
         _allow_empty_param_list: bool = False,
     ):
-        _scripted_functional_optimizer_deprecation_warning(stacklevel=2)
         self.defaults = {
             "lr": lr,
             "rho": rho,
@@ -51,15 +45,14 @@ class _FunctionalAdadelta:
         # param group as it's not a common use case.
         self.param_group = {"params": params}
 
-        self.state = torch.jit.annotate(dict[torch.Tensor, dict[str, torch.Tensor]], {})
+        self.state = torch.jit.annotate(Dict[torch.Tensor, Dict[str, torch.Tensor]], {})
 
-    def step(self, gradients: list[Optional[Tensor]]):
+    def step(self, gradients: List[Optional[Tensor]]):
         params = self.param_group["params"]
         params_with_grad = []
         grads = []
         square_avgs = []
         acc_deltas = []
-        state_steps = []
         lr = self.defaults["lr"]
         rho = self.defaults["rho"]
         eps = self.defaults["eps"]
@@ -92,7 +85,6 @@ class _FunctionalAdadelta:
                 state = self.state[param]
                 square_avgs.append(state["square_avg"])
                 acc_deltas.append(state["acc_delta"])
-                state_steps.append(state["step"])
 
         with torch.no_grad():
             F.adadelta(
@@ -100,12 +92,11 @@ class _FunctionalAdadelta:
                 grads,
                 square_avgs,
                 acc_deltas,
-                state_steps,
                 lr=lr,
                 rho=rho,
                 eps=eps,
                 weight_decay=weight_decay,
                 foreach=self.foreach,
                 maximize=self.maximize,
-                has_complex=has_complex,
+                has_complex=has_complex
             )

@@ -11,9 +11,8 @@
 
 #include <ATen/native/cuda/MemoryAccess.cuh>
 
-#include <tuple>
 
-namespace at::native {
+namespace at { namespace native {
 
 template<int N>
 static OffsetCalculator<N> make_input_offset_calculator(const TensorIteratorBase& iter) {
@@ -41,26 +40,23 @@ static OffsetCalculator<num_outputs> make_output_offset_calculator(const TensorI
   return OffsetCalculator<num_outputs>(iter.ndim(), iter.shape().data(), strides.data(), element_sizes);
 }
 
-template <bool reverted_idx = false, typename func_t, typename policy_t>
+template<typename func_t, typename policy_t>
 __device__ inline void elementwise_kernel_helper(func_t f, policy_t policy) {
   using traits = function_traits<func_t>;
   using return_t = typename traits::result_type;
   using args_t = typename traits::ArgsTuple;
-  constexpr int elems_per_thread = policy_t::tws;
 
   int idx = blockIdx.x;
-  if constexpr (reverted_idx)
-    idx = gridDim.x - blockIdx.x - 1;
 
-  return_t results[elems_per_thread];
-  args_t args[elems_per_thread];
+  return_t results[thread_work_size()];
+  args_t args[thread_work_size()];
 
   // load
   policy.load(args, idx);
 
   // compute
   #pragma unroll
-  for (int i = 0; i < elems_per_thread; i++) {
+  for (int i = 0; i < thread_work_size(); i++) {
     if (policy.check_inbounds(i)) {
       results[i] = c10::guts::apply(f, args[i]);
     }
@@ -70,7 +66,7 @@ __device__ inline void elementwise_kernel_helper(func_t f, policy_t policy) {
   policy.store(results, idx);
 }
 
-}  // namespace at::native
+}}  // namespace at::native
 
 #include <ATen/native/cuda/CUDALoops.cuh>
 
@@ -208,7 +204,7 @@ void opmath_symmetric_gpu_kernel_with_scalars(TensorIteratorBase& iter, const fu
   static_assert(
       traits::arity == 2,
       "gpu_kernel_with_scalars only supports two input arguments");
-  static_assert(std::is_same_v<opmath_arg_t, typename traits::template arg<1>::type>,
+  static_assert(std::is_same<opmath_arg_t, typename traits::template arg<1>::type>::value,
                 "f is not symmetric");
 
   OptionalDeviceGuard device_guard;
@@ -286,7 +282,7 @@ void gpu_kernel_multiple_outputs_impl(TensorIteratorBase& iter, const func_t& f)
   TORCH_INTERNAL_ASSERT(iter.can_use_32bit_indexing());
   TORCH_INTERNAL_ASSERT(iter.ntensors() == ntensors);
 
-  std::array<char*, ntensors> data;
+  at::detail::Array<char*, ntensors> data;
   for (int i = 0; i < ntensors; i++) {
     data[i] = (char*)iter.data_ptr(i);
   }

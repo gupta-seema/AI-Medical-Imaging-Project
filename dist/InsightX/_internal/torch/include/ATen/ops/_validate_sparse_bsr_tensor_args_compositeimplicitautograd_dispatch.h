@@ -17,7 +17,7 @@ namespace at {
 
 namespace compositeimplicitautograd {
 
-TORCH_API void _validate_sparse_bsr_tensor_args(const at::Tensor & crow_indices, const at::Tensor & col_indices, const at::Tensor & values, at::IntArrayRef size, ::std::optional<bool> check_pinning=::std::nullopt);
+TORCH_API void _validate_sparse_bsr_tensor_args(const at::Tensor & crow_indices, const at::Tensor & col_indices, const at::Tensor & values, at::IntArrayRef size);
 
 } // namespace compositeimplicitautograd
 } // namespace at

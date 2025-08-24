@@ -2,13 +2,12 @@ import fnmatch
 import importlib
 import inspect
 import sys
-from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from enum import Enum
 from functools import partial
 from inspect import signature
 from types import ModuleType
-from typing import Any, Callable, get_args, Optional, TypeVar, Union
+from typing import Any, Callable, Dict, Iterable, List, Mapping, Optional, Set, Type, TypeVar, Union
 
 from torch import nn
 
@@ -37,7 +36,7 @@ class Weights:
 
     url: str
     transforms: Callable
-    meta: dict[str, Any]
+    meta: Dict[str, Any]
 
     def __eq__(self, other: Any) -> bool:
         # We need this custom implementation for correct deep-copy and deserialization behavior.
@@ -142,7 +141,7 @@ def get_weight(name: str) -> WeightsEnum:
     return weights_enum[value_name]
 
 
-def get_model_weights(name: Union[Callable, str]) -> type[WeightsEnum]:
+def get_model_weights(name: Union[Callable, str]) -> Type[WeightsEnum]:
     """
     Returns the weights enum class associated to the given model.
 
@@ -156,7 +155,7 @@ def get_model_weights(name: Union[Callable, str]) -> type[WeightsEnum]:
     return _get_enum_from_fn(model)
 
 
-def _get_enum_from_fn(fn: Callable) -> type[WeightsEnum]:
+def _get_enum_from_fn(fn: Callable) -> Type[WeightsEnum]:
     """
     Internal method that gets the weight enum of a specific model builder method.
 
@@ -169,13 +168,14 @@ def _get_enum_from_fn(fn: Callable) -> type[WeightsEnum]:
     if "weights" not in sig.parameters:
         raise ValueError("The method is missing the 'weights' argument.")
 
-    ann = sig.parameters["weights"].annotation
+    ann = signature(fn).parameters["weights"].annotation
     weights_enum = None
     if isinstance(ann, type) and issubclass(ann, WeightsEnum):
         weights_enum = ann
     else:
         # handle cases like Union[Optional, T]
-        for t in get_args(ann):  # type: ignore[union-attr]
+        # TODO: Replace ann.__args__ with typing.get_args(ann) after python >= 3.8
+        for t in ann.__args__:  # type: ignore[union-attr]
             if isinstance(t, type) and issubclass(t, WeightsEnum):
                 weights_enum = t
                 break
@@ -208,7 +208,7 @@ def list_models(
     module: Optional[ModuleType] = None,
     include: Union[Iterable[str], str, None] = None,
     exclude: Union[Iterable[str], str, None] = None,
-) -> list[str]:
+) -> List[str]:
     """
     Returns a list with the names of registered models.
 
@@ -228,7 +228,7 @@ def list_models(
         k for k, v in BUILTIN_MODELS.items() if module is None or v.__module__.rsplit(".", 1)[0] == module.__name__
     }
     if include:
-        models: set[str] = set()
+        models: Set[str] = set()
         if isinstance(include, str):
             include = [include]
         for include_filter in include:

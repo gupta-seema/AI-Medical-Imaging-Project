@@ -19,7 +19,6 @@
 #include <ATen/ops/_add_relu_meta_dispatch.h>
 #include <ATen/ops/_addmm_activation_meta_dispatch.h>
 #include <ATen/ops/_amp_update_scale_meta_dispatch.h>
-#include <ATen/ops/_assert_tensor_metadata_meta_dispatch.h>
 #include <ATen/ops/_coalesced_meta_dispatch.h>
 #include <ATen/ops/_convert_indices_from_coo_to_csr_meta_dispatch.h>
 #include <ATen/ops/_convert_indices_from_csr_to_coo_meta_dispatch.h>
@@ -97,7 +96,6 @@
 #include <ATen/ops/clamp_meta_dispatch.h>
 #include <ATen/ops/clamp_max_meta_dispatch.h>
 #include <ATen/ops/clamp_min_meta_dispatch.h>
-#include <ATen/ops/copy_meta_dispatch.h>
 #include <ATen/ops/copy_sparse_to_sparse_meta_dispatch.h>
 #include <ATen/ops/copysign_meta_dispatch.h>
 #include <ATen/ops/cos_meta_dispatch.h>

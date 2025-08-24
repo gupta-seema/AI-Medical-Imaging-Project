@@ -1,13 +1,10 @@
-# mypy: allow-untyped-defs
-from typing import Optional, Union
+from numbers import Number
 
 import torch
-from torch import nan, Tensor
+from torch import nan
 from torch.distributions import constraints
 from torch.distributions.distribution import Distribution
 from torch.distributions.utils import broadcast_all
-from torch.types import _Number, _size
-
 
 __all__ = ["Uniform"]
 
@@ -28,46 +25,40 @@ class Uniform(Distribution):
         low (float or Tensor): lower range (inclusive).
         high (float or Tensor): upper range (exclusive).
     """
-
+    # TODO allow (loc,scale) parameterization to allow independent constraints.
+    arg_constraints = {
+        "low": constraints.dependent(is_discrete=False, event_dim=0),
+        "high": constraints.dependent(is_discrete=False, event_dim=0),
+    }
     has_rsample = True
 
     @property
-    def arg_constraints(self):
-        # TODO allow (loc,scale) parameterization to allow independent constraints.
-        return {
-            "low": constraints.less_than(self.high),
-            "high": constraints.greater_than(self.low),
-        }
-
-    @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return (self.high + self.low) / 2
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return nan * self.high
 
     @property
-    def stddev(self) -> Tensor:
+    def stddev(self):
         return (self.high - self.low) / 12**0.5
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return (self.high - self.low).pow(2) / 12
 
-    def __init__(
-        self,
-        low: Union[Tensor, float],
-        high: Union[Tensor, float],
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, low, high, validate_args=None):
         self.low, self.high = broadcast_all(low, high)
 
-        if isinstance(low, _Number) and isinstance(high, _Number):
+        if isinstance(low, Number) and isinstance(high, Number):
             batch_shape = torch.Size()
         else:
             batch_shape = self.low.size()
         super().__init__(batch_shape, validate_args=validate_args)
+
+        if self._validate_args and not torch.lt(self.low, self.high).all():
+            raise ValueError("Uniform is not defined when low>= high")
 
     def expand(self, batch_shape, _instance=None):
         new = self._get_checked_instance(Uniform, _instance)
@@ -82,7 +73,7 @@ class Uniform(Distribution):
     def support(self):
         return constraints.interval(self.low, self.high)
 
-    def rsample(self, sample_shape: _size = torch.Size()) -> Tensor:
+    def rsample(self, sample_shape=torch.Size()):
         shape = self._extended_shape(sample_shape)
         rand = torch.rand(shape, dtype=self.low.dtype, device=self.low.device)
         return self.low + rand * (self.high - self.low)

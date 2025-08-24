@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import re
 
 import torch._C as C
@@ -70,7 +69,7 @@ class PythonDispatcher:
     ]
     supported_keys = runtime_keys + alias_keys
 
-    def __init__(self) -> None:
+    def __init__(self):
         C._dispatch_check_invariants(self.name)  # type: ignore[attr-defined]
         self.ref = C._dispatch_library("FRAGMENT", self.namespace, "")
         self.ref.def_("foo(Tensor x) -> Tensor")
@@ -92,10 +91,10 @@ class PythonDispatcher:
     """
 
     def register(self, dispatchKeys):
-        # Overridden is not supported and triggers a warning in C++ dispatcher.
+        # Overriden is not supported and triggers a warning in C++ dispatcher.
         if len(set(dispatchKeys)) != len(dispatchKeys):
             raise RuntimeError(
-                f"Overridden is not allowed but found duplicates in {dispatchKeys}."
+                f"Overriden is not allowed but found duplicates in {dispatchKeys}."
             )
         # We currently forbid this in codegen instead of C++ dispatcher.
         if (

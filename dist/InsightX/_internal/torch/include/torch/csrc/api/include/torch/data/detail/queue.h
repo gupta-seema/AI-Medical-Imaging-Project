@@ -10,7 +10,9 @@
 #include <mutex>
 #include <queue>
 
-namespace torch::data::detail {
+namespace torch {
+namespace data {
+namespace detail {
 
 /// A basic locked, blocking MPMC queue.
 ///
@@ -38,13 +40,13 @@ class Queue {
   /// the queue. An optional `timeout` in seconds can be used to limit the time
   /// spent waiting for an element. If the wait times out, an exception is
   /// raised.
-  T pop(std::optional<std::chrono::milliseconds> timeout = std::nullopt) {
+  T pop(optional<std::chrono::milliseconds> timeout = nullopt) {
     std::unique_lock<std::mutex> lock(mutex_);
     if (timeout) {
       if (!cv_.wait_for(
               lock, *timeout, [this] { return !this->queue_.empty(); })) {
         // clang-format off
-        TORCH_CHECK(false,
+        AT_ERROR(
             "Timeout in DataLoader queue while waiting for next batch"
             " (timeout was ", timeout->count(), " ms)");
         // clang-format on
@@ -77,4 +79,6 @@ class Queue {
   std::mutex mutex_;
   std::condition_variable cv_;
 };
-} // namespace torch::data::detail
+} // namespace detail
+} // namespace data
+} // namespace torch

@@ -60,14 +60,16 @@ const std::array<at::Tag, 1> kJitOnlyOperatorTags = {
 // the concrete operator nature.
 struct TORCH_API Operator {
  private:
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   struct C10Operator final {
     c10::OperatorHandle handle_;
     Operation op_;
   };
   struct UnparsedFunctionSchema final {
     std::string schema_string_;
-    mutable std::optional<c10::AliasAnalysisKind> alias_analysis_;
+    mutable c10::optional<c10::AliasAnalysisKind> alias_analysis_;
   };
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   struct JitOnlyOperator final {
     // The only valid transition for schema_ is from right->left, i.e.
     // when the schema gets parsed.
@@ -296,16 +298,16 @@ TORCH_API bool aliasAnalysisHasSpecialCaseFor(c10::Symbol sym);
 // compile-time function for the selective op registration based on schema
 // string.
 template <typename Func>
-std::optional<Operator> OperatorGenerator(
+c10::optional<Operator> OperatorGenerator(
     const char* schema_str,
     Func&& op,
     AliasAnalysisKind alias_analysis) {
-  return std::optional<Operator>(Operator(
+  return c10::optional<Operator>(Operator(
       std::string(schema_str), std::forward<Func>(op), alias_analysis));
 }
 
 template <typename Func>
-std::optional<Operator> OperatorGenerator(
+c10::optional<Operator> OperatorGenerator(
     torch::detail::SelectiveStr<true> schema_str,
     Func&& op,
     AliasAnalysisKind alias_analysis) {
@@ -316,22 +318,22 @@ std::optional<Operator> OperatorGenerator(
 }
 
 template <typename Func>
-std::optional<Operator> OperatorGenerator(
+c10::optional<Operator> OperatorGenerator(
     torch::detail::SelectiveStr<false> schema_str,
     Func&& op,
     AliasAnalysisKind alias_analysis) {
-  return std::nullopt;
+  return c10::nullopt;
 }
 
 template <typename Func>
-std::optional<Operator> OperatorGenerator(
+c10::optional<Operator> OperatorGenerator(
     const std::string name,
     const std::string overload_name,
     const std::vector<c10::Argument> arguments,
     const std::vector<c10::Argument> returns,
     Func&& op,
     AliasAnalysisKind alias_analysis) {
-  return std::optional<Operator>(Operator(
+  return c10::optional<Operator>(Operator(
       name,
       overload_name,
       arguments,

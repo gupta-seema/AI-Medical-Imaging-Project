@@ -14,11 +14,12 @@
 
 namespace py = pybind11;
 
-namespace torch::throughput_benchmark {
+namespace torch {
+namespace throughput_benchmark {
 
 /**
  * The struct is used to provide results of a benchmark to the caller
- * In the future all additional statistics should be added here.
+ * In the future all additional statics should be added here.
  */
 struct BenchmarkExecutionStats {
   float latency_avg_ms{-1};
@@ -58,7 +59,7 @@ struct BenchmarkConfig {
   // If set autograd profiler will be enabled. I.e. this variable would be
   // created before the main benchmark loop (but after the warmup):
   // RecordProfile guard(profiler_output_path);
-  std::string profiler_output_path;
+  std::string profiler_output_path{""};
 };
 
 namespace detail {
@@ -79,7 +80,7 @@ class BenchmarkHelper {
   // would race with Python
   void runOnce(Input&&) const;
   // This method is to be used when calling from Python directly
-  Output runOnce(const py::args&, const py::kwargs&) const;
+  Output runOnce(py::args&&, const py::kwargs&) const;
   // Aggregate input in the format Model expects in order to avoid further
   // conversions at the benchmark time
   void addInput(py::args&&, py::kwargs&&);
@@ -103,7 +104,6 @@ struct C10_HIDDEN ModuleInput {
   ModuleInput(const ModuleInput&) = delete;
   ModuleInput& operator=(ModuleInput& other) = delete;
   ModuleInput& operator=(ModuleInput&& other) = delete;
-  ~ModuleInput() = default;
 
   ModuleInput(py::args&& args, py::kwargs&& kwargs)
       : args(std::move(args)), kwargs(std::move(kwargs)) {}
@@ -135,16 +135,15 @@ void ScriptModuleBenchmark::runOnce(ScriptModuleInput&& input) const;
 
 template <>
 ScriptModuleOutput ScriptModuleBenchmark::runOnce(
-    const py::args& args,
+    py::args&& args,
     const py::kwargs& kwargs) const;
 
 template <>
 void ModuleBenchmark::runOnce(ModuleInput&& input) const;
 
 template <>
-ModuleOutput ModuleBenchmark::runOnce(
-    const py::args& args,
-    const py::kwargs& kwargs) const;
+ModuleOutput ModuleBenchmark::runOnce(py::args&& args, const py::kwargs& kwargs)
+    const;
 
 template <>
 void ScriptModuleBenchmark::addInput(py::args&& args, py::kwargs&& kwargs);
@@ -182,7 +181,7 @@ class C10_HIDDEN ThroughputBenchmark {
   void addInput(py::args args, py::kwargs kwargs);
 
   // Equivalent to just running the model directly on the given input
-  py::object runOnce(const py::args& args, const py::kwargs& kwargs);
+  py::object runOnce(py::args&& args, const py::kwargs& kwargs);
 
   // The main method of the class allows to perform a multi-threaded benchmark
   // It returns BenchmarkExecutionStats object with a lot of useful statistics
@@ -194,6 +193,7 @@ class C10_HIDDEN ThroughputBenchmark {
   detail::ScriptModuleBenchmark script_module_;
   detail::ModuleBenchmark module_;
 };
-} // namespace torch::throughput_benchmark
+} // namespace throughput_benchmark
+} // namespace torch
 
 #include <torch/csrc/utils/throughput_benchmark-inl.h>

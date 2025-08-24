@@ -1,20 +1,158 @@
 #pragma once
 
-#include <torch/csrc/inductor/aoti_runtime/mini_array_ref.h>
 #include <torch/csrc/inductor/aoti_runtime/utils.h>
-#include <torch/csrc/inductor/aoti_torch/c/shim.h>
 
-#include <cassert>
+#include <assert.h>
 #include <cstdint>
 #include <cstring>
 
-namespace torch::aot_inductor {
+namespace torch {
+namespace aot_inductor {
+
+// Can't use c10::ArrayRef because it's not truly header-only and
+// pulls in other c10 headers. This is (sadly) copy-pasted and
+// adapted.
+template <typename T>
+class MiniArrayRef final {
+ public:
+  using iterator = T*;
+  using const_iterator = const T*;
+  using size_type = size_t;
+  using value_type = T;
+
+  using reverse_iterator = std::reverse_iterator<iterator>;
+
+ private:
+  /// The start of the array, in an external buffer.
+  T* Data;
+
+  /// The number of elements.
+  size_type Length;
+
+ public:
+  /// @name Constructors
+  /// @{
+
+  /// Construct an empty MiniArrayRef.
+  /* implicit */ constexpr MiniArrayRef() : Data(nullptr), Length(0) {}
+
+  /// Construct an MiniArrayRef from a single element.
+  // TODO Make this explicit
+  constexpr MiniArrayRef(const T& OneElt) : Data(&OneElt), Length(1) {}
+
+  /// Construct an MiniArrayRef from a pointer and length.
+  constexpr MiniArrayRef(T* data, size_t length) : Data(data), Length(length) {}
+
+  /// Construct an MiniArrayRef from a range.
+  constexpr MiniArrayRef(T* begin, T* end) : Data(begin), Length(end - begin) {}
+
+  template <
+      typename Container,
+      typename = std::enable_if_t<std::is_same<
+          std::remove_const_t<decltype(std::declval<Container>().data())>,
+          T*>::value>>
+  /* implicit */ MiniArrayRef(Container& container)
+      : Data(container.data()), Length(container.size()) {}
+
+  /// Construct an MiniArrayRef from a std::vector.
+  // The enable_if stuff here makes sure that this isn't used for
+  // std::vector<bool>, because MiniArrayRef can't work on a std::vector<bool>
+  // bitfield.
+  template <typename A>
+  /* implicit */ MiniArrayRef(const std::vector<T, A>& Vec)
+      : Data(Vec.data()), Length(Vec.size()) {
+    static_assert(
+        !std::is_same<T, bool>::value,
+        "MiniArrayRef<bool> cannot be constructed from a std::vector<bool> bitfield.");
+  }
+
+  /// Construct an MiniArrayRef from a std::array
+  template <size_t N>
+  /* implicit */ constexpr MiniArrayRef(std::array<T, N>& Arr)
+      : Data(Arr.data()), Length(N) {}
+
+  /// Construct an MiniArrayRef from a C array.
+  template <size_t N>
+  /* implicit */ constexpr MiniArrayRef(T (&Arr)[N]) : Data(Arr), Length(N) {}
+
+  /// Construct an MiniArrayRef from a std::initializer_list.
+  /* implicit */ constexpr MiniArrayRef(const std::initializer_list<T>& Vec)
+      : Data(
+            std::begin(Vec) == std::end(Vec) ? static_cast<T*>(nullptr)
+                                             : std::begin(Vec)),
+        Length(Vec.size()) {}
+
+  /// @}
+  /// @name Simple Operations
+  /// @{
+
+  constexpr iterator begin() const {
+    return Data;
+  }
+  constexpr iterator end() const {
+    return Data + Length;
+  }
+
+  // These are actually the same as iterator, since MiniArrayRef only
+  // gives you const iterators.
+  constexpr const_iterator cbegin() const {
+    return Data;
+  }
+  constexpr const_iterator cend() const {
+    return Data + Length;
+  }
+
+  constexpr reverse_iterator rbegin() const {
+    return reverse_iterator(end());
+  }
+  constexpr reverse_iterator rend() const {
+    return reverse_iterator(begin());
+  }
+
+  /// empty - Check if the array is empty.
+  constexpr bool empty() const {
+    return Length == 0;
+  }
+
+  constexpr T* data() const {
+    return Data;
+  }
+
+  /// size - Get the array size.
+  constexpr size_t size() const {
+    return Length;
+  }
+
+  /// equals - Check for element-wise equality.
+  constexpr bool equals(MiniArrayRef RHS) const {
+    return Length == RHS.Length && std::equal(begin(), end(), RHS.begin());
+  }
+
+  /// @}
+  /// @name Operator Overloads
+  /// @{
+  constexpr const T& operator[](size_t Index) const {
+    return Data[Index];
+  }
+
+  /// Disallow accidental assignment from a temporary.
+  ///
+  /// The declaration here is extra complicated so that "arrayRef = {}"
+  /// continues to select the move assignment operator.
+  template <typename U>
+  typename std::enable_if<std::is_same<U, T>::value, MiniArrayRef<T>>::type&
+  operator=(U&& Temporary) = delete;
+
+  /// Disallow accidental assignment from a temporary.
+  ///
+  /// The declaration here is extra complicated so that "arrayRef = {}"
+  /// continues to select the move assignment operator.
+  template <typename U>
+  typename std::enable_if<std::is_same<U, T>::value, MiniArrayRef<T>>::type&
+  operator=(std::initializer_list<U>) = delete;
+};
 
 using MiniIntArrayRef = MiniArrayRef<int64_t>;
-
-static_assert(
-    sizeof(MiniIntArrayRef) == sizeof(void*) + sizeof(size_t),
-    "changing the size of MiniArrayRef breaks ABI compatibility!");
 
 inline bool is_contiguous_strides_for_shape(
     int64_t ndim,
@@ -51,14 +189,15 @@ class ArrayRefTensor {
         sizes_(sizes),
         strides_(strides),
         device_type_(device_type),
-        device_idx_(device_idx) {
+        device_idx_(device_idx),
+        numel_(arr.size()) {
     assert(sizes.size() == strides.size());
     assert(is_contiguous_strides_for_shape(
         sizes.size(), strides.data(), sizes.data()));
   }
 
   AtenTensorHandle expensiveCopyToTensor() const {
-    AtenTensorHandle result = nullptr;
+    AtenTensorHandle result;
     AOTI_TORCH_ERROR_CODE_CHECK(aoti_torch_empty_strided(
         sizes_.size(),
         sizes_.data(),
@@ -67,7 +206,7 @@ class ArrayRefTensor {
         device_type_,
         device_idx_,
         &result));
-    void* dataPtr = nullptr;
+    void* dataPtr;
     AOTI_TORCH_ERROR_CODE_CHECK(aoti_torch_get_data_ptr(result, &dataPtr));
     std::memcpy(dataPtr, data(), numel() * sizeof(T));
     return result;
@@ -77,24 +216,6 @@ class ArrayRefTensor {
   // an owning AtenTensorHandle from release(). So, we allocate one!
   AtenTensorHandle release() {
     return expensiveCopyToTensor();
-  }
-
-  AtenTensorHandle borrowAsTensor() const {
-    AtenTensorHandle result = nullptr;
-    AOTI_TORCH_ERROR_CODE_CHECK(aoti_torch_create_tensor_from_blob_v2(
-        data(),
-        sizes_.size(),
-        sizes_.data(),
-        strides_.data(),
-        0,
-        aoti_torch_dtype<std::remove_const_t<T>>(),
-        device_type_,
-        device_idx_,
-        &result,
-        aoti_torch_layout_strided(),
-        nullptr,
-        0));
-    return result;
   }
 
   // We don't need to free any memory.
@@ -121,7 +242,7 @@ class ArrayRefTensor {
   }
 
   auto numel() const {
-    return arrayRef_.size();
+    return numel_;
   }
 
   void set_arrayref(MiniArrayRef<T> new_arrayref) {
@@ -136,16 +257,20 @@ class ArrayRefTensor {
   MiniArrayRef<const int64_t> strides_;
   int32_t device_type_ = 0;
   int32_t device_idx_ = 0;
-  // We continue to zero-initialize this field in case we repurpose
-  // the space later; having predictable contents can only help.
-  int32_t unusedDoNotRemoveForABICompatibility_ = 0;
+  int32_t numel_ = 0;
 };
 
-static_assert(
-    sizeof(ArrayRefTensor<int>) ==
-        3 * sizeof(MiniIntArrayRef) + 3 * sizeof(int32_t) +
-            (alignof(ArrayRefTensor<int>) > 4 ? sizeof(int32_t) : 0),
-    "changing the size of ArrayRefTensor breaks ABI compatibility!");
+inline AtenTensorHandle reinterpret_tensor_wrapper(
+    AtenTensorHandle self,
+    int64_t ndim,
+    const int64_t* sizes_ptr,
+    const int64_t* strides_ptr,
+    int64_t storage_offset) {
+  AtenTensorHandle result;
+  AOTI_TORCH_ERROR_CODE_CHECK(aoti_torch__reinterpret_tensor(
+      self, ndim, sizes_ptr, strides_ptr, storage_offset, &result));
+  return result;
+}
 
 template <typename T>
 inline ArrayRefTensor<T> reinterpret_tensor_wrapper(
@@ -166,6 +291,12 @@ inline ArrayRefTensor<T> reinterpret_tensor_wrapper(
       self.device_idx());
 }
 
+inline void* get_data_ptr_wrapper(AtenTensorHandle tensor) {
+  void* result;
+  AOTI_TORCH_ERROR_CODE_CHECK(aoti_torch_get_data_ptr(tensor, &result));
+  return result;
+}
+
 template <typename T>
 inline T* get_data_ptr_wrapper(ArrayRefTensor<T>& tensor) {
   return tensor.data();
@@ -174,6 +305,11 @@ inline T* get_data_ptr_wrapper(ArrayRefTensor<T>& tensor) {
 template <typename T>
 inline T* get_data_ptr_wrapper(const MiniArrayRef<T>& arr) {
   return arr.data();
+}
+
+inline AtenTensorHandle unwrap_raii_handle_if_needed(
+    const RAIIAtenTensorHandle& handle) {
+  return handle.get();
 }
 
 template <typename T>
@@ -186,6 +322,11 @@ template <typename T>
 inline ArrayRefTensor<T>& unwrap_raii_handle_if_needed(
     ArrayRefTensor<T>& tensor) {
   return tensor;
+}
+
+inline RAIIAtenTensorHandle wrap_with_raii_handle_if_needed(
+    AtenTensorHandle handle) {
+  return RAIIAtenTensorHandle(handle);
 }
 
 template <typename T>
@@ -201,12 +342,6 @@ inline ArrayRefTensor<T>& wrap_with_raii_handle_if_needed(
 }
 
 template <typename T>
-inline ArrayRefTensor<T> wrap_with_raii_handle_if_needed(
-    ArrayRefTensor<T>&& tensor) {
-  return std::move(tensor);
-}
-
-template <typename T>
 inline RAIIAtenTensorHandle expensive_copy_to_tensor_if_needed(
     const ArrayRefTensor<T>& tensor) {
   return tensor.expensiveCopyToTensor();
@@ -218,25 +353,15 @@ inline AtenTensorHandle expensive_copy_to_tensor_if_needed(
 }
 
 template <typename T>
-const T& copy_arrayref_tensor_to_tensor(const T& t) {
+const T& convert_arrayref_tensor_to_tensor(const T& t) {
   return t;
 }
 
 template <typename T>
-RAIIAtenTensorHandle copy_arrayref_tensor_to_tensor(
+RAIIAtenTensorHandle convert_arrayref_tensor_to_tensor(
     const ArrayRefTensor<T>& art) {
   return art.expensiveCopyToTensor();
 }
 
-template <typename T>
-const T& borrow_arrayref_tensor_as_tensor(const T& t) {
-  return t;
-}
-
-template <typename T>
-RAIIAtenTensorHandle borrow_arrayref_tensor_as_tensor(
-    const ArrayRefTensor<T>& art) {
-  return art.borrowAsTensor();
-}
-
-} // namespace torch::aot_inductor
+} // namespace aot_inductor
+} // namespace torch

@@ -3,7 +3,9 @@
 #include <ATen/PadNd.h>
 #include <torch/nn/options/padding.h>
 
-namespace torch::nn::functional {
+namespace torch {
+namespace nn {
+namespace functional {
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace detail {
@@ -25,7 +27,7 @@ inline Tensor pad(
     TORCH_CHECK(false, "Unrecognised padding mode");
   }();
 
-  std::optional<double> fill_value;
+  c10::optional<double> fill_value;
   if (value != 0.0) {
     fill_value = value;
   }
@@ -35,7 +37,7 @@ inline Tensor pad(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.pad
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.pad
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::PadFuncOptions` class to
@@ -51,4 +53,6 @@ inline Tensor pad(const Tensor& input, const PadFuncOptions& options) {
   return detail::pad(input, options.pad(), options.mode(), options.value());
 }
 
-} // namespace torch::nn::functional
+} // namespace functional
+} // namespace nn
+} // namespace torch

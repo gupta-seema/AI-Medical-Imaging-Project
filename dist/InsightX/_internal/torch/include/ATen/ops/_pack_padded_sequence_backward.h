@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor _pack_padded_sequence_backward(const at::Tensor & grad, at::In
     return at::_ops::_pack_padded_sequence_backward::call(grad, c10::fromIntArrayRefSlow(input_size), batch_sizes, batch_first);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor _pack_padded_sequence_backward(const at::Tensor & grad, at::IntArrayRef input_size, const at::Tensor & batch_sizes, bool batch_first) {
     return at::_ops::_pack_padded_sequence_backward::call(grad, c10::fromIntArrayRefSlow(input_size), batch_sizes, batch_first);
   }
@@ -39,7 +38,7 @@ inline at::Tensor _pack_padded_sequence_backward_symint(const at::Tensor & grad,
     return at::_ops::_pack_padded_sequence_backward::call(grad, input_size, batch_sizes, batch_first);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor _pack_padded_sequence_backward(const at::Tensor & grad, c10::SymIntArrayRef input_size, const at::Tensor & batch_sizes, bool batch_first) {
     return at::_ops::_pack_padded_sequence_backward::call(grad, input_size, batch_sizes, batch_first);
   }

@@ -1,7 +1,8 @@
-# mypy: allow-untyped-defs
+from typing import Dict, Tuple
 
 from torch.fx._compatibility import compatibility
 from torch.fx.graph import Graph
+
 from torch.fx.graph_module import GraphModule
 from torch.fx.passes.utils.matcher_utils import SubgraphMatcher
 from torch.nn import Module
@@ -29,7 +30,7 @@ def lift_subgraph_as_module(
     subgraph: Graph,
     comp_name: str = "",
     class_name: str = "GraphModule",
-) -> tuple[GraphModule, dict[str, str]]:
+) -> Tuple[GraphModule, Dict[str, str]]:
     """
     Create a GraphModule for subgraph, which copies the necessary attributes from the original parent graph_module.
 
@@ -51,7 +52,7 @@ def lift_subgraph_as_module(
     # make "weight" a attribute of "conv" HolderModule and point to conv.weight in
     # the original module.
     submodule = HolderModule({})
-    orig_to_split_fqn_mapping: dict[str, str] = {}
+    orig_to_split_fqn_mapping: Dict[str, str] = {}
     for n in subgraph.nodes:
         if n.op not in ("call_module", "get_attr"):
             continue

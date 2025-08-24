@@ -5,10 +5,8 @@
 #include <c10/util/Float8_e4m3fnuz.h>
 #include <c10/util/Float8_e5m2.h>
 #include <c10/util/Float8_e5m2fnuz.h>
-#include <c10/util/Float8_e8m0fnu.h>
 #include <c10/util/Half.h>
 #include <c10/util/complex.h>
-#include <c10/util/overflows.h>
 
 #include <type_traits>
 
@@ -42,21 +40,6 @@ struct maybe_real<true, src_t> {
   }
 };
 
-template <bool, typename src_t>
-struct maybe_bool {
-  C10_HOST_DEVICE static inline src_t apply(src_t src) {
-    return src;
-  }
-};
-
-template <typename src_t>
-struct maybe_bool<true, src_t> {
-  C10_HOST_DEVICE static inline decltype(auto) apply(src_t src) {
-    // Don't use bool operator so as to to also compile for ComplexHalf.
-    return src.real() || src.imag();
-  }
-};
-
 // Note: deliberately ignores undefined behavior, consistent with NumPy.
 // PyTorch's type conversions can cause a variety of undefined behavior,
 // including float to integral overflow and signed to unsigned integer overflow.
@@ -68,17 +51,6 @@ struct static_cast_with_inter_type {
     constexpr bool real = needs_real<dest_t, src_t>::value;
     auto r = maybe_real<real, src_t>::apply(src);
     return static_cast<dest_t>(r);
-  }
-};
-
-// Partial template specialization for casting to bool.
-// Need to handle complex types separately, as we don't
-// simply want to cast the real part to bool.
-template <typename src_t>
-struct static_cast_with_inter_type<bool, src_t> {
-  C10_HOST_DEVICE static inline bool apply(src_t src) {
-    constexpr bool complex = needs_real<bool, src_t>::value;
-    return static_cast<bool>(maybe_bool<complex, src_t>::apply(src));
   }
 };
 
@@ -152,19 +124,6 @@ struct static_cast_with_inter_type<
   }
 };
 
-// TODO(#146647): Can we make all these template specialization happen
-// based off our apply macros?
-template <>
-struct static_cast_with_inter_type<
-    c10::complex<c10::Half>,
-    c10::Float8_e8m0fnu> {
-  C10_HOST_DEVICE __ubsan_ignore_undefined__ static inline c10::complex<
-      c10::Half>
-  apply(c10::Float8_e8m0fnu src) {
-    return static_cast<c10::complex<c10::Half>>(c10::complex<float>{src});
-  }
-};
-
 template <>
 struct static_cast_with_inter_type<c10::complex<c10::Half>, c10::Half> {
   C10_HOST_DEVICE __ubsan_ignore_undefined__ static inline c10::complex<
@@ -192,7 +151,7 @@ C10_HOST_DEVICE To convert(From f) {
 }
 
 // Define separately to avoid being inlined and prevent code-size bloat
-[[noreturn]] C10_API void report_overflow(const char* name);
+C10_API void report_overflow(const char* name);
 
 template <typename To, typename From>
 To checked_convert(From f, const char* name) {

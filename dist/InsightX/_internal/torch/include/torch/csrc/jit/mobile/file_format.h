@@ -29,7 +29,8 @@
  * only be called from one or two locations per binary.
  */
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 /**
  * The format of a file or data stream.
@@ -118,9 +119,9 @@ static void file_not_found_error() {
   std::stringstream message;
   message << "Error while opening file: ";
   if (errno == ENOENT) {
-    message << "no such file or directory" << '\n';
+    message << "no such file or directory" << std::endl;
   } else {
-    message << "error no is: " << errno << '\n';
+    message << "error no is: " << errno << std::endl;
   }
   TORCH_CHECK(false, message.str());
 }
@@ -134,7 +135,7 @@ static inline std::tuple<std::shared_ptr<char>, size_t> get_file_content(
     // failed to open file, chances are it's no such file or directory.
     file_not_found_error();
   }
-  struct stat statbuf{};
+  struct stat statbuf {};
   fstat(fd, &statbuf);
   size_t size = statbuf.st_size;
   void* ptr = mmap(nullptr, statbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
@@ -191,4 +192,5 @@ static inline std::tuple<std::shared_ptr<char>, size_t> get_rai_content(
   return std::make_tuple(data, buffer_size);
 }
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

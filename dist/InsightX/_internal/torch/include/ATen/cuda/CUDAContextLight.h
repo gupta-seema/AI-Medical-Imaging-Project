@@ -2,7 +2,6 @@
 // Light-weight version of CUDAContext.h with fewer transitive includes
 
 #include <cstdint>
-#include <map>
 
 #include <cuda_runtime_api.h>
 #include <cusparse.h>
@@ -10,17 +9,15 @@
 
 // cublasLT was introduced in CUDA 10.1 but we enable only for 11.1 that also
 // added bf16 support
+#if (!defined(USE_ROCM) && !defined(_MSC_VER)) || (defined(USE_ROCM) && ROCM_VERSION >= 50700)
 #include <cublasLt.h>
+#endif
 
 #ifdef CUDART_VERSION
 #include <cusolverDn.h>
 #endif
 
-#if defined(USE_CUDSS)
-#include <cudss.h>
-#endif
-
-#if defined(USE_ROCM)
+#if defined(USE_ROCM) && ROCM_VERSION >= 50300
 #include <hipsolver/hipsolver.h>
 #endif
 
@@ -85,18 +82,14 @@ TORCH_CUDA_CPP_API c10::Allocator* getCUDADeviceAllocator();
 /* Handles */
 TORCH_CUDA_CPP_API cusparseHandle_t getCurrentCUDASparseHandle();
 TORCH_CUDA_CPP_API cublasHandle_t getCurrentCUDABlasHandle();
+#if (!defined(USE_ROCM) && !defined(_MSC_VER)) || (defined(USE_ROCM) && ROCM_VERSION >= 50700)
 TORCH_CUDA_CPP_API cublasLtHandle_t getCurrentCUDABlasLtHandle();
-
-TORCH_CUDA_CPP_API void clearCublasWorkspaces();
-TORCH_CUDA_CPP_API std::map<std::tuple<void *, void *>, at::DataPtr>& cublas_handle_stream_to_workspace();
-TORCH_CUDA_CPP_API size_t getChosenWorkspaceSize();
-
-#if defined(CUDART_VERSION) || defined(USE_ROCM)
-TORCH_CUDA_CPP_API cusolverDnHandle_t getCurrentCUDASolverDnHandle();
 #endif
 
-#if defined(USE_CUDSS)
-TORCH_CUDA_CPP_API cudssHandle_t getCurrentCudssHandle();
+TORCH_CUDA_CPP_API void clearCublasWorkspaces();
+
+#if defined(CUDART_VERSION) || defined(USE_ROCM) && ROCM_VERSION >= 50300
+TORCH_CUDA_CPP_API cusolverDnHandle_t getCurrentCUDASolverDnHandle();
 #endif
 
 } // namespace at::cuda

@@ -1,17 +1,13 @@
-# mypy: allow-untyped-defs
 import functools
-import operator
 import re
 from collections import deque
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import Dict, List
 
+from torch.autograd import _KinetoEvent
 from torch.autograd.profiler import profile
+
 from torch.profiler import DeviceType
-
-
-if TYPE_CHECKING:
-    from torch.autograd import _KinetoEvent
 
 
 def _traverse(tree, next_fn, children_fn=lambda x: x.children, reverse: bool = False):
@@ -64,7 +60,7 @@ class EventKey:
     def __repr__(self):
         return f"{self.event.name}"
 
-    def intervals_overlap(self, intervals: list[Interval]):
+    def intervals_overlap(self, intervals: List[Interval]):
         overlap_time = 0
         intervals = sorted(intervals, key=lambda x: x.start)
 
@@ -100,13 +96,13 @@ class EventKey:
 class BasicEvaluation:
     def __init__(self, prof: profile):
         self.profile = prof
-        self.metrics: dict[EventKey, EventMetrics] = {}
+        self.metrics: Dict[EventKey, EventMetrics] = {}
         self.compute_self_time()
         self.event_keys = sorted(
             (e for e in self.metrics.keys()), key=lambda x: x.event.start_time_ns
         )
         self.events = [e.event for e in self.event_keys]
-        self.cuda_events: list[_KinetoEvent] = []
+        self.cuda_events: List[_KinetoEvent] = []
         self.queue_depth_list = self.compute_queue_depth()
         self.compute_idle_time()
 
@@ -151,18 +147,18 @@ class BasicEvaluation:
 
         cuda_launch_events = sorted(
             (e for e in cuda_event_list if is_cuda_launch_kernel(e)),
-            key=lambda x: x.start_ns(),
+            key=lambda x: x.start_us(),
         )
         cuda_kernel_events = sorted(
             (e for e in cuda_event_list if is_cuda_kernel(e)),
-            key=lambda x: x.start_ns(),
+            key=lambda x: x.start_us(),
         )
 
         self.cuda_events = sorted(
-            cuda_launch_events + cuda_kernel_events, key=lambda x: x.start_ns()
+            cuda_launch_events + cuda_kernel_events, key=lambda x: x.start_us()
         )
 
-        kernel_mapping: dict[_KinetoEvent, int] = {}
+        kernel_mapping: Dict[_KinetoEvent, int] = {}
         last_mapped_kernel = 0
         for cuda_launch_event in cuda_launch_events:
             index = index_of_first_match(
@@ -182,13 +178,11 @@ class BasicEvaluation:
         def new_old_event_comparator(event):
             if hasattr(event, "start_us"):
                 return event.start_us() * 1000
-            if hasattr(event, "start_ns"):
-                return event.start_ns()
             if hasattr(event, "start_time_ns"):
                 return event.start_time_ns
-            raise Exception("Unknown Event Type")  # noqa: TRY002
+            raise Exception("Unknown Event Type")
 
-        queue_depth_list: list[Interval] = []
+        queue_depth_list: List[Interval] = []
         all_events.sort(key=new_old_event_comparator)
         for event in all_events:
             # Find latest cuda kernel event
@@ -198,26 +192,20 @@ class BasicEvaluation:
                 # Find current spawned cuda kernel event
                 if event in kernel_mapping and kernel_mapping[event] is not None:
                     spawned_kernel_index = kernel_mapping[event]
-            if hasattr(event, "start_ns"):
-                start_time = event.start_ns()
-                end_time = event.start_ns() + event.duration_ns()
-                # Find current spawned cuda kernel event
-                if event in kernel_mapping and kernel_mapping[event] is not None:
-                    spawned_kernel_index = kernel_mapping[event]
             elif hasattr(event, "start_time_ns"):
                 start_time = event.start_time_ns  # type: ignore[attr-defined]
                 end_time = event.end_time_ns  # type: ignore[attr-defined]
 
             while (
                 current_kernel_index < len(cuda_kernel_events)
-                and (cuda_kernel_events[current_kernel_index].start_ns())
+                and (cuda_kernel_events[current_kernel_index].start_us()) * 1000
                 <= start_time  # type: ignore[possibly-undefined]
             ):
                 current_kernel_index += 1
             current_queue_depth = spawned_kernel_index - current_kernel_index + 1
             current_queue_depth = max(current_queue_depth, 0)
 
-            if hasattr(event, "start_us") or hasattr(event, "start_ns"):
+            if hasattr(event, "start_us"):
                 queue_depth_list.append(
                     Interval(start_time, end_time, current_queue_depth)  # type: ignore[possibly-undefined]
                 )
@@ -233,7 +221,7 @@ class BasicEvaluation:
         # Based on queue_depth_list, we can calculate idle time for all the events
         idle = False
         idle_start = 0
-        idle_intervals: list[Interval] = []
+        idle_intervals: List[Interval] = []
         if self.queue_depth_list and self.events:
             idle_intervals += [
                 Interval(self.events[0].start_time_ns, self.queue_depth_list[0].start),
@@ -320,7 +308,7 @@ class BasicEvaluation:
                 event
                 for _, event in sorted(
                     zip(heuristic_score_list, event_list),
-                    key=operator.itemgetter(0),
+                    key=lambda x: x[0],
                     reverse=True,
                 )
             ]
@@ -335,11 +323,11 @@ class BasicEvaluation:
 
         output += "\n".join(
             [
-                f"""{'-' * 80}
+                f"""{'-'*80}
 Event:                {event}
 Source code location: {source_code_location(event.event)}
 Percentage idle time: {self.metrics[event].fraction_idle_time * 100:.2f}%
-{'-' * 80}"""
+{'-'*80}"""
                 for event in event_list
             ]
         )

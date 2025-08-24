@@ -10,7 +10,6 @@
 #include <cstdint>
 #include <iterator>
 #include <numeric>
-#include <optional>
 #include <ostream>
 #include <type_traits>
 
@@ -43,7 +42,7 @@ class C10_API SymInt {
       // Large negative number, heap allocate it
       promote_to_negative();
     }
-  }
+  };
   SymInt() : data_(0) {}
   SymInt(SymNode n);
 
@@ -93,7 +92,7 @@ class C10_API SymInt {
     // https://stackoverflow.com/questions/42534749/signed-extension-from-24-bit-to-32-bit-in-c
     uint64_t extended_bits = (unextended_bits ^ sign_bit_mask) - sign_bit_mask;
     return static_cast<SymNodeImpl*>(
-        // NOLINTNEXTLINE(performance-no-int-to-ptr, bugprone*)
+        // NOLINTNEXTLINE(performance-no-int-to-ptr)
         reinterpret_cast<void*>(static_cast<uintptr_t>(extended_bits)));
   }
 
@@ -224,20 +223,15 @@ class C10_API SymInt {
 
   operator SymFloat() const;
 
-  void unsafe_set_data(size_t nbytes) {
-    TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!is_heap_allocated());
-    data_ = static_cast<int64_t>(nbytes);
-  }
-
   // Don't use this.  Prefer maybe_as_int instead
   int64_t as_int_unchecked() const {
     TORCH_INTERNAL_ASSERT_DEBUG_ONLY(!is_heap_allocated());
     return data_;
   }
 
-  std::optional<int64_t> maybe_as_int() const {
+  c10::optional<int64_t> maybe_as_int() const {
     if (!is_heap_allocated()) {
-      return data_;
+      return c10::make_optional(data_);
     }
     auto* node = toSymNodeImplUnowned();
     if (auto c = node->constant_int()) {
@@ -417,6 +411,13 @@ inline bool sym_ge(int64_t a, int64_t b) {
 
 inline SymBool sym_ge(const SymInt& a, const SymInt& b) {
   return a.sym_ge(b);
+}
+
+inline bool definitely_true(
+    const c10::SymBool& b,
+    const char* file,
+    int64_t line) {
+  return b.has_hint() && b.guard_bool(file, line);
 }
 
 } // namespace c10

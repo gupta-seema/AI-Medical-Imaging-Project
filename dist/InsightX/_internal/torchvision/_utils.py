@@ -1,6 +1,5 @@
 import enum
-from collections.abc import Sequence
-from typing import TypeVar
+from typing import Sequence, Type, TypeVar
 
 T = TypeVar("T", bound=enum.Enum)
 
@@ -8,7 +7,7 @@ T = TypeVar("T", bound=enum.Enum)
 class StrEnumMeta(enum.EnumMeta):
     auto = enum.auto
 
-    def from_str(self: type[T], member: str) -> T:  # type: ignore[misc]
+    def from_str(self: Type[T], member: str) -> T:  # type: ignore[misc]
         try:
             return self[member]
         except KeyError:

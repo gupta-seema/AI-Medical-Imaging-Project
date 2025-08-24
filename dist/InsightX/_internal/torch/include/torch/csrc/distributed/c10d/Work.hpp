@@ -1,8 +1,7 @@
 #pragma once
 
 #include <ATen/ATen.h>
-#include <chrono>
-#include <mutex>
+#include <stdexcept>
 #include <vector>
 
 constexpr auto kNoTimeout = std::chrono::milliseconds(0);
@@ -34,14 +33,6 @@ enum class OpType : std::uint8_t {
   UNKNOWN = 100,
 };
 
-// TODO: support different types of failures/errors
-enum class WorkResult : std::uint8_t {
-  SUCCESS = 0,
-  TIMEOUT = 1,
-  COMM_ERROR = 2,
-  UNKNOWN = 100,
-};
-
 // Converts OpType to human readable string.
 TORCH_API std::string opTypeToString(OpType opType);
 
@@ -58,8 +49,8 @@ class TORCH_API Work : public torch::CustomClassHolder {
       int rank = -1,
       OpType opType = OpType::UNKNOWN,
       const char* profilingTitle = nullptr,
-      const std::optional<std::vector<at::Tensor>>& inputTensors =
-          std::nullopt);
+      const c10::optional<std::vector<at::Tensor>>& inputTensors =
+          c10::nullopt);
 
   ~Work() override;
 
@@ -115,11 +106,6 @@ class TORCH_API Work : public torch::CustomClassHolder {
   // Returns a Future object that will be associated with the completion of
   // work. Only NCCL backend is currently supported.
   virtual c10::intrusive_ptr<c10::ivalue::Future> getFuture();
-
-  // Get a Future object that would be marked as either success or failure
-  // This API can be used by the user to track the completion of the work
-  // and handle the exception if any.
-  virtual c10::intrusive_ptr<c10::ivalue::Future> getFutureResult();
 
   virtual float getDuration() const;
 

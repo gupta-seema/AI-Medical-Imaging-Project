@@ -1,12 +1,8 @@
-# mypy: allow-untyped-defs
-from collections.abc import Iterable
-from typing import Union
+from typing import Iterable, List, Union
 
 import torch
-from torch import Tensor
-
-from . import _lazy_call, _lazy_init, current_device, device_count, is_initialized
-
+from .. import Tensor
+from . import _lazy_call, _lazy_init, current_device, device_count
 
 __all__ = [
     "get_rng_state",
@@ -43,9 +39,11 @@ def get_rng_state(device: Union[int, str, torch.device] = "cuda") -> Tensor:
     return default_generator.get_state()
 
 
-def get_rng_state_all() -> list[Tensor]:
+def get_rng_state_all() -> List[Tensor]:
     r"""Return a list of ByteTensor representing the random number states of all devices."""
-    results = [get_rng_state(i) for i in range(device_count())]
+    results = []
+    for i in range(device_count()):
+        results.append(get_rng_state(i))
     return results
 
 
@@ -59,11 +57,8 @@ def set_rng_state(
         device (torch.device or int, optional): The device to set the RNG state.
             Default: ``'cuda'`` (i.e., ``torch.device('cuda')``, the current CUDA device).
     """
-    if not is_initialized():
-        with torch._C._DisableFuncTorch():
-            # Clone the state because the callback will be triggered
-            # later when CUDA is lazy initialized.
-            new_state = new_state.clone(memory_format=torch.contiguous_format)
+    with torch._C._DisableFuncTorch():
+        new_state_copy = new_state.clone(memory_format=torch.contiguous_format)
     if isinstance(device, str):
         device = torch.device(device)
     elif isinstance(device, int):
@@ -74,7 +69,7 @@ def set_rng_state(
         if idx is None:
             idx = current_device()
         default_generator = torch.cuda.default_generators[idx]
-        default_generator.set_state(new_state)
+        default_generator.set_state(new_state_copy)
 
     _lazy_call(cb)
 

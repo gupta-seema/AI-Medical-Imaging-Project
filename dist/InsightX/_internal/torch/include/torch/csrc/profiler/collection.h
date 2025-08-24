@@ -24,7 +24,9 @@
 #include <torch/csrc/profiler/util.h>
 #include <torch/csrc/utils/python_stub.h>
 
-namespace torch::profiler::impl {
+namespace torch {
+namespace profiler {
+namespace impl {
 
 enum class EventType : uint8_t {
   TorchOp = 0,
@@ -47,7 +49,7 @@ struct TORCH_API RawTensorMetadataBase {
   StorageImplData data_;
   c10::ScalarType dtype_{c10::ScalarType::Undefined};
   c10::Layout layout_{c10::Layout::Strided};
-  uint32_t size_dim_{0};
+  uint32_t dim_{0};
 };
 
 // Collected during profiling.
@@ -57,12 +59,11 @@ struct TORCH_API RawTensorMetadata : RawTensorMetadataBase {
   RawTensorMetadata(RawTensorMetadata&&) noexcept = default;
   RawTensorMetadata& operator=(const RawTensorMetadata&) = default;
   RawTensorMetadata& operator=(RawTensorMetadata&&) noexcept = default;
-  ~RawTensorMetadata() = default;
   explicit RawTensorMetadata(const at::Tensor& t);
 
-  // Wrap `weak_self_` in `std::optional` and split device into components to
+  // Wrap `weak_self_` in `c10::optional` and split device into components to
   // keep struct default constructable. (which the std::array initializer needs)
-  std::optional<WeakTensor> weak_self_;
+  c10::optional<WeakTensor> weak_self_;
   c10::DeviceType device_type_{c10::DeviceType::CPU};
   c10::DeviceIndex device_index_{-1};
 };
@@ -84,26 +85,15 @@ struct TORCH_API TensorMetadata : public RawTensorMetadataBase {
   std::vector<int64_t> strides_;
 
   // Set during `calculateUniqueTensorIDs`.
-  std::optional<TensorID> id_;
-  std::optional<AllocationID> allocation_id_;
-};
-
-// Used during post processing.
-struct TORCH_API ProfilerStepInfo {
-  int64_t start_time_ns; // start time of the profiler step
-  int64_t end_time_ns; // end time of the profiler step
-  uint64_t out_idx; // index of the profiler step in the profiler "out" var in
-                    // getRecords
-
-  ProfilerStepInfo(int64_t start, int64_t end, uint64_t out_idx)
-      : start_time_ns(start), end_time_ns(end), out_idx(out_idx) {}
+  c10::optional<TensorID> id_;
+  c10::optional<AllocationID> allocation_id_;
 };
 
 using op_input_t = std::variant<
     TensorMetadata,
     std::vector<TensorMetadata>,
     c10::IValue,
-    std::nullopt_t>;
+    c10::nullopt_t>;
 
 // ============================================================================
 // == ExtraFields =============================================================
@@ -116,10 +106,8 @@ struct TorchOpBasicFields {
   uint64_t forward_tid_{0};
   at::RecordScope scope_{};
   bool is_async_{false};
-  uint64_t record_function_id_{0};
   int64_t debug_handle_{0};
   std::string name_;
-  std::string overload_name_;
 
   // Set in the exit callback.
   uint64_t end_tid_{0};
@@ -129,7 +117,6 @@ using jit_stack_t = std::vector<std::string>;
 using jit_modules_t = std::vector<std::string>;
 using extra_args_t = std::unordered_map<std::string, c10::IValue>;
 using extra_meta_t = std::unordered_map<std::string, std::string>;
-using kwinputs_t = std::unordered_map<std::string, c10::IValue>;
 
 struct FallbackPair {
   ProfilerVoidEventStub device_event_start_ = nullptr;
@@ -148,7 +135,6 @@ struct ExtraFields<EventType::TorchOp> : TorchOpBasicFields {
       jit_modules_t&& jit_modules,
       extra_args_t&& extra_args,
       extra_meta_t&& extra_meta,
-      kwinputs_t&& kwinputs,
       FallbackPair&& device_fallback,
       bool allow_tf32_cublas,
       std::unique_ptr<perf_counters_t>&& perf_event_counters)
@@ -161,7 +147,6 @@ struct ExtraFields<EventType::TorchOp> : TorchOpBasicFields {
         jit_modules_{std::move(jit_modules)},
         extra_args_{std::move(extra_args)},
         extra_meta_{std::move(extra_meta)},
-        kwinputs_{std::move(kwinputs)},
         device_fallback_{std::move(device_fallback)},
         allow_tf32_cublas_{allow_tf32_cublas},
         perf_event_counters_{std::move(perf_event_counters)} {}
@@ -173,7 +158,6 @@ struct ExtraFields<EventType::TorchOp> : TorchOpBasicFields {
   jit_modules_t jit_modules_;
   extra_args_t extra_args_;
   extra_meta_t extra_meta_;
-  kwinputs_t kwinputs_;
   FallbackPair device_fallback_;
   bool allow_tf32_cublas_;
   std::unique_ptr<perf_counters_t> perf_event_counters_;
@@ -212,9 +196,7 @@ struct RawAllocation {
 };
 
 // For performance.
-static_assert(
-    std::is_trivial_v<RawAllocation>,
-    "Non-Trivial member of RawAllocation.");
+static_assert(c10::is_pod_v<RawAllocation>, "Non-POD member of RawAllocation.");
 
 template <>
 struct ExtraFields<EventType::Allocation> : RawAllocation {
@@ -224,8 +206,8 @@ struct ExtraFields<EventType::Allocation> : RawAllocation {
     return {device_type_, device_index_};
   }
 
-  std::optional<TensorID> id_;
-  std::optional<AllocationID> allocation_id_;
+  c10::optional<TensorID> id_;
+  c10::optional<AllocationID> allocation_id_;
 };
 
 template <>
@@ -240,8 +222,8 @@ struct ExtraFields<EventType::OutOfMemory> {
 
 // For performance.
 static_assert(
-    std::is_trivial_v<ExtraFields<EventType::OutOfMemory>>,
-    "Non-Trivial member of ExtraFields<EventType::OutOfMemory>.");
+    c10::is_pod_v<ExtraFields<EventType::OutOfMemory>>,
+    "Non-POD member of ExtraFields<EventType::OutOfMemory>.");
 
 struct PyFrameState {
   int line_no_;
@@ -263,7 +245,7 @@ struct NNModuleInfo {
   struct ParameterInfo {
     std::string name_;
     TensorMetadata metadata_;
-    std::optional<TensorMetadata> grad_metadata_;
+    c10::optional<TensorMetadata> grad_metadata_;
   };
 
   PyModuleSelf self_;
@@ -278,7 +260,7 @@ struct NNModuleInfo {
 struct OptimizerInfo {
   struct ParameterInfo {
     TensorMetadata metadata_;
-    std::optional<TensorMetadata> grad_metadata_;
+    c10::optional<TensorMetadata> grad_metadata_;
     std::vector<std::pair<std::string, TensorMetadata>> state_;
   };
 
@@ -310,8 +292,8 @@ template <>
 struct ExtraFields<EventType::PyCall> : public PyExtraFieldsBase {
   struct args_t {
     PyFrameState frame_state_;
-    std::optional<NNModuleInfo> module_info_;
-    std::optional<OptimizerInfo> optimizer_info_;
+    c10::optional<NNModuleInfo> module_info_;
+    c10::optional<OptimizerInfo> optimizer_info_;
   };
 
   ExtraFields(
@@ -325,8 +307,8 @@ struct ExtraFields<EventType::PyCall> : public PyExtraFieldsBase {
         optimizer_{std::move(args.optimizer_info_)} {}
 
   PyFrameState callsite_;
-  std::optional<NNModuleInfo> module_;
-  std::optional<OptimizerInfo> optimizer_;
+  c10::optional<NNModuleInfo> module_;
+  c10::optional<OptimizerInfo> optimizer_;
 };
 
 template <>
@@ -357,7 +339,7 @@ struct ExtraFields<EventType::Kineto> {
   };
 
   std::string name_;
-  int64_t duration_ns_{0};
+  int64_t duration_us_{0};
   uint64_t correlation_id_{0};
   libkineto::ActivityType activity_type_;
   Flow flow;
@@ -381,7 +363,7 @@ struct TORCH_API Result : public std::enable_shared_from_this<Result> {
   }
 
   template <typename T, typename Fn>
-  void visit_if_base(const Fn& fn) const {
+  void visit_if_base(Fn&& fn) const {
     visit([&](const auto& extra_fields) {
       using extra_fields_t = typename std::remove_cv_t<
           typename std::remove_reference_t<decltype(extra_fields)>>;
@@ -397,7 +379,6 @@ struct TORCH_API Result : public std::enable_shared_from_this<Result> {
   }
 
   std::string name() const;
-  std::string overload_name() const;
   libkineto::ActivityType kinetoType() const;
   uint64_t correlationID() const;
   int64_t endTimeNS() const;
@@ -453,7 +434,6 @@ struct KinetoObserverContext : public at::ObserverContext {
 
     bool allow_tf32_cublas_;
     std::unique_ptr<perf_counters_t> counters_;
-    extra_meta_t* extra_nccl_meta_{};
   };
 
   explicit KinetoObserverContext(Event* event) : event_{event} {}
@@ -575,7 +555,6 @@ class TORCH_API ThreadLocalSubqueue {
     // NB: This is a destructive operation.
     void materialize(
         std::vector<std::shared_ptr<Result>>& out,
-        std::vector<ProfilerStepInfo>& step_info,
         const std::function<c10::time_t(c10::approx_time_t)>& time_converter,
         const uint64_t tid,
         const kineto::DeviceAndResource& kineto_info);
@@ -613,9 +592,6 @@ class TORCH_API ThreadLocalSubqueue {
     // report extra metadata, i.e. collective communication meta
     AppendOnlyList<extra_meta_t, BlockSize> extra_meta_;
 
-    // report kwinputs
-    AppendOnlyList<kwinputs_t, BlockSize> kwinputs_;
-
     // ProfilerState::KINETO_GPU_FALLBACK or
     // ProfilerState::KINETO_PRIVATEUSE1_FALLBACK
     AppendOnlyList<FallbackPair, BlockSize> device_fallback_;
@@ -648,7 +624,6 @@ class TORCH_API RecordQueue {
   bool tracePython() const;
   ThreadLocalSubqueue* getSubqueue();
   void stop();
-  void restart();
 
   // NB: This is a destructive operation.
   std::pair<
@@ -656,8 +631,8 @@ class TORCH_API RecordQueue {
       std::unique_ptr<torch::profiler::impl::kineto::ActivityTraceWrapper>>
   getRecords(
       std::function<c10::time_t(c10::approx_time_t)> time_converter,
-      uint64_t start_time_ns,
-      uint64_t end_time_ns);
+      uint64_t start_time_us,
+      uint64_t end_time_us);
 
  private:
   uint32_t id_;
@@ -681,10 +656,6 @@ TORCH_API bool get_cuda_sync_enabled();
 TORCH_API void set_cuda_sync_enabled_fn(std::function<bool()>);
 TORCH_API void set_cuda_sync_enabled_val(bool);
 
-// Comms related RecordFunctions will record information about tensor storage
-// locations.
-TORCH_API bool get_record_tensor_addrs_enabled();
-TORCH_API void set_record_tensor_addrs_enabled_fn(std::function<bool()>);
-TORCH_API void set_record_tensor_addrs_enabled_val(bool);
-
-} // namespace torch::profiler::impl
+} // namespace impl
+} // namespace profiler
+} // namespace torch

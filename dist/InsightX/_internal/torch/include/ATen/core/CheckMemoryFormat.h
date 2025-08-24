@@ -1,13 +1,14 @@
 #include <c10/core/TensorOptions.h>
 
-namespace c10::impl {
+namespace c10 { namespace impl {
 
-inline std::optional<MemoryFormat>
+inline c10::optional<MemoryFormat>
 check_tensor_options_and_extract_memory_format(
     const TensorOptions& options,
-    std::optional<MemoryFormat> memory_format) {
+    c10::optional<MemoryFormat> memory_format) {
   TORCH_CHECK(
-      options.requires_grad_opt() != true,
+      options.requires_grad_opt() == c10::nullopt ||
+      options.requires_grad_opt().value() == false,
       "Operators taking TensorOptions cannot take a TensorOptions with "
       "options.requires_grad set as true. This isn't implemented yet.");
   TORCH_CHECK(
@@ -21,4 +22,4 @@ check_tensor_options_and_extract_memory_format(
   }
 }
 
-} // namespace impl namespace c10
+}} // namespace impl namespace c10

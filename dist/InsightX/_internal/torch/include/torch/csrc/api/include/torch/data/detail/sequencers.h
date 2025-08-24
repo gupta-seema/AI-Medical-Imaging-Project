@@ -6,12 +6,15 @@
 #include <cstddef>
 #include <vector>
 
-namespace torch::data::detail::sequencers {
+namespace torch {
+namespace data {
+namespace detail {
+namespace sequencers {
 namespace detail {
 template <typename Result>
-bool buffer_contains_result(const std::vector<std::optional<Result>>& buffer) {
+bool buffer_contains_result(const std::vector<optional<Result>>& buffer) {
   return std::any_of(
-      buffer.begin(), buffer.end(), [](const std::optional<Result>& result) {
+      buffer.begin(), buffer.end(), [](const optional<Result>& result) {
         return result.has_value();
       });
 }
@@ -24,9 +27,9 @@ bool buffer_contains_result(const std::vector<std::optional<Result>>& buffer) {
 /// buffers results internally to return them in order of their sequence number.
 template <typename Result>
 struct Sequencer {
-  using ResultProducer = std::function<std::optional<Result>()>;
+  using ResultProducer = std::function<optional<Result>()>;
   virtual ~Sequencer() = default;
-  virtual std::optional<Result> next(ResultProducer next_result) = 0;
+  virtual optional<Result> next(ResultProducer next_result) = 0;
 };
 
 /// A `Sequencer` that does not enforce any ordering. It is effectively the
@@ -34,7 +37,7 @@ struct Sequencer {
 template <typename Result>
 struct NoSequencer final : public Sequencer<Result> {
   using typename Sequencer<Result>::ResultProducer;
-  std::optional<Result> next(ResultProducer next_result) override {
+  optional<Result> next(ResultProducer next_result) override {
     return next_result();
   }
 };
@@ -65,7 +68,7 @@ struct OrderedSequencer : public Sequencer<Result> {
   explicit OrderedSequencer(size_t max_jobs) : buffer_(max_jobs) {}
 
   /// Buffers results until the next one in the expected order is received.
-  std::optional<Result> next(ResultProducer next_result) override {
+  optional<Result> next(ResultProducer next_result) override {
     // If we already have the result for the next sqn, return it.
     if (auto& maybe_result = buffer(next_sequence_number_)) {
       auto result = std::move(*maybe_result);
@@ -90,11 +93,11 @@ struct OrderedSequencer : public Sequencer<Result> {
       buffer(result->sequence_number) = std::move(result);
     }
     // The result was an empty optional, so we are done with this epoch.
-    return std::nullopt;
+    return nullopt;
   }
 
   /// Accesses the buffer at the `index` modulo the buffer size.
-  std::optional<Result>& buffer(size_t index) {
+  optional<Result>& buffer(size_t index) {
     return buffer_.at(index % buffer_.size());
   }
 
@@ -102,6 +105,9 @@ struct OrderedSequencer : public Sequencer<Result> {
   size_t next_sequence_number_ = 0;
 
   /// A fixed-size buffer (after construction).
-  std::vector<std::optional<Result>> buffer_;
+  std::vector<optional<Result>> buffer_;
 };
-} // namespace torch::data::detail::sequencers
+} // namespace sequencers
+} // namespace detail
+} // namespace data
+} // namespace torch

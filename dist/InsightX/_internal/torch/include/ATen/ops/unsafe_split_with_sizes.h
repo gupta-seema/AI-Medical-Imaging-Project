@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline ::std::vector<at::Tensor> unsafe_split_with_sizes(const at::Tensor & self
     return at::_ops::unsafe_split_with_sizes::call(self, c10::fromIntArrayRefSlow(split_sizes), dim);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   ::std::vector<at::Tensor> unsafe_split_with_sizes(const at::Tensor & self, at::IntArrayRef split_sizes, int64_t dim=0) {
     return at::_ops::unsafe_split_with_sizes::call(self, c10::fromIntArrayRefSlow(split_sizes), dim);
   }
@@ -39,7 +38,7 @@ inline ::std::vector<at::Tensor> unsafe_split_with_sizes_symint(const at::Tensor
     return at::_ops::unsafe_split_with_sizes::call(self, split_sizes, dim);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   ::std::vector<at::Tensor> unsafe_split_with_sizes(const at::Tensor & self, c10::SymIntArrayRef split_sizes, int64_t dim=0) {
     return at::_ops::unsafe_split_with_sizes::call(self, split_sizes, dim);
   }
@@ -50,7 +49,7 @@ inline void unsafe_split_with_sizes_out(at::TensorList out, const at::Tensor & s
     return at::_ops::unsafe_split_with_sizes_out::call(self, c10::fromIntArrayRefSlow(split_sizes), dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   void unsafe_split_with_sizes_out(at::TensorList out, const at::Tensor & self, at::IntArrayRef split_sizes, int64_t dim=0) {
     return at::_ops::unsafe_split_with_sizes_out::call(self, c10::fromIntArrayRefSlow(split_sizes), dim, out);
   }
@@ -61,7 +60,7 @@ inline void unsafe_split_with_sizes_outf(const at::Tensor & self, at::IntArrayRe
     return at::_ops::unsafe_split_with_sizes_out::call(self, c10::fromIntArrayRefSlow(split_sizes), dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   void unsafe_split_with_sizes_outf(const at::Tensor & self, at::IntArrayRef split_sizes, int64_t dim, at::TensorList out) {
     return at::_ops::unsafe_split_with_sizes_out::call(self, c10::fromIntArrayRefSlow(split_sizes), dim, out);
   }
@@ -72,7 +71,7 @@ inline void unsafe_split_with_sizes_symint_out(at::TensorList out, const at::Ten
     return at::_ops::unsafe_split_with_sizes_out::call(self, split_sizes, dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   void unsafe_split_with_sizes_out(at::TensorList out, const at::Tensor & self, c10::SymIntArrayRef split_sizes, int64_t dim=0) {
     return at::_ops::unsafe_split_with_sizes_out::call(self, split_sizes, dim, out);
   }
@@ -83,7 +82,7 @@ inline void unsafe_split_with_sizes_symint_outf(const at::Tensor & self, c10::Sy
     return at::_ops::unsafe_split_with_sizes_out::call(self, split_sizes, dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   void unsafe_split_with_sizes_outf(const at::Tensor & self, c10::SymIntArrayRef split_sizes, int64_t dim, at::TensorList out) {
     return at::_ops::unsafe_split_with_sizes_out::call(self, split_sizes, dim, out);
   }

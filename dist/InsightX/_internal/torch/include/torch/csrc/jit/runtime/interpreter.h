@@ -1,6 +1,6 @@
 #pragma once
+#include <c10/util/Optional.h>
 #include <memory>
-#include <optional>
 #include <vector>
 
 #include <ATen/ThreadLocalState.h>
@@ -9,8 +9,8 @@
 #include <torch/csrc/Export.h>
 #include <torch/csrc/jit/frontend/source_range.h>
 
-TORCH_DECLARE_bool(torch_jit_disable_warning_prints);
-TORCH_DECLARE_bool(torch_jit_enable_rethrow_caught_exception);
+C10_DECLARE_bool(torch_jit_disable_warning_prints);
+C10_DECLARE_bool(torch_jit_enable_rethrow_caught_exception);
 
 namespace at {
 class Tensor;
@@ -39,8 +39,6 @@ struct Instruction;
 using Stack = std::vector<c10::IValue>;
 using c10::ivalue::Future;
 using TaskLauncher = std::function<void(std::function<void()>)>;
-
-bool TORCH_API in_torchscript_runtime();
 
 struct TORCH_API Code {
   Code() = default;
@@ -111,6 +109,7 @@ struct Suspend : public std::exception {
     return "Suspend";
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   explicit Suspend(c10::intrusive_ptr<Future> future_)
       : future(std::move(future_)) {}
 
@@ -125,7 +124,7 @@ struct InterpreterContinuation {
       InterpreterState state_,
       Stack stack_,
       int64_t dist_autograd_context_id = 0,
-      std::optional<at::ThreadLocalState> tls_state = std::nullopt)
+      c10::optional<at::ThreadLocalState> tls_state = c10::nullopt)
       : state(std::move(state_)),
         stack(std::move(stack_)),
         tls_state_(std::move(tls_state))
@@ -141,7 +140,7 @@ struct InterpreterContinuation {
  private:
   InterpreterState state;
   Stack stack;
-  std::optional<at::ThreadLocalState> tls_state_ = std::nullopt;
+  c10::optional<at::ThreadLocalState> tls_state_ = c10::nullopt;
 #ifdef USE_DISTRIBUTED
   int64_t dist_autograd_context_id_;
 #endif

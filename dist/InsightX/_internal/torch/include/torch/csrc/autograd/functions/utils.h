@@ -13,7 +13,8 @@
 #include <memory>
 #include <vector>
 
-namespace torch::autograd {
+namespace torch {
+namespace autograd {
 
 using function_constructor = std::function<std::shared_ptr<Node>(edge_list&&)>;
 
@@ -45,7 +46,7 @@ struct ComputeRequiresGrad : IterArgs<ComputeRequiresGrad> {
       out = true;
     }
   }
-  void operator()(const std::optional<at::Tensor>& tensor) {
+  void operator()(const c10::optional<at::Tensor>& tensor) {
     if (tensor.has_value()) {
       (*this)(*tensor);
     }
@@ -71,10 +72,7 @@ inline void set_history(
     // If the codegen triggers this, you most likely want to add your newly
     // added function to the DONT_REQUIRE_DERIVATIVE list in
     // tools/autograd/gen_variable_type.py
-    TORCH_CHECK(
-        isDifferentiableType(variable.scalar_type()),
-        "Autograd not support dtype: ",
-        variable.scalar_type());
+    TORCH_INTERNAL_ASSERT(isDifferentiableType(variable.scalar_type()));
     auto output_nr = grad_fn->add_input_metadata(variable);
     impl::set_gradient_edge(variable, {grad_fn, output_nr});
   } else {
@@ -90,7 +88,7 @@ inline void set_history(
   }
 }
 
-inline bool isFwGradDefined(const std::optional<at::Tensor>& t) {
+inline bool isFwGradDefined(const c10::optional<at::Tensor>& t) {
   return t.has_value() && t->defined() && t->_fw_grad(/*level */ 0).defined();
 }
 
@@ -103,13 +101,14 @@ inline bool isFwGradDefinedTensorList(const at::ITensorListRef& variables) {
 }
 
 inline bool isFwGradDefinedTensorList(
-    const c10::List<std::optional<at::Tensor>>& li) {
+    const c10::List<c10::optional<at::Tensor>>& li) {
   bool ret = false;
   for (auto i : c10::irange(li.size())) {
     auto t = li.get(i);
-    ret |= isFwGradDefined(t);
+    ret |= (t.has_value() && isFwGradDefined(t.value()));
   }
   return ret;
 }
 
-} // namespace torch::autograd
+} // namespace autograd
+} // namespace torch

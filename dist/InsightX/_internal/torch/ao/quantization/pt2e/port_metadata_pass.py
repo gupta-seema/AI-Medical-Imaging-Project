@@ -1,15 +1,17 @@
-# mypy: allow-untyped-defs
 import logging
 from typing import Optional
 
 import torch
 from torch._export.error import InternalError
+
 from torch.ao.quantization.pt2e.utils import (
     _filter_sym_size_users,
     _find_q_dq_node_for_user,
     _is_valid_annotation,
 )
+
 from torch.ao.quantization.quantizer import QuantizationSpecBase
+
 from torch.fx.passes.infra.pass_base import PassBase, PassResult
 
 
@@ -27,20 +29,12 @@ _QUANTIZE_OPS = [
     torch.ops.quantized_decomposed.quantize_per_tensor.default,
     torch.ops.quantized_decomposed.quantize_per_tensor.tensor,
     torch.ops.quantized_decomposed.quantize_per_channel.default,
-    torch.ops.pt2e_quant.quantize_affine,
 ]
 
 _DEQUANTIZE_OPS = [
     torch.ops.quantized_decomposed.dequantize_per_tensor.default,
     torch.ops.quantized_decomposed.dequantize_per_tensor.tensor,
     torch.ops.quantized_decomposed.dequantize_per_channel.default,
-    torch.ops.pt2e_quant.dequantize_affine,
-]
-
-_CHOOSE_QPARAMS_OPS = [
-    torch.ops.quantized_decomposed.choose_qparams.tensor,
-    torch.ops.quantized_decomposed.choose_qparams_symmetric.tensor,
-    torch.ops.pt2e_quant.choose_qparams_affine,
 ]
 
 
@@ -64,7 +58,10 @@ def _find_choose_qparams_node(node: torch.fx.Node) -> Optional[torch.fx.Node]:
         n = queue.popleft()
         if n.op == "output":
             continue
-        if n.op == "call_function" and n.target in _CHOOSE_QPARAMS_OPS:
+        if (
+            n.op == "call_function"
+            and n.target == torch.ops.quantized_decomposed.choose_qparams.tensor
+        ):
             return n
         for k in n.users.keys():
             queue.append(k)
@@ -104,25 +101,10 @@ def _port_metadata_for_input_quant_nodes(
         # if the q_node can be traced back to get_attr node
         q_to_get_attr_nodes = [q_node]
         q_node_input = q_node.args[0]
-        while (
-            isinstance(q_node_input, torch.fx.Node)
-            and q_node_input.op == "call_function"
-            and q_node_input.target
-            in [
-                torch.ops.aten.flatten.using_ints,
-                torch.ops.aten.permute.default,
-                torch.ops.aten.permute_copy.default,
-                torch.ops.aten.slice_copy.Tensor,
-                torch.ops.aten.squeeze.dim,
-                torch.ops.aten.squeeze_copy.dim,
-                torch.ops.aten.transpose.Dimname,
-                torch.ops.aten.transpose.int,
-                torch.ops.aten.transpose_,
-                torch.ops.aten.view_copy.default,
-                torch.ops.aten.view.default,
-                torch.ops.aten._mkldnn_transpose,
-            ]
-        ):
+        while isinstance(q_node_input, torch.fx.Node) and q_node_input.op not in [
+            "placeholder",
+            "get_attr",
+        ]:
             q_to_get_attr_nodes.append(q_node_input)
             q_node_input = q_node_input.args[0]
         if isinstance(q_node_input, torch.fx.Node) and q_node_input.op == "get_attr":
@@ -138,10 +120,8 @@ def _port_metadata_for_output_quant_nodes(
         return
 
     node_users = _filter_sym_size_users(node)
-    if len(node.users) == 0:
-        return
     if len(node_users) != 1:
-        logger.warning(f"Expecting {node} to have single user")  # noqa: G004
+        raise InternalError(f"Expecting {node} to have single user")
     q_node = node_users.pop()
     if q_node.op != "call_function" or q_node.target not in _QUANTIZE_OPS:
         logger.warning(

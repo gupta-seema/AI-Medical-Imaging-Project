@@ -6,7 +6,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
+#include <c10/util/Optional.h>
 #include <c10/core/QScheme.h>
 #include <ATen/core/Reduction.h>
 #include <ATen/core/Tensor.h>
@@ -17,6 +17,5 @@
 namespace at {
 namespace native {
 TORCH_API at::Tensor avg_pool1d(const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride={}, at::IntArrayRef padding=0, bool ceil_mode=false, bool count_include_pad=true);
-TORCH_API at::Tensor & avg_pool1d_out(const at::Tensor & self, at::IntArrayRef kernel_size, at::IntArrayRef stride, at::IntArrayRef padding, bool ceil_mode, bool count_include_pad, at::Tensor & out);
 } // namespace native
 } // namespace at

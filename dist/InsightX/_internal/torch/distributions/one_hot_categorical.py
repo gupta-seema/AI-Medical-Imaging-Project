@@ -1,13 +1,7 @@
-# mypy: allow-untyped-defs
-from typing import Optional
-
 import torch
-from torch import Tensor
 from torch.distributions import constraints
 from torch.distributions.categorical import Categorical
 from torch.distributions.distribution import Distribution
-from torch.types import _size
-
 
 __all__ = ["OneHotCategorical", "OneHotCategoricalStraightThrough"]
 
@@ -41,17 +35,11 @@ class OneHotCategorical(Distribution):
         probs (Tensor): event probabilities
         logits (Tensor): event log probabilities (unnormalized)
     """
-
     arg_constraints = {"probs": constraints.simplex, "logits": constraints.real_vector}
     support = constraints.one_hot
     has_enumerate_support = True
 
-    def __init__(
-        self,
-        probs: Optional[Tensor] = None,
-        logits: Optional[Tensor] = None,
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, probs=None, logits=None, validate_args=None):
         self._categorical = Categorical(probs, logits)
         batch_shape = self._categorical.batch_shape
         event_shape = self._categorical.param_shape[-1:]
@@ -71,33 +59,33 @@ class OneHotCategorical(Distribution):
         return self._categorical._new(*args, **kwargs)
 
     @property
-    def _param(self) -> Tensor:
+    def _param(self):
         return self._categorical._param
 
     @property
-    def probs(self) -> Tensor:
+    def probs(self):
         return self._categorical.probs
 
     @property
-    def logits(self) -> Tensor:
+    def logits(self):
         return self._categorical.logits
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return self._categorical.probs
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         probs = self._categorical.probs
-        mode = probs.argmax(dim=-1)
+        mode = probs.argmax(axis=-1)
         return torch.nn.functional.one_hot(mode, num_classes=probs.shape[-1]).to(probs)
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return self._categorical.probs * (1 - self._categorical.probs)
 
     @property
-    def param_shape(self) -> torch.Size:
+    def param_shape(self):
         return self._categorical.param_shape
 
     def sample(self, sample_shape=torch.Size()):
@@ -131,12 +119,11 @@ class OneHotCategoricalStraightThrough(OneHotCategorical):
     through gradient estimator from [1].
 
     [1] Estimating or Propagating Gradients Through Stochastic Neurons for Conditional Computation
-    (Bengio et al., 2013)
+    (Bengio et al, 2013)
     """
-
     has_rsample = True
 
-    def rsample(self, sample_shape: _size = torch.Size()) -> Tensor:
+    def rsample(self, sample_shape=torch.Size()):
         samples = self.sample(sample_shape)
         probs = self._categorical.probs  # cached via @lazy_property
         return samples + (probs - probs.detach())

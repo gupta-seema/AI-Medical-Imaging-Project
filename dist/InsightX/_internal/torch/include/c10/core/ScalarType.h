@@ -1,13 +1,12 @@
 #pragma once
 
 #include <c10/util/BFloat16.h>
+#include <c10/util/Deprecated.h>
 #include <c10/util/Exception.h>
-#include <c10/util/Float4_e2m1fn_x2.h>
 #include <c10/util/Float8_e4m3fn.h>
 #include <c10/util/Float8_e4m3fnuz.h>
 #include <c10/util/Float8_e5m2.h>
 #include <c10/util/Float8_e5m2fnuz.h>
-#include <c10/util/Float8_e8m0fnu.h>
 #include <c10/util/Half.h>
 #include <c10/util/bits.h>
 #include <c10/util/complex.h>
@@ -23,7 +22,6 @@
 #include <limits>
 #include <ostream>
 #include <type_traits>
-#include <unordered_map>
 
 namespace c10 {
 
@@ -31,11 +29,6 @@ namespace c10 {
 // of these dtypes will be implemented in python with Tensor subclass
 template <unsigned int N>
 struct dummy_uint1_7_t {};
-
-// dummy struct for int1 to int7, actual functionality
-// of these dtypes will be implemented in python with Tensor subclass
-template <unsigned int N>
-struct dummy_int1_7_t {};
 
 // For the macros below:
 //
@@ -96,16 +89,7 @@ struct dummy_int1_7_t {};
   _(c10::dummy_uint1_7_t<4>, UInt4) /* 33 */             \
   _(c10::dummy_uint1_7_t<5>, UInt5) /* 34 */             \
   _(c10::dummy_uint1_7_t<6>, UInt6) /* 35 */             \
-  _(c10::dummy_uint1_7_t<7>, UInt7) /* 36 */             \
-  _(c10::dummy_int1_7_t<1>, Int1) /* 37 */               \
-  _(c10::dummy_int1_7_t<2>, Int2) /* 38 */               \
-  _(c10::dummy_int1_7_t<3>, Int3) /* 39 */               \
-  _(c10::dummy_int1_7_t<4>, Int4) /* 40 */               \
-  _(c10::dummy_int1_7_t<5>, Int5) /* 41 */               \
-  _(c10::dummy_int1_7_t<6>, Int6) /* 42 */               \
-  _(c10::dummy_int1_7_t<7>, Int7) /* 43 */               \
-  _(c10::Float8_e8m0fnu, Float8_e8m0fnu) /* 44 */        \
-  _(c10::Float4_e2m1fn_x2, Float4_e2m1fn_x2) /* 45 */
+  _(c10::dummy_uint1_7_t<7>, UInt7) /* 36 */
 
 // If you want to support ComplexHalf for real, add ComplexHalf
 // into this macro (and change the name).  But beware: convert()
@@ -149,8 +133,7 @@ struct dummy_int1_7_t {};
   _(at::Float8_e5m2, Float8_e5m2)              \
   _(at::Float8_e4m3fn, Float8_e4m3fn)          \
   _(at::Float8_e5m2fnuz, Float8_e5m2fnuz)      \
-  _(at::Float8_e4m3fnuz, Float8_e4m3fnuz)      \
-  _(at::Float8_e8m0fnu, Float8_e8m0fnu)
+  _(at::Float8_e4m3fnuz, Float8_e4m3fnuz)
 
 enum class ScalarType : int8_t {
 #define DEFINE_ST_ENUM_VAL_(_1, n) n,
@@ -276,6 +259,87 @@ AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(SPECIALIZE_CppTypeToScalarType)
              ::c10::ScalarType::SCALARTYPE3>::t),                             \
     SCALARTYPE3)
 
+#define AT_FORALL_SCALAR_TYPES_AND4(                       \
+    SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, SCALARTYPE4, _) \
+  _(uint8_t, Byte)                                         \
+  _(int8_t, Char)                                          \
+  _(int16_t, Short)                                        \
+  _(int, Int)                                              \
+  _(int64_t, Long)                                         \
+  _(float, Float)                                          \
+  _(double, Double)                                        \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<             \
+             ::c10::ScalarType::SCALARTYPE1>::t),          \
+    SCALARTYPE1)                                           \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<             \
+             ::c10::ScalarType::SCALARTYPE2>::t),          \
+    SCALARTYPE2)                                           \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<             \
+             ::c10::ScalarType::SCALARTYPE3>::t),          \
+    SCALARTYPE3)                                           \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<             \
+             ::c10::ScalarType::SCALARTYPE4>::t),          \
+    SCALARTYPE4)
+
+#define AT_FORALL_SCALAR_TYPES_AND5(                                    \
+    SCALARTYPE1, SCALARTYPE2, SCALARTYPE3, SCALARTYPE4, SCALARTYPE5, _) \
+  _(uint8_t, Byte)                                                      \
+  _(int8_t, Char)                                                       \
+  _(int16_t, Short)                                                     \
+  _(int, Int)                                                           \
+  _(int64_t, Long)                                                      \
+  _(float, Float)                                                       \
+  _(double, Double)                                                     \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<                          \
+             ::c10::ScalarType::SCALARTYPE1>::t),                       \
+    SCALARTYPE1)                                                        \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<                          \
+             ::c10::ScalarType::SCALARTYPE2>::t),                       \
+    SCALARTYPE2)                                                        \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<                          \
+             ::c10::ScalarType::SCALARTYPE3>::t),                       \
+    SCALARTYPE3)                                                        \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<                          \
+             ::c10::ScalarType::SCALARTYPE4>::t),                       \
+    SCALARTYPE4)                                                        \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<                          \
+             ::c10::ScalarType::SCALARTYPE5>::t),                       \
+    SCALARTYPE5)
+
+#define AT_FORALL_SCALAR_TYPES_AND6(              \
+    SCALARTYPE1,                                  \
+    SCALARTYPE2,                                  \
+    SCALARTYPE3,                                  \
+    SCALARTYPE4,                                  \
+    SCALARTYPE5,                                  \
+    SCALARTYPE6,                                  \
+    _)                                            \
+  _(uint8_t, Byte)                                \
+  _(int8_t, Char)                                 \
+  _(int16_t, Short)                               \
+  _(int, Int)                                     \
+  _(int64_t, Long)                                \
+  _(float, Float)                                 \
+  _(double, Double)                               \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<    \
+             ::c10::ScalarType::SCALARTYPE1>::t), \
+    SCALARTYPE1)                                  \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<    \
+             ::c10::ScalarType::SCALARTYPE2>::t), \
+    SCALARTYPE2)                                  \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<    \
+             ::c10::ScalarType::SCALARTYPE3>::t), \
+    SCALARTYPE3)                                  \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<    \
+             ::c10::ScalarType::SCALARTYPE4>::t), \
+    SCALARTYPE4)                                  \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<    \
+             ::c10::ScalarType::SCALARTYPE5>::t), \
+    SCALARTYPE5)                                  \
+  _(decltype(::c10::impl::ScalarTypeToCPPType<    \
+             ::c10::ScalarType::SCALARTYPE6>::t), \
+    SCALARTYPE6)
+
 #define AT_FORALL_SCALAR_TYPES_AND7(              \
     SCALARTYPE1,                                  \
     SCALARTYPE2,                                  \
@@ -321,13 +385,6 @@ AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(SPECIALIZE_CppTypeToScalarType)
   _(c10::quint4x2, QUInt4x2)    \
   _(c10::quint2x4, QUInt2x4)
 
-#define AT_FORALL_FLOAT8_TYPES(_)         \
-  _(at::Float8_e5m2, Float8_e5m2)         \
-  _(at::Float8_e4m3fn, Float8_e4m3fn)     \
-  _(at::Float8_e5m2fnuz, Float8_e5m2fnuz) \
-  _(at::Float8_e4m3fnuz, Float8_e4m3fnuz) \
-  _(at::Float8_e8m0fnu, Float8_e8m0fnu)
-
 #define AT_FORALL_COMPLEX_TYPES(_)     \
   _(c10::complex<float>, ComplexFloat) \
   _(c10::complex<double>, ComplexDouble)
@@ -339,7 +396,7 @@ AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(SPECIALIZE_CppTypeToScalarType)
 AT_FORALL_SCALAR_TYPES_WITH_COMPLEX_AND_QINTS(DEFINE_CONSTANT)
 #undef DEFINE_CONSTANT
 
-inline const char* toString(ScalarType t) {
+static inline const char* toString(ScalarType t) {
 #define DEFINE_CASE(_, name) \
   case ScalarType::name:     \
     return #name;
@@ -352,7 +409,7 @@ inline const char* toString(ScalarType t) {
 #undef DEFINE_CASE
 }
 
-inline size_t elementSize(ScalarType t) {
+static inline size_t elementSize(ScalarType t) {
 #define CASE_ELEMENTSIZE_CASE(ctype, name) \
   case ScalarType::name:                   \
     return sizeof(ctype);
@@ -365,7 +422,7 @@ inline size_t elementSize(ScalarType t) {
 #undef CASE_ELEMENTSIZE_CASE
 }
 
-inline bool isIntegralType(ScalarType t, bool includeBool) {
+static inline bool isIntegralType(ScalarType t, bool includeBool) {
   bool isIntegral =
       (t == ScalarType::Byte || t == ScalarType::Char || t == ScalarType::Int ||
        t == ScalarType::Long || t == ScalarType::Short ||
@@ -375,48 +432,46 @@ inline bool isIntegralType(ScalarType t, bool includeBool) {
   return isIntegral || (includeBool && t == ScalarType::Bool);
 }
 
-[[deprecated(
-    "isIntegralType is deprecated. Please use the overload with 'includeBool' parameter instead.")]] inline bool
-isIntegralType(ScalarType t) {
+C10_DEPRECATED_MESSAGE(
+    "isIntegralType is deprecated. Please use the overload with 'includeBool' parameter instead.")
+static inline bool isIntegralType(ScalarType t) {
   return isIntegralType(t, /*includeBool=*/false);
 }
 
-inline bool isFloat8Type(ScalarType t) {
+static inline bool isFloat8Type(ScalarType t) {
   return t == ScalarType::Float8_e5m2 || t == ScalarType::Float8_e5m2fnuz ||
-      t == ScalarType::Float8_e4m3fn || t == ScalarType::Float8_e4m3fnuz ||
-      t == ScalarType::Float8_e8m0fnu;
+      t == ScalarType::Float8_e4m3fn || t == ScalarType::Float8_e4m3fnuz;
 }
 
-inline bool isReducedFloatingType(ScalarType t) {
-  return t == ScalarType::Half || t == ScalarType::BFloat16 ||
-      isFloat8Type(t) || t == ScalarType::Float4_e2m1fn_x2;
+static inline bool isReducedFloatingType(ScalarType t) {
+  return t == ScalarType::Half || t == ScalarType::BFloat16 || isFloat8Type(t);
 }
 
-inline bool isFloatingType(ScalarType t) {
+static inline bool isFloatingType(ScalarType t) {
   return t == ScalarType::Double || t == ScalarType::Float ||
       isReducedFloatingType(t);
 }
 
-inline bool isComplexType(ScalarType t) {
+static inline bool isComplexType(ScalarType t) {
   return (
       t == ScalarType::ComplexHalf || t == ScalarType::ComplexFloat ||
       t == ScalarType::ComplexDouble);
 }
 
-inline bool isQIntType(ScalarType t) {
+static inline bool isQIntType(ScalarType t) {
   // Don't forget to extend this when adding new QInt types
   return t == ScalarType::QInt8 || t == ScalarType::QUInt8 ||
       t == ScalarType::QInt32 || t == ScalarType::QUInt4x2 ||
       t == ScalarType::QUInt2x4;
 }
 
-inline bool isBitsType(ScalarType t) {
+static inline bool isBitsType(ScalarType t) {
   return t == ScalarType::Bits1x8 || t == ScalarType::Bits2x4 ||
       t == ScalarType::Bits4x2 || t == ScalarType::Bits8 ||
       t == ScalarType::Bits16;
 }
 
-inline bool isBarebonesUnsignedType(ScalarType t) {
+static inline bool isBarebonesUnsignedType(ScalarType t) {
   return t == ScalarType::UInt1 || t == ScalarType::UInt2 ||
       t == ScalarType::UInt3 || t == ScalarType::UInt4 ||
       t == ScalarType::UInt5 || t == ScalarType::UInt6 ||
@@ -424,7 +479,7 @@ inline bool isBarebonesUnsignedType(ScalarType t) {
       t == ScalarType::UInt32 || t == ScalarType::UInt64;
 }
 
-inline ScalarType toQIntType(ScalarType t) {
+static inline ScalarType toQIntType(ScalarType t) {
   switch (t) {
     case ScalarType::Byte:
       return ScalarType::QUInt8;
@@ -437,7 +492,7 @@ inline ScalarType toQIntType(ScalarType t) {
   }
 }
 
-inline ScalarType toUnderlying(ScalarType t) {
+static inline ScalarType toUnderlying(ScalarType t) {
   switch (t) {
     case ScalarType::QUInt8:
     case ScalarType::QUInt4x2:
@@ -453,82 +508,43 @@ inline ScalarType toUnderlying(ScalarType t) {
   }
 }
 
-inline bool isSignedType(ScalarType t) {
-#define CASE_ISSIGNED(name)     \
-  case ScalarType::name:        \
-    return std::numeric_limits< \
-        ::c10::impl::ScalarTypeToCPPTypeT<ScalarType::name>>::is_signed;
+static inline bool isSignedType(ScalarType t) {
+  TORCH_CHECK(!isQIntType(t), "isSignedType not supported for quantized types");
+#define CASE_SIGNED(ctype, name) \
+  case ScalarType::name:         \
+    return std::numeric_limits<ctype>::is_signed;
 
-  // TODO(#146647): If we expect to have numeric_limits for everything,
-  // let's just have a big macro for the whole thing.
-  // If we're hardcoding it, let's just use the macro and a "true"/"false"
-  // below?
   switch (t) {
-    case ScalarType::QInt8:
-    case ScalarType::QUInt8:
-    case ScalarType::QInt32:
-    case ScalarType::QUInt4x2:
-    case ScalarType::QUInt2x4:
-      TORCH_CHECK(false, "isSignedType not supported for quantized types");
     case ScalarType::Bits1x8:
     case ScalarType::Bits2x4:
     case ScalarType::Bits4x2:
     case ScalarType::Bits8:
     case ScalarType::Bits16:
       TORCH_CHECK(false, "Bits types are undefined");
-      CASE_ISSIGNED(UInt16);
-      CASE_ISSIGNED(UInt32);
-      CASE_ISSIGNED(UInt64);
-      CASE_ISSIGNED(BFloat16);
-      CASE_ISSIGNED(Float8_e5m2);
-      CASE_ISSIGNED(Float8_e5m2fnuz);
-      CASE_ISSIGNED(Float8_e4m3fn);
-      CASE_ISSIGNED(Float8_e4m3fnuz);
-      CASE_ISSIGNED(Float8_e8m0fnu);
-      CASE_ISSIGNED(Byte);
-      CASE_ISSIGNED(Char);
-      CASE_ISSIGNED(Short);
-      CASE_ISSIGNED(Int);
-      CASE_ISSIGNED(Long);
-      CASE_ISSIGNED(Half);
-      CASE_ISSIGNED(Float);
-      CASE_ISSIGNED(Double);
-      CASE_ISSIGNED(ComplexHalf);
-      CASE_ISSIGNED(ComplexFloat);
-      CASE_ISSIGNED(ComplexDouble);
-      CASE_ISSIGNED(Bool);
-    case ScalarType::Int1:
-    case ScalarType::Int2:
-    case ScalarType::Int3:
-    case ScalarType::Int4:
-    case ScalarType::Int5:
-    case ScalarType::Int6:
-    case ScalarType::Int7:
-    case ScalarType::Float4_e2m1fn_x2:
+    case ScalarType::ComplexHalf:
+    case ScalarType::ComplexFloat:
+    case ScalarType::ComplexDouble:
       return true;
-    case ScalarType::UInt1:
-    case ScalarType::UInt2:
-    case ScalarType::UInt3:
-    case ScalarType::UInt4:
-    case ScalarType::UInt5:
-    case ScalarType::UInt6:
-    case ScalarType::UInt7:
-      return false;
-    case ScalarType::Undefined:
-    case ScalarType::NumOptions:
-      break;
-      // Do not add default here, but rather define behavior of every new entry
-      // here.  `-Wswitch-enum` would raise a warning in those cases.
+      AT_FORALL_SCALAR_TYPES_AND7(
+          Half,
+          Bool,
+          BFloat16,
+          Float8_e5m2,
+          Float8_e4m3fn,
+          Float8_e5m2fnuz,
+          Float8_e4m3fnuz,
+          CASE_SIGNED)
+    default:
+      TORCH_CHECK(false, "Unknown ScalarType");
   }
-  TORCH_CHECK(false, "Unknown ScalarType ", t);
-#undef CASE_ISSIGNED
+#undef CASE_SIGNED
 }
 
-inline bool isUnderlying(ScalarType type, ScalarType qtype) {
+static inline bool isUnderlying(ScalarType type, ScalarType qtype) {
   return type == toUnderlying(qtype);
 }
 
-inline ScalarType toRealValueType(ScalarType t) {
+static inline ScalarType toRealValueType(ScalarType t) {
   switch (t) {
     case ScalarType::ComplexHalf:
       return ScalarType::Half;
@@ -541,7 +557,7 @@ inline ScalarType toRealValueType(ScalarType t) {
   }
 }
 
-inline ScalarType toComplexType(ScalarType t) {
+static inline ScalarType toComplexType(ScalarType t) {
   switch (t) {
     case ScalarType::BFloat16:
       // BFloat16 has range equivalent to Float,
@@ -566,7 +582,7 @@ inline ScalarType toComplexType(ScalarType t) {
 
 // see tensor_attributes.rst for detailed explanation and examples
 // of casting rules.
-inline bool canCast(const ScalarType from, const ScalarType to) {
+static inline bool canCast(const ScalarType from, const ScalarType to) {
   // We disallow complex -> non complex, e.g., float_tensor *= complex is
   // disallowed.
   if (isComplexType(from) && !isComplexType(to)) {
@@ -600,13 +616,5 @@ inline std::ostream& operator<<(
     at::ScalarType scalar_type) {
   return stream << toString(scalar_type);
 }
-
-// Returns a pair of strings representing the names for each dtype.
-// The returned pair is (name, legacy_name_if_applicable)
-C10_API std::pair<std::string, std::string> getDtypeNames(
-    c10::ScalarType scalarType);
-
-// Returns a map of string name to dtype.
-C10_API const std::unordered_map<std::string, ScalarType>& getStringToDtypeMap();
 
 } // namespace c10

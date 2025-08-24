@@ -10,7 +10,8 @@
 #include <unordered_map>
 #include <utility>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 struct QuantFusionInfo {
   std::string quantized_op_name;
@@ -25,9 +26,7 @@ std::string getExtraArgList(std::vector<std::string> extra_args) {
       extra_args.begin(),
       extra_args.end(),
       std::string(),
-      [](const std::string& acc, const std::string& arg) {
-        return acc + ", " + arg;
-      });
+      [](std::string acc, const std::string& arg) { return acc + ", " + arg; });
 }
 
 // Get the pattern we want to replace the match with
@@ -76,7 +75,8 @@ std::string getQuantizeForScalar(const std::string& value) {
           )" +
       value + "_tensor : Tensor = aten::scalar_tensor(" + value + ", " + value +
       "_float_scalar_type";
-  for ([[maybe_unused]] const auto i : c10::irange(3)) {
+  for (const auto i : c10::irange(3)) {
+    (void)i; // Suppress unused variable warning
     quantize_pattern += ", " + value + "_none";
   }
   quantize_pattern += ")";
@@ -808,6 +808,13 @@ graph(%a_quant, %alpha, %scale, %input_scale, %r_scale, %r_zero_point, %r_dtype)
        "%count_include_pad",
        "%divisor_override"});
 
+  std::string common_general_value_op = R"(
+          %r_scale : float = aten::q_scale(%a_quant)
+          %r_zero_point : int = aten::q_zero_point(%a_quant)
+          %r_dtype : int = prim::dtype(%a_quant)
+          %r_quant = aten::quantize_per_tensor(%r, %r_scale, %r_zero_point, %r_dtype)
+          return (%r_quant) )";
+
   auto avg_pool3d = getInputTensorQParamOpFusionInfo(
       "aten::avg_pool3d",
       {"%kernel_size",
@@ -1261,4 +1268,5 @@ graph(%a_dequant, %w_quant, %b, %stride, %padding, %output_padding, %groups, %di
        std::move(conv_transpose2d_with_quant_prepack)}};
 }
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

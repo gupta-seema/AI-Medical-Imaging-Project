@@ -1,11 +1,9 @@
-# mypy: allow-untyped-defs
 import gc
-import typing
+from typing import Optional
 
 import torch
-
+from torch.utils import _pytree
 from .._utils import _dummy_type
-
 
 if not hasattr(torch._C, "_CudaStreamBase"):
     # Define dummy base classes
@@ -46,32 +44,12 @@ def graph_pool_handle():
 class CUDAGraph(torch._C._CUDAGraph):
     r"""Wrapper around a CUDA graph.
 
-    Arguments:
-        keep_graph (bool, optional): If ``keep_graph=False``, the
-            cudaGraphExec_t will be instantiated on GPU at the end of
-            ``capture_end`` and the underlying cudaGraph_t will be
-            destroyed. Users who want to query or otherwise modify the
-            underlying cudaGraph_t before instantiatiation can set
-            ``keep_graph=True`` and access it via ``raw_cuda_graph`` after
-            ``capture_end``. Note that the cudaGraphExec_t will not be
-            instantiated at the end of ``capture_end`` in this
-            case. Instead, it wil be instantiated via an explicit called
-            to ``instantiate`` or automatically on the first call to
-            ``replay`` if ``instantiate`` was not already called. Calling
-            ``instantiate`` manually before ``replay`` is recommended to
-            prevent increased latency on the first call to ``replay``. It
-            is allowed to modify the raw cudaGraph_t after first calling
-            ``instantiate``, but the user must call ``instantiate`` again
-            manually to make sure the instantiated graph has these
-            changes. Pytorch has no means of tracking these changes.
-
     .. warning::
         This API is in beta and may change in future releases.
-
     """
 
-    def __new__(cls, keep_graph=False):
-        return super().__new__(cls, keep_graph)
+    def __new__(cls):
+        return super().__new__(cls)
 
     def capture_begin(self, pool=None, capture_error_mode="global"):
         r"""Begin capturing CUDA work on the current stream.
@@ -103,15 +81,6 @@ class CUDAGraph(torch._C._CUDAGraph):
         """
         super().capture_end()
 
-    def instantiate(self):
-        r"""Instantiate the CUDA graph. Will be called by
-        ``capture_end`` if ``keep_graph=False``, or by ``replay`` if
-        ``keep_graph=True`` and ``instantiate`` has not already been
-        explicitly called. Does not destroy the cudaGraph_t returned
-        by ``raw_cuda_graph``.
-        """
-        super().instantiate()
-
     def replay(self):
         r"""Replay the CUDA work captured by this graph."""
         super().replay()
@@ -141,13 +110,6 @@ class CUDAGraph(torch._C._CUDAGraph):
         enabled via CUDAGraph.enable_debug_mode()
         """
         return super().debug_dump(debug_path)
-
-    def raw_cuda_graph(self):
-        r"""Returns the underlying cudaGraph_t. ``keep_graph`` must be True.
-
-        See the following for APIs for how to manipulate this object: `Graph Managmement <https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__GRAPH.html>`_ and `cuda-python Graph Management bindings <https://nvidia.github.io/cuda-python/cuda-bindings/latest/module/runtime.html#graph-management>`_
-        """  # noqa: B950
-        return super().raw_cuda_graph()
 
 
 class graph:
@@ -180,7 +142,7 @@ class graph:
         https://docs.nvidia.com/cuda/cuda-runtime-api/group__CUDART__STREAM.html#group__CUDART__STREAM_1g9d0535d93a214cbf126835257b16ba85
     """  # noqa: B950
 
-    default_capture_stream: typing.Optional["torch.cuda.Stream"] = None
+    default_capture_stream: Optional["torch.cuda.Stream"] = None
 
     def __init__(
         self,
@@ -322,7 +284,7 @@ def make_graphed_callables(
                 + ":func:`~make_graphed_callables`, only parameters may be trainable. All buffers must have "
                 + "``requires_grad=False``."
             )
-        flatten_arg = torch.utils._pytree.arg_tree_leaves(*args)
+        flatten_arg = _pytree.arg_tree_leaves(*args)
         flatten_sample_args.append(tuple(flatten_arg))
         assert all(isinstance(arg, torch.Tensor) for arg in flatten_arg), (
             "In the beta API, sample_args "
@@ -354,25 +316,18 @@ def make_graphed_callables(
         for func, args, static_input_surface in zip(
             callables, sample_args, per_callable_static_input_surfaces
         ):
-            grad_inputs, outputs, outputs_grad = None, None, None
             for _ in range(num_warmup_iters):
-                outputs = torch.utils._pytree.tree_leaves(func(*args))
-                outputs_grad = tuple(o for o in outputs if o.requires_grad)
-                if len(outputs_grad) > 0:
-                    grad_inputs = torch.autograd.grad(
-                        outputs=outputs_grad,
-                        inputs=tuple(
-                            i for i in static_input_surface if i.requires_grad
-                        ),
-                        grad_outputs=tuple(
-                            torch.empty_like(o) for o in outputs if o.requires_grad
-                        ),
-                        only_inputs=True,
-                        allow_unused=allow_unused_input,
-                    )
-            for v in [outputs, outputs_grad, grad_inputs]:
-                del v
-
+                outputs = _pytree.tree_leaves(func(*args))
+                grad_inputs = torch.autograd.grad(
+                    outputs=tuple(o for o in outputs if o.requires_grad),
+                    inputs=tuple(i for i in static_input_surface if i.requires_grad),
+                    grad_outputs=tuple(
+                        torch.empty_like(o) for o in outputs if o.requires_grad
+                    ),
+                    only_inputs=True,
+                    allow_unused=allow_unused_input,
+                )
+            del outputs, grad_inputs  # type: ignore[possibly-undefined]
     torch.cuda.synchronize()
 
     # All captures here share a mempool. To avoid replays corrupting each other's memory,
@@ -386,17 +341,18 @@ def make_graphed_callables(
         with torch.cuda.graph(fwd_graph, pool=mempool):
             outputs = func(*args)
 
-        flatten_outputs, spec = torch.utils._pytree.tree_flatten(outputs)
+        flatten_outputs, spec = _pytree.tree_flatten(outputs)
         per_callable_static_outputs.append(tuple(flatten_outputs))
         per_callable_output_unflatten_spec.append(spec)
 
     # Capture backward graphs in reverse order
     per_callable_static_grad_outputs = []
     per_callable_static_grad_inputs = []
-    for static_input_surface, static_outputs, bwd_graph in zip(
+    for static_input_surface, static_outputs, bwd_graph, module_params in zip(
         reversed(per_callable_static_input_surfaces),
         reversed(per_callable_static_outputs),
         reversed(bwd_graphs),
+        reversed(per_callable_module_params),
     ):
         # For now, assumes all static_outputs require grad
         # assert all(o.requires_grad for o in static_outputs), "Outputs of graphed callables must require grad."
@@ -404,17 +360,14 @@ def make_graphed_callables(
             torch.empty_like(o) if o.requires_grad else None for o in static_outputs
         )
 
-        outputs_grad = tuple(o for o in static_outputs if o.requires_grad)
-        grad_inputs = None
-        if len(outputs_grad) > 0:
-            with torch.cuda.graph(bwd_graph, pool=mempool):
-                grad_inputs = torch.autograd.grad(
-                    outputs=outputs_grad,
-                    inputs=tuple(i for i in static_input_surface if i.requires_grad),
-                    grad_outputs=tuple(o for o in static_grad_outputs if o is not None),
-                    only_inputs=True,
-                    allow_unused=allow_unused_input,
-                )
+        with torch.cuda.graph(bwd_graph, pool=mempool):
+            grad_inputs = torch.autograd.grad(
+                outputs=tuple(o for o in static_outputs if o.requires_grad),
+                inputs=tuple(i for i in static_input_surface if i.requires_grad),
+                grad_outputs=tuple(o for o in static_grad_outputs if o is not None),
+                only_inputs=True,
+                allow_unused=allow_unused_input,
+            )
 
         # Constructs a tuple suitable for returning from Graphed.backward:
         # Pads out the actually-needed grads with Nones in gradient slots for inputs that don't require grad.
@@ -422,7 +375,7 @@ def make_graphed_callables(
         static_grad_inputs = []
         grad_idx = 0
         for arg in static_input_surface:
-            if arg.requires_grad and grad_inputs is not None:
+            if arg.requires_grad:
                 static_grad_inputs.append(grad_inputs[grad_idx])
                 grad_idx += 1
             else:
@@ -481,9 +434,9 @@ def make_graphed_callables(
             # Runs the autograd function with inputs == all inputs to the graph that might require grad
             # (explicit user args + module parameters)
             # Assumes module params didn't change since capture.
-            flatten_user_args = torch.utils._pytree.arg_tree_leaves(*user_args)
+            flatten_user_args = _pytree.arg_tree_leaves(*user_args)
             out = Graphed.apply(*(tuple(flatten_user_args) + module_params))
-            return torch.utils._pytree.tree_unflatten(out, output_unflatten_spec)
+            return _pytree.tree_unflatten(out, output_unflatten_spec)
 
         return functionalized
 

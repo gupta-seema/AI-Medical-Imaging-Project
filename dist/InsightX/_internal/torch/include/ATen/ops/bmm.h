@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -35,20 +34,6 @@ inline at::Tensor & bmm_out(at::Tensor & out, const at::Tensor & self, const at:
 // aten::bmm.out(Tensor self, Tensor mat2, *, Tensor(a!) out) -> Tensor(a!)
 inline at::Tensor & bmm_outf(const at::Tensor & self, const at::Tensor & mat2, at::Tensor & out) {
     return at::_ops::bmm_out::call(self, mat2, out);
-}
-
-// aten::bmm.dtype(Tensor self, Tensor mat2, ScalarType out_dtype) -> Tensor
-inline at::Tensor bmm(const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype) {
-    return at::_ops::bmm_dtype::call(self, mat2, out_dtype);
-}
-
-// aten::bmm.dtype_out(Tensor self, Tensor mat2, ScalarType out_dtype, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & bmm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype) {
-    return at::_ops::bmm_dtype_out::call(self, mat2, out_dtype, out);
-}
-// aten::bmm.dtype_out(Tensor self, Tensor mat2, ScalarType out_dtype, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & bmm_outf(const at::Tensor & self, const at::Tensor & mat2, at::ScalarType out_dtype, at::Tensor & out) {
-    return at::_ops::bmm_dtype_out::call(self, mat2, out_dtype, out);
 }
 
 }

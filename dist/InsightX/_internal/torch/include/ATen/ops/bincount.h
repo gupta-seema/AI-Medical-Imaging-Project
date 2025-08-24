@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -23,70 +22,18 @@
 namespace at {
 
 
-// aten::bincount(Tensor self, Tensor? weights=None, SymInt minlength=0) -> Tensor
-inline at::Tensor bincount(const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, int64_t minlength=0) {
+// aten::bincount(Tensor self, Tensor? weights=None, int minlength=0) -> Tensor
+inline at::Tensor bincount(const at::Tensor & self, const c10::optional<at::Tensor> & weights={}, int64_t minlength=0) {
     return at::_ops::bincount::call(self, weights, minlength);
 }
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor bincount(const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, int64_t minlength=0) {
-    return at::_ops::bincount::call(self, weights, minlength);
-  }
-}
 
-// aten::bincount(Tensor self, Tensor? weights=None, SymInt minlength=0) -> Tensor
-inline at::Tensor bincount_symint(const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, c10::SymInt minlength=0) {
-    return at::_ops::bincount::call(self, weights, minlength);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor bincount(const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, c10::SymInt minlength=0) {
-    return at::_ops::bincount::call(self, weights, minlength);
-  }
-}
-
-// aten::bincount.out(Tensor self, Tensor? weights=None, SymInt minlength=0, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & bincount_out(at::Tensor & out, const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, int64_t minlength=0) {
+// aten::bincount.out(Tensor self, Tensor? weights=None, int minlength=0, *, Tensor(a!) out) -> Tensor(a!)
+inline at::Tensor & bincount_out(at::Tensor & out, const at::Tensor & self, const c10::optional<at::Tensor> & weights={}, int64_t minlength=0) {
     return at::_ops::bincount_out::call(self, weights, minlength, out);
 }
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor & bincount_out(at::Tensor & out, const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, int64_t minlength=0) {
+// aten::bincount.out(Tensor self, Tensor? weights=None, int minlength=0, *, Tensor(a!) out) -> Tensor(a!)
+inline at::Tensor & bincount_outf(const at::Tensor & self, const c10::optional<at::Tensor> & weights, int64_t minlength, at::Tensor & out) {
     return at::_ops::bincount_out::call(self, weights, minlength, out);
-  }
-}
-
-// aten::bincount.out(Tensor self, Tensor? weights=None, SymInt minlength=0, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & bincount_outf(const at::Tensor & self, const ::std::optional<at::Tensor> & weights, int64_t minlength, at::Tensor & out) {
-    return at::_ops::bincount_out::call(self, weights, minlength, out);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor & bincount_outf(const at::Tensor & self, const ::std::optional<at::Tensor> & weights, int64_t minlength, at::Tensor & out) {
-    return at::_ops::bincount_out::call(self, weights, minlength, out);
-  }
-}
-
-// aten::bincount.out(Tensor self, Tensor? weights=None, SymInt minlength=0, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & bincount_symint_out(at::Tensor & out, const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, c10::SymInt minlength=0) {
-    return at::_ops::bincount_out::call(self, weights, minlength, out);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor & bincount_out(at::Tensor & out, const at::Tensor & self, const ::std::optional<at::Tensor> & weights={}, c10::SymInt minlength=0) {
-    return at::_ops::bincount_out::call(self, weights, minlength, out);
-  }
-}
-
-// aten::bincount.out(Tensor self, Tensor? weights=None, SymInt minlength=0, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & bincount_symint_outf(const at::Tensor & self, const ::std::optional<at::Tensor> & weights, c10::SymInt minlength, at::Tensor & out) {
-    return at::_ops::bincount_out::call(self, weights, minlength, out);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor & bincount_outf(const at::Tensor & self, const ::std::optional<at::Tensor> & weights, c10::SymInt minlength, at::Tensor & out) {
-    return at::_ops::bincount_out::call(self, weights, minlength, out);
-  }
 }
 
 }

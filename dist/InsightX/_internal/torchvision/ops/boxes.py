@@ -1,19 +1,12 @@
+from typing import Tuple
+
 import torch
 import torchvision
 from torch import Tensor
 from torchvision.extension import _assert_has_ops
 
 from ..utils import _log_api_usage_once
-from ._box_convert import (
-    _box_cxcywh_to_xyxy,
-    _box_cxcywhr_to_xywhr,
-    _box_xywh_to_xyxy,
-    _box_xywhr_to_cxcywhr,
-    _box_xywhr_to_xyxyxyxy,
-    _box_xyxy_to_cxcywh,
-    _box_xyxy_to_xywh,
-    _box_xyxyxyxy_to_xywhr,
-)
+from ._box_convert import _box_cxcywh_to_xyxy, _box_xywh_to_xyxy, _box_xyxy_to_cxcywh, _box_xyxy_to_xywh
 from ._utils import _upcast
 
 
@@ -76,8 +69,7 @@ def batched_nms(
         _log_api_usage_once(batched_nms)
     # Benchmarks that drove the following thresholds are at
     # https://github.com/pytorch/vision/issues/1311#issuecomment-781329339
-    # and https://github.com/pytorch/vision/pull/8925
-    if boxes.numel() > (4000 if boxes.device.type == "cpu" else 100_000) and not torchvision._is_tracing():
+    if boxes.numel() > (4000 if boxes.device.type == "cpu" else 20000) and not torchvision._is_tracing():
         return _batched_nms_vanilla(boxes, scores, idxs, iou_threshold)
     else:
         return _batched_nms_coordinate_trick(boxes, scores, idxs, iou_threshold)
@@ -146,7 +138,7 @@ def remove_small_boxes(boxes: Tensor, min_size: float) -> Tensor:
     return keep
 
 
-def clip_boxes_to_image(boxes: Tensor, size: tuple[int, int]) -> Tensor:
+def clip_boxes_to_image(boxes: Tensor, size: Tuple[int, int]) -> Tensor:
     """
     Clip boxes so that they lie inside an image of size ``size``.
 
@@ -202,71 +194,41 @@ def box_convert(boxes: Tensor, in_fmt: str, out_fmt: str) -> Tensor:
     ``'cxcywh'``: boxes are represented via centre, width and height, cx, cy being center of box, w, h
     being width and height.
 
-    ``'xywhr'``: boxes are represented via corner, width and height, x1, y2 being top left, w, h being width and height.
-    r is rotation angle w.r.t to the box center by :math:`|r|` degrees counter clock wise in the image plan
-
-    ``'cxcywhr'``: boxes are represented via centre, width and height, cx, cy being center of box, w, h
-    being width and height.
-    r is rotation angle w.r.t to the box center by :math:`|r|` degrees counter clock wise in the image plan
-
-    ``'xyxyxyxy'``: boxes are represented via corners, x1, y1 being top left, x2, y2 top right,
-    x3, y3 bottom right, and x4, y4 bottom left.
-
     Args:
-        boxes (Tensor[N, K]): boxes which will be converted. K is the number of coordinates (4 for unrotated bounding boxes, 5 or 8 for rotated bounding boxes)
-        in_fmt (str): Input format of given boxes. Supported formats are ['xyxy', 'xywh', 'cxcywh', 'xywhr', 'cxcywhr', 'xyxyxyxy'].
-        out_fmt (str): Output format of given boxes. Supported formats are ['xyxy', 'xywh', 'cxcywh', 'xywhr', 'cxcywhr', 'xyxyxyxy']
+        boxes (Tensor[N, 4]): boxes which will be converted.
+        in_fmt (str): Input format of given boxes. Supported formats are ['xyxy', 'xywh', 'cxcywh'].
+        out_fmt (str): Output format of given boxes. Supported formats are ['xyxy', 'xywh', 'cxcywh']
 
     Returns:
-        Tensor[N, K]: Boxes into converted format.
+        Tensor[N, 4]: Boxes into converted format.
     """
     if not torch.jit.is_scripting() and not torch.jit.is_tracing():
         _log_api_usage_once(box_convert)
-    allowed_fmts = (
-        "xyxy",
-        "xywh",
-        "cxcywh",
-        "xywhr",
-        "cxcywhr",
-        "xyxyxyxy",
-    )
+    allowed_fmts = ("xyxy", "xywh", "cxcywh")
     if in_fmt not in allowed_fmts or out_fmt not in allowed_fmts:
-        raise ValueError(f"Unsupported Bounding Box Conversions for given in_fmt {in_fmt} and out_fmt {out_fmt}")
+        raise ValueError("Unsupported Bounding Box Conversions for given in_fmt and out_fmt")
 
     if in_fmt == out_fmt:
         return boxes.clone()
-    e = (in_fmt, out_fmt)
-    if e == ("xywh", "xyxy"):
-        boxes = _box_xywh_to_xyxy(boxes)
-    elif e == ("cxcywh", "xyxy"):
-        boxes = _box_cxcywh_to_xyxy(boxes)
-    elif e == ("xyxy", "xywh"):
-        boxes = _box_xyxy_to_xywh(boxes)
-    elif e == ("xyxy", "cxcywh"):
-        boxes = _box_xyxy_to_cxcywh(boxes)
-    elif e == ("xywh", "cxcywh"):
-        boxes = _box_xywh_to_xyxy(boxes)
-        boxes = _box_xyxy_to_cxcywh(boxes)
-    elif e == ("cxcywh", "xywh"):
-        boxes = _box_cxcywh_to_xyxy(boxes)
-        boxes = _box_xyxy_to_xywh(boxes)
-    elif e == ("cxcywhr", "xywhr"):
-        boxes = _box_cxcywhr_to_xywhr(boxes)
-    elif e == ("xywhr", "cxcywhr"):
-        boxes = _box_xywhr_to_cxcywhr(boxes)
-    elif e == ("cxcywhr", "xyxyxyxy"):
-        boxes = _box_cxcywhr_to_xywhr(boxes).to(boxes.dtype)
-        boxes = _box_xywhr_to_xyxyxyxy(boxes)
-    elif e == ("xyxyxyxy", "cxcywhr"):
-        boxes = _box_xyxyxyxy_to_xywhr(boxes).to(boxes.dtype)
-        boxes = _box_xywhr_to_cxcywhr(boxes)
-    elif e == ("xywhr", "xyxyxyxy"):
-        boxes = _box_xywhr_to_xyxyxyxy(boxes)
-    elif e == ("xyxyxyxy", "xywhr"):
-        boxes = _box_xyxyxyxy_to_xywhr(boxes)
-    else:
-        raise NotImplementedError(f"Unsupported Bounding Box Conversions for given in_fmt {e[0]} and out_fmt {e[1]}")
 
+    if in_fmt != "xyxy" and out_fmt != "xyxy":
+        # convert to xyxy and change in_fmt xyxy
+        if in_fmt == "xywh":
+            boxes = _box_xywh_to_xyxy(boxes)
+        elif in_fmt == "cxcywh":
+            boxes = _box_cxcywh_to_xyxy(boxes)
+        in_fmt = "xyxy"
+
+    if in_fmt == "xyxy":
+        if out_fmt == "xywh":
+            boxes = _box_xyxy_to_xywh(boxes)
+        elif out_fmt == "cxcywh":
+            boxes = _box_xyxy_to_cxcywh(boxes)
+    elif out_fmt == "xyxy":
+        if in_fmt == "xywh":
+            boxes = _box_xywh_to_xyxy(boxes)
+        elif in_fmt == "cxcywh":
+            boxes = _box_cxcywh_to_xyxy(boxes)
     return boxes
 
 
@@ -291,7 +253,7 @@ def box_area(boxes: Tensor) -> Tensor:
 
 # implementation from https://github.com/kuangliu/torchcv/blob/master/torchcv/utils/box.py
 # with slight modifications
-def _box_inter_union(boxes1: Tensor, boxes2: Tensor) -> tuple[Tensor, Tensor]:
+def _box_inter_union(boxes1: Tensor, boxes2: Tensor) -> Tuple[Tensor, Tensor]:
     area1 = box_area(boxes1)
     area2 = box_area(boxes2)
 
@@ -416,7 +378,7 @@ def distance_box_iou(boxes1: Tensor, boxes2: Tensor, eps: float = 1e-7) -> Tenso
     return diou
 
 
-def _box_diou_iou(boxes1: Tensor, boxes2: Tensor, eps: float = 1e-7) -> tuple[Tensor, Tensor]:
+def _box_diou_iou(boxes1: Tensor, boxes2: Tensor, eps: float = 1e-7) -> Tuple[Tensor, Tensor]:
 
     iou = box_iou(boxes1, boxes2)
     lti = torch.min(boxes1[:, None, :2], boxes2[:, :2])
@@ -429,7 +391,9 @@ def _box_diou_iou(boxes1: Tensor, boxes2: Tensor, eps: float = 1e-7) -> tuple[Te
     x_g = (boxes2[:, 0] + boxes2[:, 2]) / 2
     y_g = (boxes2[:, 1] + boxes2[:, 3]) / 2
     # The distance between boxes' centers squared.
-    centers_distance_squared = (_upcast(x_p[:, None] - x_g[None, :]) ** 2) + (_upcast(y_p[:, None] - y_g[None, :]) ** 2)
+    centers_distance_squared = (_upcast((x_p[:, None] - x_g[None, :])) ** 2) + (
+        _upcast((y_p[:, None] - y_g[None, :])) ** 2
+    )
     # The distance IoU is the IoU penalized by a normalized
     # distance between boxes' centers squared.
     return iou - (centers_distance_squared / diagonal_distance_squared), iou
@@ -440,13 +404,7 @@ def masks_to_boxes(masks: torch.Tensor) -> torch.Tensor:
     Compute the bounding boxes around the provided masks.
 
     Returns a [N, 4] tensor containing bounding boxes. The boxes are in ``(x1, y1, x2, y2)`` format with
-    ``0 <= x1 <= x2`` and ``0 <= y1 <= y2``.
-
-    .. warning::
-
-        In most cases the output will guarantee ``x1 < x2`` and ``y1 < y2``. But
-        if the input is degenerate, e.g. if a mask is a single row or a single
-        column, then the output may have x1 = x2 or y1 = y2.
+    ``0 <= x1 < x2`` and ``0 <= y1 < y2``.
 
     Args:
         masks (Tensor[N, H, W]): masks to transform where N is the number of masks

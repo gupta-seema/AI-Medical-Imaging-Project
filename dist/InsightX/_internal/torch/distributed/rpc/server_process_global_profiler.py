@@ -1,19 +1,17 @@
 #!/usr/bin/python3
-# mypy: allow-untyped-defs
 
 import itertools
 
 import torch
 from torch.autograd.profiler_legacy import profile
+from typing import List
 
 from . import (
     _disable_server_process_global_profiler,
     _enable_server_process_global_profiler,
 )
 
-
-__all__: list[str] = []
-
+__all__: List[str] = []
 
 class _server_process_global_profile(profile):
     """
@@ -47,11 +45,11 @@ class _server_process_global_profile(profile):
 
         profile_memory (bool, optional): Whether to report memory usage, default: ``False``
 
-    .. warning::
+    .. warning:
         Enabling memory profiling incurs additional profiler overhead
 
-    .. warning::
-        Due to some CUDA multiprocessing limitations (see :ref:`multiprocessing-cuda-note`),
+    .. warning:
+        Due to some CUDA multiprocessing limitations (multiprocessing-cuda-note_),
         one cannot use the profiler with ``use_cuda = True`` to benchmark
         DataLoaders with ``num_workers > 0``. If you wish to benchmark data loading,
         please use ``use_cuda = False`` or ``num_workers = 0``.
@@ -63,14 +61,10 @@ class _server_process_global_profile(profile):
         >>> import torch.distributed.rpc as rpc
         >>> rpc.init_rpc("worker0", rank=0, world_size=2)
         >>> x, y = torch.tensor(1), torch.tensor(2)
-        >>> outer_profile_rref = rpc.remote(
-        ...     dst_worker_name, rpc._server_process_global_profile
-        ... )
+        >>> outer_profile_rref = rpc.remote(dst_worker_name, rpc._server_process_global_profile)
         >>> outer_profile_rref.rpc_sync().__enter__()
         >>> rpc.rpc_sync(dst_worker_name, torch.add, (x, y))
-        >>> inner_profile_rref = rpc.remote(
-        ...     dst_worker_name, rpc._server_process_global_profile
-        ... )
+        >>> inner_profile_rref = rpc.remote(dst_worker_name, rpc._server_process_global_profile)
         >>> inner_profile_rref.rpc_sync().__enter__()
         >>> rpc.rpc_sync(dst_worker_name, torch.sub, (x, y))
         >>> inner_profile_rref.rpc_sync().__exit__(None, None, None)
@@ -128,8 +122,7 @@ class _server_process_global_profile(profile):
             False,
             False,
             False,
-            torch.profiler._ExperimentalConfig(),
-        )
+            torch.profiler._ExperimentalConfig())
         _enable_server_process_global_profiler(profiler_config)
         return self
 
@@ -158,10 +151,8 @@ class _server_process_global_profile(profile):
         process_global_function_events = []
         for thread_local_events in process_global_events:
             # Parse from ``Event``s to ``FunctionEvent``s.
-            thread_local_function_events = (
-                torch.autograd.profiler_legacy._parse_legacy_records(
-                    thread_local_events
-                )
+            thread_local_function_events = torch.autograd.profiler_legacy._parse_legacy_records(
+                thread_local_events
             )
             thread_local_function_events.sort(
                 key=lambda function_event: [
@@ -176,7 +167,7 @@ class _server_process_global_profile(profile):
         )
         self.function_events = torch.autograd.profiler_util.EventList(
             flattened_function_events,
-            use_device="cuda" if self.use_cuda else None,
+            use_cuda=self.use_cuda,
             profile_memory=self.profile_memory,
         )
         self.function_events._build_tree()

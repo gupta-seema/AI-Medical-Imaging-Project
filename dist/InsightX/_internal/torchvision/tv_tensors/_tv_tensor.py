@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
-
-from typing import Any, Callable, TypeVar
+from typing import Any, Callable, Dict, Mapping, Optional, Sequence, Tuple, Type, TypeVar, Union
 
 import torch
 from torch._C import DisableTorchFunctionSubclass
@@ -25,9 +23,9 @@ class TVTensor(torch.Tensor):
     @staticmethod
     def _to_tensor(
         data: Any,
-        dtype: torch.dtype | None = None,
-        device: torch.device | str | int | None = None,
-        requires_grad: bool | None = None,
+        dtype: Optional[torch.dtype] = None,
+        device: Optional[Union[torch.device, str, int]] = None,
+        requires_grad: Optional[bool] = None,
     ) -> torch.Tensor:
         if requires_grad is None:
             requires_grad = data.requires_grad if isinstance(data, torch.Tensor) else False
@@ -38,7 +36,7 @@ class TVTensor(torch.Tensor):
         cls,
         output: torch.Tensor,
         args: Sequence[Any] = (),
-        kwargs: Mapping[str, Any] | None = None,
+        kwargs: Optional[Mapping[str, Any]] = None,
     ) -> torch.Tensor:
         # Same as torch._tensor._convert
         if isinstance(output, torch.Tensor) and not isinstance(output, cls):
@@ -53,9 +51,9 @@ class TVTensor(torch.Tensor):
     def __torch_function__(
         cls,
         func: Callable[..., torch.Tensor],
-        types: tuple[type[torch.Tensor], ...],
+        types: Tuple[Type[torch.Tensor], ...],
         args: Sequence[Any] = (),
-        kwargs: Mapping[str, Any] | None = None,
+        kwargs: Optional[Mapping[str, Any]] = None,
     ) -> torch.Tensor:
         """For general information about how the __torch_function__ protocol works,
         see https://pytorch.org/docs/stable/notes/extending.html#extending-torch
@@ -124,7 +122,7 @@ class TVTensor(torch.Tensor):
         with DisableTorchFunctionSubclass():
             return super().dtype
 
-    def __deepcopy__(self: D, memo: dict[int, Any]) -> D:
+    def __deepcopy__(self: D, memo: Dict[int, Any]) -> D:
         # We need to detach first, since a plain `Tensor.clone` will be part of the computation graph, which does
         # *not* happen for `deepcopy(Tensor)`. A side-effect from detaching is that the `Tensor.requires_grad`
         # attribute is cleared, so we need to refill it before we return.

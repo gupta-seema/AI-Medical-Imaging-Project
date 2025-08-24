@@ -58,22 +58,22 @@ using at::IntArrayRef;
 using at::ArrayRef;
 using at::Type;
 using at::ScalarType;
-using std::optional;
+using c10::optional;
 using c10::fmap;
 
 #define _CONJ_VIEW_FUNC_AVAILABLE
 struct _ConjViewFunc : public torch::autograd::ViewFunc {
-  _ConjViewFunc()
-  {}
-  virtual ~_ConjViewFunc() override = default;
+  _ConjViewFunc() 
+  {};
+  virtual ~_ConjViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -85,17 +85,17 @@ private:
 
 #define _INDICES_VIEW_FUNC_AVAILABLE
 struct _IndicesViewFunc : public torch::autograd::ViewFunc {
-  _IndicesViewFunc()
-  {}
-  virtual ~_IndicesViewFunc() override = default;
+  _IndicesViewFunc() 
+  {};
+  virtual ~_IndicesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -107,17 +107,17 @@ private:
 
 #define _NEG_VIEW_VIEW_FUNC_AVAILABLE
 struct _NegViewViewFunc : public torch::autograd::ViewFunc {
-  _NegViewViewFunc()
-  {}
-  virtual ~_NegViewViewFunc() override = default;
+  _NegViewViewFunc() 
+  {};
+  virtual ~_NegViewViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -129,17 +129,17 @@ private:
 
 #define _NESTED_GET_VALUES_VIEW_FUNC_AVAILABLE
 struct _NestedGetValuesViewFunc : public torch::autograd::ViewFunc {
-  _NestedGetValuesViewFunc()
-  {}
-  virtual ~_NestedGetValuesViewFunc() override = default;
+  _NestedGetValuesViewFunc() 
+  {};
+  virtual ~_NestedGetValuesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -152,16 +152,16 @@ private:
 #define _NESTED_VIEW_FROM_BUFFER_VIEW_FUNC_AVAILABLE
 struct _NestedViewFromBufferViewFunc : public torch::autograd::ViewFunc {
   _NestedViewFromBufferViewFunc(const at::Tensor & nested_size, const at::Tensor & nested_strides, const at::Tensor & offsets) : nested_size(nested_size), nested_strides(nested_strides), offsets(offsets)
-  {}
-  virtual ~_NestedViewFromBufferViewFunc() override = default;
+  {};
+  virtual ~_NestedViewFromBufferViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -175,17 +175,17 @@ private:
 
 #define _NESTED_VIEW_FROM_JAGGED_VIEW_FUNC_AVAILABLE
 struct _NestedViewFromJaggedViewFunc : public torch::autograd::ViewFunc {
-  _NestedViewFromJaggedViewFunc(const at::Tensor & offsets, const at::Tensor & dummy, const ::std::optional<at::Tensor> & lengths, int64_t ragged_idx, const ::std::optional<at::Tensor> & min_seqlen, const ::std::optional<at::Tensor> & max_seqlen) : offsets(offsets), dummy(dummy), lengths(lengths), ragged_idx(ragged_idx), min_seqlen(min_seqlen), max_seqlen(max_seqlen)
-  {}
-  virtual ~_NestedViewFromJaggedViewFunc() override = default;
+  _NestedViewFromJaggedViewFunc(const at::Tensor & offsets, const at::Tensor & dummy, const c10::optional<at::Tensor> & lengths, int64_t ragged_idx) : offsets(offsets), dummy(dummy), lengths(lengths), ragged_idx(ragged_idx)
+  {};
+  virtual ~_NestedViewFromJaggedViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -194,25 +194,23 @@ protected:
 private:
   at::Tensor offsets;
   at::Tensor dummy;
-  ::std::optional<at::Tensor> lengths;
+  c10::optional<at::Tensor> lengths;
   int64_t ragged_idx;
-  ::std::optional<at::Tensor> min_seqlen;
-  ::std::optional<at::Tensor> max_seqlen;
 };
 
 #define _RESHAPE_ALIAS_VIEW_FUNC_AVAILABLE
 struct _ReshapeAliasViewFunc : public torch::autograd::ViewFunc {
   _ReshapeAliasViewFunc(c10::SymIntArrayRef size, c10::SymIntArrayRef stride) : size(size.vec()), stride(stride.vec())
-  {}
-  virtual ~_ReshapeAliasViewFunc() override = default;
+  {};
+  virtual ~_ReshapeAliasViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -225,17 +223,17 @@ private:
 
 #define _TEST_AUTOGRAD_MULTIPLE_DISPATCH_VIEW_VIEW_FUNC_AVAILABLE
 struct _TestAutogradMultipleDispatchViewViewFunc : public torch::autograd::ViewFunc {
-  _TestAutogradMultipleDispatchViewViewFunc()
-  {}
-  virtual ~_TestAutogradMultipleDispatchViewViewFunc() override = default;
+  _TestAutogradMultipleDispatchViewViewFunc() 
+  {};
+  virtual ~_TestAutogradMultipleDispatchViewViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -247,17 +245,17 @@ private:
 
 #define _VALUES_VIEW_FUNC_AVAILABLE
 struct _ValuesViewFunc : public torch::autograd::ViewFunc {
-  _ValuesViewFunc()
-  {}
-  virtual ~_ValuesViewFunc() override = default;
+  _ValuesViewFunc() 
+  {};
+  virtual ~_ValuesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -269,17 +267,17 @@ private:
 
 #define ALIAS_VIEW_FUNC_AVAILABLE
 struct AliasViewFunc : public torch::autograd::ViewFunc {
-  AliasViewFunc()
-  {}
-  virtual ~AliasViewFunc() override = default;
+  AliasViewFunc() 
+  {};
+  virtual ~AliasViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -291,17 +289,17 @@ private:
 
 #define AS_STRIDED_VIEW_FUNC_AVAILABLE
 struct AsStridedViewFunc : public torch::autograd::ViewFunc {
-  AsStridedViewFunc(c10::SymIntArrayRef size, c10::SymIntArrayRef stride, ::std::optional<c10::SymInt> storage_offset) : size(size.vec()), stride(stride.vec()), storage_offset(storage_offset)
-  {}
-  virtual ~AsStridedViewFunc() override = default;
+  AsStridedViewFunc(c10::SymIntArrayRef size, c10::SymIntArrayRef stride, c10::optional<c10::SymInt> storage_offset) : size(size.vec()), stride(stride.vec()), storage_offset(storage_offset)
+  {};
+  virtual ~AsStridedViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -310,22 +308,22 @@ protected:
 private:
   ::std::vector<c10::SymInt> size;
   ::std::vector<c10::SymInt> stride;
-  ::std::optional<c10::SymInt> storage_offset;
+  c10::optional<c10::SymInt> storage_offset;
 };
 
 #define CCOL_INDICES_VIEW_FUNC_AVAILABLE
 struct CcolIndicesViewFunc : public torch::autograd::ViewFunc {
-  CcolIndicesViewFunc()
-  {}
-  virtual ~CcolIndicesViewFunc() override = default;
+  CcolIndicesViewFunc() 
+  {};
+  virtual ~CcolIndicesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -338,16 +336,16 @@ private:
 #define CHUNK_VIEW_FUNC_AVAILABLE
 struct ChunkViewFunc : public torch::autograd::ViewFunc {
   ChunkViewFunc(int64_t chunks, int64_t dim, int64_t view_idx) : chunks(chunks), dim(dim), view_idx(view_idx)
-  {}
-  virtual ~ChunkViewFunc() override = default;
+  {};
+  virtual ~ChunkViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -361,17 +359,17 @@ private:
 
 #define COL_INDICES_VIEW_FUNC_AVAILABLE
 struct ColIndicesViewFunc : public torch::autograd::ViewFunc {
-  ColIndicesViewFunc()
-  {}
-  virtual ~ColIndicesViewFunc() override = default;
+  ColIndicesViewFunc() 
+  {};
+  virtual ~ColIndicesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -383,17 +381,17 @@ private:
 
 #define CROW_INDICES_VIEW_FUNC_AVAILABLE
 struct CrowIndicesViewFunc : public torch::autograd::ViewFunc {
-  CrowIndicesViewFunc()
-  {}
-  virtual ~CrowIndicesViewFunc() override = default;
+  CrowIndicesViewFunc() 
+  {};
+  virtual ~CrowIndicesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -406,16 +404,16 @@ private:
 #define DIAGONAL_VIEW_FUNC_AVAILABLE
 struct DiagonalViewFunc : public torch::autograd::ViewFunc {
   DiagonalViewFunc(int64_t offset, int64_t dim1, int64_t dim2) : offset(offset), dim1(dim1), dim2(dim2)
-  {}
-  virtual ~DiagonalViewFunc() override = default;
+  {};
+  virtual ~DiagonalViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -430,16 +428,16 @@ private:
 #define EXPAND_VIEW_FUNC_AVAILABLE
 struct ExpandViewFunc : public torch::autograd::ViewFunc {
   ExpandViewFunc(c10::SymIntArrayRef size, bool implicit) : size(size.vec()), implicit(implicit)
-  {}
-  virtual ~ExpandViewFunc() override = default;
+  {};
+  virtual ~ExpandViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -452,17 +450,17 @@ private:
 
 #define INDICES_VIEW_FUNC_AVAILABLE
 struct IndicesViewFunc : public torch::autograd::ViewFunc {
-  IndicesViewFunc()
-  {}
-  virtual ~IndicesViewFunc() override = default;
+  IndicesViewFunc() 
+  {};
+  virtual ~IndicesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -475,16 +473,16 @@ private:
 #define NARROW_VIEW_FUNC_AVAILABLE
 struct NarrowViewFunc : public torch::autograd::ViewFunc {
   NarrowViewFunc(int64_t dim, c10::SymInt start, c10::SymInt length) : dim(dim), start(start), length(length)
-  {}
-  virtual ~NarrowViewFunc() override = default;
+  {};
+  virtual ~NarrowViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -499,16 +497,16 @@ private:
 #define PERMUTE_VIEW_FUNC_AVAILABLE
 struct PermuteViewFunc : public torch::autograd::ViewFunc {
   PermuteViewFunc(at::IntArrayRef dims) : dims(dims.vec())
-  {}
-  virtual ~PermuteViewFunc() override = default;
+  {};
+  virtual ~PermuteViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -520,17 +518,17 @@ private:
 
 #define ROW_INDICES_VIEW_FUNC_AVAILABLE
 struct RowIndicesViewFunc : public torch::autograd::ViewFunc {
-  RowIndicesViewFunc()
-  {}
-  virtual ~RowIndicesViewFunc() override = default;
+  RowIndicesViewFunc() 
+  {};
+  virtual ~RowIndicesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -543,16 +541,16 @@ private:
 #define SELECT_INT_VIEW_FUNC_AVAILABLE
 struct SelectIntViewFunc : public torch::autograd::ViewFunc {
   SelectIntViewFunc(int64_t dim, c10::SymInt index) : dim(dim), index(index)
-  {}
-  virtual ~SelectIntViewFunc() override = default;
+  {};
+  virtual ~SelectIntViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -565,17 +563,17 @@ private:
 
 #define SLICE_TENSOR_VIEW_FUNC_AVAILABLE
 struct SliceTensorViewFunc : public torch::autograd::ViewFunc {
-  SliceTensorViewFunc(int64_t dim, ::std::optional<c10::SymInt> start, ::std::optional<c10::SymInt> end, c10::SymInt step) : dim(dim), start(start), end(end), step(step)
-  {}
-  virtual ~SliceTensorViewFunc() override = default;
+  SliceTensorViewFunc(int64_t dim, c10::optional<c10::SymInt> start, c10::optional<c10::SymInt> end, c10::SymInt step) : dim(dim), start(start), end(end), step(step)
+  {};
+  virtual ~SliceTensorViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -583,24 +581,24 @@ protected:
 
 private:
   int64_t dim;
-  ::std::optional<c10::SymInt> start;
-  ::std::optional<c10::SymInt> end;
+  c10::optional<c10::SymInt> start;
+  c10::optional<c10::SymInt> end;
   c10::SymInt step;
 };
 
 #define SLICE_INVERSE_VIEW_FUNC_AVAILABLE
 struct SliceInverseViewFunc : public torch::autograd::ViewFunc {
-  SliceInverseViewFunc(const at::Tensor & src, int64_t dim, ::std::optional<c10::SymInt> start, ::std::optional<c10::SymInt> end, c10::SymInt step) : src(src), dim(dim), start(start), end(end), step(step)
-  {}
-  virtual ~SliceInverseViewFunc() override = default;
+  SliceInverseViewFunc(const at::Tensor & src, int64_t dim, c10::optional<c10::SymInt> start, c10::optional<c10::SymInt> end, c10::SymInt step) : src(src), dim(dim), start(start), end(end), step(step)
+  {};
+  virtual ~SliceInverseViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -609,24 +607,24 @@ protected:
 private:
   at::Tensor src;
   int64_t dim;
-  ::std::optional<c10::SymInt> start;
-  ::std::optional<c10::SymInt> end;
+  c10::optional<c10::SymInt> start;
+  c10::optional<c10::SymInt> end;
   c10::SymInt step;
 };
 
 #define SPLIT_TENSOR_VIEW_FUNC_AVAILABLE
 struct SplitTensorViewFunc : public torch::autograd::ViewFunc {
   SplitTensorViewFunc(c10::SymInt split_size, int64_t dim, int64_t view_idx) : split_size(split_size), dim(dim), view_idx(view_idx)
-  {}
-  virtual ~SplitTensorViewFunc() override = default;
+  {};
+  virtual ~SplitTensorViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -641,16 +639,16 @@ private:
 #define SPLIT_WITH_SIZES_VIEW_FUNC_AVAILABLE
 struct SplitWithSizesViewFunc : public torch::autograd::ViewFunc {
   SplitWithSizesViewFunc(c10::SymIntArrayRef split_sizes, int64_t dim, int64_t view_idx) : split_sizes(split_sizes.vec()), dim(dim), view_idx(view_idx)
-  {}
-  virtual ~SplitWithSizesViewFunc() override = default;
+  {};
+  virtual ~SplitWithSizesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -664,17 +662,17 @@ private:
 
 #define SQUEEZE_VIEW_FUNC_AVAILABLE
 struct SqueezeViewFunc : public torch::autograd::ViewFunc {
-  SqueezeViewFunc()
-  {}
-  virtual ~SqueezeViewFunc() override = default;
+  SqueezeViewFunc() 
+  {};
+  virtual ~SqueezeViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -687,16 +685,16 @@ private:
 #define SQUEEZE_DIM_VIEW_FUNC_AVAILABLE
 struct SqueezeDimViewFunc : public torch::autograd::ViewFunc {
   SqueezeDimViewFunc(int64_t dim) : dim(dim)
-  {}
-  virtual ~SqueezeDimViewFunc() override = default;
+  {};
+  virtual ~SqueezeDimViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -709,16 +707,16 @@ private:
 #define SQUEEZE_DIMS_VIEW_FUNC_AVAILABLE
 struct SqueezeDimsViewFunc : public torch::autograd::ViewFunc {
   SqueezeDimsViewFunc(at::IntArrayRef dim) : dim(dim.vec())
-  {}
-  virtual ~SqueezeDimsViewFunc() override = default;
+  {};
+  virtual ~SqueezeDimsViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -730,17 +728,17 @@ private:
 
 #define T_VIEW_FUNC_AVAILABLE
 struct TViewFunc : public torch::autograd::ViewFunc {
-  TViewFunc()
-  {}
-  virtual ~TViewFunc() override = default;
+  TViewFunc() 
+  {};
+  virtual ~TViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -753,16 +751,16 @@ private:
 #define TRANSPOSE_INT_VIEW_FUNC_AVAILABLE
 struct TransposeIntViewFunc : public torch::autograd::ViewFunc {
   TransposeIntViewFunc(int64_t dim0, int64_t dim1) : dim0(dim0), dim1(dim1)
-  {}
-  virtual ~TransposeIntViewFunc() override = default;
+  {};
+  virtual ~TransposeIntViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -776,16 +774,16 @@ private:
 #define UNBIND_INT_VIEW_FUNC_AVAILABLE
 struct UnbindIntViewFunc : public torch::autograd::ViewFunc {
   UnbindIntViewFunc(int64_t dim, int64_t view_idx) : dim(dim), view_idx(view_idx)
-  {}
-  virtual ~UnbindIntViewFunc() override = default;
+  {};
+  virtual ~UnbindIntViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -799,16 +797,16 @@ private:
 #define UNFOLD_VIEW_FUNC_AVAILABLE
 struct UnfoldViewFunc : public torch::autograd::ViewFunc {
   UnfoldViewFunc(int64_t dimension, int64_t size, int64_t step) : dimension(dimension), size(size), step(step)
-  {}
-  virtual ~UnfoldViewFunc() override = default;
+  {};
+  virtual ~UnfoldViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -823,16 +821,16 @@ private:
 #define UNSQUEEZE_VIEW_FUNC_AVAILABLE
 struct UnsqueezeViewFunc : public torch::autograd::ViewFunc {
   UnsqueezeViewFunc(int64_t dim) : dim(dim)
-  {}
-  virtual ~UnsqueezeViewFunc() override = default;
+  {};
+  virtual ~UnsqueezeViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -844,17 +842,17 @@ private:
 
 #define VALUES_VIEW_FUNC_AVAILABLE
 struct ValuesViewFunc : public torch::autograd::ViewFunc {
-  ValuesViewFunc()
-  {}
-  virtual ~ValuesViewFunc() override = default;
+  ValuesViewFunc() 
+  {};
+  virtual ~ValuesViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -867,16 +865,16 @@ private:
 #define VIEW_VIEW_FUNC_AVAILABLE
 struct ViewViewFunc : public torch::autograd::ViewFunc {
   ViewViewFunc(c10::SymIntArrayRef size) : size(size.vec())
-  {}
-  virtual ~ViewViewFunc() override = default;
+  {};
+  virtual ~ViewViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -889,16 +887,16 @@ private:
 #define VIEW_DTYPE_VIEW_FUNC_AVAILABLE
 struct ViewDtypeViewFunc : public torch::autograd::ViewFunc {
   ViewDtypeViewFunc(at::ScalarType dtype) : dtype(dtype)
-  {}
-  virtual ~ViewDtypeViewFunc() override = default;
+  {};
+  virtual ~ViewDtypeViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -910,17 +908,17 @@ private:
 
 #define VIEW_AS_COMPLEX_VIEW_FUNC_AVAILABLE
 struct ViewAsComplexViewFunc : public torch::autograd::ViewFunc {
-  ViewAsComplexViewFunc()
-  {}
-  virtual ~ViewAsComplexViewFunc() override = default;
+  ViewAsComplexViewFunc() 
+  {};
+  virtual ~ViewAsComplexViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;
@@ -932,17 +930,17 @@ private:
 
 #define VIEW_AS_REAL_VIEW_FUNC_AVAILABLE
 struct ViewAsRealViewFunc : public torch::autograd::ViewFunc {
-  ViewAsRealViewFunc()
-  {}
-  virtual ~ViewAsRealViewFunc() override = default;
+  ViewAsRealViewFunc() 
+  {};
+  virtual ~ViewAsRealViewFunc() override {};
   virtual std::vector<c10::SymInt> get_symints() const override;
   virtual size_t num_symints() const override;
   virtual std::vector<at::Tensor> get_tensors() const override;
   virtual size_t num_tensors() const override;
   virtual at::Tensor operator()(const at::Tensor&) const override;
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = ::std::nullopt,
-      std::optional<std::vector<at::Tensor>> = ::std::nullopt) const override;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
 protected:
   virtual void set_symints(std::vector<c10::SymInt>) override;

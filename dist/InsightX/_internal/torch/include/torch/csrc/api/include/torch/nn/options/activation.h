@@ -5,7 +5,8 @@
 #include <torch/enum.h>
 #include <torch/types.h>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 /// Options for the `ELU` module.
 ///
@@ -251,7 +252,7 @@ struct TORCH_API SoftmaxFuncOptions {
   /// If specified, the input tensor is casted to `dtype` before the operation
   /// is performed. This is useful for preventing data type overflows. Default:
   /// None.
-  TORCH_ARG(std::optional<torch::Dtype>, dtype) = std::nullopt;
+  TORCH_ARG(c10::optional<torch::Dtype>, dtype) = c10::nullopt;
 };
 
 } // namespace functional
@@ -292,7 +293,7 @@ struct TORCH_API SoftminFuncOptions {
   /// If specified, the input tensor is casted to `dtype` before the operation
   /// is performed. This is useful for preventing data type overflows. Default:
   /// None.
-  TORCH_ARG(std::optional<torch::Dtype>, dtype) = std::nullopt;
+  TORCH_ARG(c10::optional<torch::Dtype>, dtype) = c10::nullopt;
 };
 
 } // namespace functional
@@ -333,7 +334,7 @@ struct TORCH_API LogSoftmaxFuncOptions {
   /// If specified, the input tensor is casted to `dtype` before the operation
   /// is performed. This is useful for preventing data type overflows. Default:
   /// None.
-  TORCH_ARG(std::optional<torch::Dtype>, dtype) = std::nullopt;
+  TORCH_ARG(c10::optional<torch::Dtype>, dtype) = c10::nullopt;
 };
 
 } // namespace functional
@@ -639,10 +640,10 @@ struct TORCH_API MultiheadAttentionOptions {
   /// add a new batch of zeros to the key and value sequences at dim=1.
   TORCH_ARG(bool, add_zero_attn) = false;
 
-  /// total number of features in key. Default: std::nullopt.
+  /// total number of features in key. Default: c10::nullopt.
   TORCH_ARG(int64_t, kdim);
 
-  /// total number of features in key. Default: std::nullopt.
+  /// total number of features in key. Default: c10::nullopt.
   TORCH_ARG(int64_t, vdim);
 };
 
@@ -709,4 +710,5 @@ struct TORCH_API MultiheadAttentionForwardFuncOptions {
 
 } // namespace functional
 
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

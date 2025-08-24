@@ -1,6 +1,7 @@
 #pragma once
 
 #include <c10/util/StringUtil.h>
+#include <c10/util/string_view.h>
 #include <c10/util/irange.h>
 #include <ATen/core/jit_type.h>
 #include <ATen/core/symbol.h>
@@ -8,7 +9,6 @@
 #include <ATen/core/alias_info.h>
 #include <ATen/core/operator_name.h>
 #include <ATen/core/dispatch/OperatorOptions.h>
-#include <string_view>
 #include <unordered_map>
 #include <utility>
 
@@ -25,24 +25,24 @@ using AliasTypeSet = std::vector<TypePtr>;
 
 bool operator==(const Argument& lhs, const Argument& rhs);
 
-struct TORCH_API Argument {
+struct Argument {
   Argument(
       std::string name = "",
       const TypePtr& type = nullptr,
-      std::optional<int32_t> N = std::nullopt,
-      std::optional<IValue> default_value = std::nullopt,
+      c10::optional<int32_t> N = c10::nullopt,
+      c10::optional<IValue> default_value = c10::nullopt,
       bool kwarg_only = false,
-      std::optional<AliasInfo> alias_info = std::nullopt)
+      c10::optional<AliasInfo> alias_info = c10::nullopt)
     : Argument(std::move(name), type, type, N, std::move(default_value), kwarg_only, std::move(alias_info)) {}
 
   Argument(
       std::string name,
       TypePtr fake_type,
       TypePtr real_type,
-      std::optional<int32_t> N = std::nullopt,
-      std::optional<IValue> default_value = std::nullopt,
+      c10::optional<int32_t> N = c10::nullopt,
+      c10::optional<IValue> default_value = c10::nullopt,
       bool kwarg_only = false,
-      std::optional<AliasInfo> alias_info = std::nullopt)
+      c10::optional<AliasInfo> alias_info = c10::nullopt)
       : name_(std::move(name)),
         type_(fake_type ? std::move(fake_type) : TensorType::get()),
         real_type_(real_type ? std::move(real_type) : type_),
@@ -82,7 +82,6 @@ struct TORCH_API Argument {
     }
     return *this;
   }
-  ~Argument() = default;
 
   const std::string& name() const {
     return name_;
@@ -95,10 +94,10 @@ struct TORCH_API Argument {
   const TypePtr& real_type() const {
     return real_type_;
   }
-  const std::optional<int32_t>& N() const {
+  c10::optional<int32_t> N() const {
     return N_;
   }
-  const std::optional<IValue>& default_value() const {
+  const c10::optional<IValue>& default_value() const {
     return default_value_;
   }
   bool kwarg_only() const {
@@ -109,7 +108,7 @@ struct TORCH_API Argument {
     return is_out_;
   }
 
-  [[nodiscard]] const AliasInfo* alias_info() const {
+  C10_NODISCARD const AliasInfo* alias_info() const {
     return alias_info_.get();
   }
 
@@ -144,14 +143,14 @@ struct TORCH_API Argument {
         inferred_type_hint);
   }
 
-  Argument cloneWithType(const TypePtr& new_type) const {
+  Argument cloneWithType(TypePtr new_type) const {
     return Argument(
         name_,
-        new_type,
+        std::move(new_type),
         N_,
         default_value_,
         kwarg_only_,
-        alias_info_ ? std::optional<AliasInfo>(*alias_info_) : std::nullopt);
+        alias_info_ ? c10::optional<AliasInfo>(*alias_info_) : c10::nullopt);
   }
 
   // this function checks whether this Argument is backward compatible with
@@ -180,9 +179,9 @@ struct TORCH_API Argument {
   // e.g. for int[3]: type = ListType::ofInts(), N = 3
   // If present, this will allow scalars to be broadcast to this length to
   // become a list.
-  std::optional<int32_t> N_;
+  c10::optional<int32_t> N_;
 
-  std::optional<IValue> default_value_;
+  c10::optional<IValue> default_value_;
   // AliasInfo is huge, so let's only allocate memory for it if
   // necessary (which it isn't during schema parsing on startup, to
   // give a pertinent example).
@@ -323,10 +322,10 @@ struct TORCH_API FunctionSchema {
   // alias information should we infer?
   // NB: due to alias analysis kind merging, this may be nullopt.  Eventually
   // this should always be set no matter what
-  std::optional<AliasAnalysisKind> alias_kind_;
+  c10::optional<AliasAnalysisKind> alias_kind_;
 
   template <typename T>
-  void checkArg(const IValue& value, const Argument& argument, std::optional<size_t> pos) const;
+  void checkArg(const IValue& value, const Argument& argument, optional<size_t> pos) const;
 
   void checkSchema() const {
     bool seen_default_arg = false;
@@ -395,10 +394,10 @@ struct TORCH_API FunctionSchema {
     const AliasInfo* aliasInfo = getCorrectList(argument.type)[argument.index].alias_info();
     return aliasInfo && aliasInfo->isWrite();
   }
-  bool is_mutable(std::string_view name) const {
-    std::optional<int> index = argumentIndexWithName(name);
+  bool is_mutable(c10::string_view name) const {
+    c10::optional<int> index = argumentIndexWithName(name);
     TORCH_INTERNAL_ASSERT(
-        index.has_value(), "Schema has no argument named ", name);
+        index != c10::nullopt, "Schema has no argument named ", name);
 
     return is_mutable({c10::SchemaArgType::input, static_cast<size_t>(*index)});
   }
@@ -417,27 +416,27 @@ struct TORCH_API FunctionSchema {
 
   // Returns whether the two AliasTypeSets contain any similarities
   // ie: whether the two type sets can alias.
-  bool canAliasTypeSetsAlias(const std::optional<AliasTypeSet> &lhs, const std::optional<AliasTypeSet> &rhs) const;
+  bool canAliasTypeSetsAlias(const c10::optional<AliasTypeSet> &lhs, const c10::optional<AliasTypeSet> &rhs) const;
 
   // Recursively Finds all contained types within the AliasTypeSet.
-  std::optional<AliasTypeSet> getAliasTypeSetContainedTypes(const std::optional<AliasTypeSet> &aliasTypeSet) const;
+  c10::optional<AliasTypeSet> getAliasTypeSetContainedTypes(const c10::optional<AliasTypeSet> &aliasTypeSet) const;
 
   // Similar to mapTypeToAliasTypeSet defined in alias_analysis.cpp.
   // Used to map types to a type such that all types that can alias will be mapped to the same type.
   // For example, calling this method on 'Optional[List[int]]' is the same as calling this method
   // on 'List[int]'.
-  std::optional<AliasTypeSet> mapTypeToAliasTypeSet(const TypePtr& type) const;
+  c10::optional<AliasTypeSet> mapTypeToAliasTypeSet(const TypePtr& type) const;
 
   // Returns either arguments() or returns() depending on the SchemaArgType
   // output => returns(), input => arguments()
   const std::vector<Argument>& getCorrectList(SchemaArgType type) const;
 
-  std::optional<int> argumentIndexWithName(std::string_view name) const {
+  c10::optional<int> argumentIndexWithName(c10::string_view name) const {
     for (const auto i : c10::irange(arguments().size())) {
       if(name == arguments()[i].name())
         return i;
     }
-    return std::nullopt;
+    return c10::nullopt;
   }
   FunctionSchema cloneWithName(std::string name, std::string overload_name) const {
     return FunctionSchema(
@@ -471,8 +470,8 @@ struct TORCH_API FunctionSchema {
   std::string formatTypeMismatchMsg(
       const Argument& expected,
       const std::string& actual_type,
-      std::optional<size_t> position = std::nullopt,
-      std::optional<std::string> value = std::nullopt) const;
+      c10::optional<size_t> position = c10::nullopt,
+      c10::optional<std::string> value = c10::nullopt) const;
 
   FunctionSchema cloneWithRemappedTypes(
       const std::function<TypePtr(TypePtr)> type_map) const;
@@ -515,7 +514,7 @@ struct TORCH_API FunctionSchema {
     alias_kind_ = v;
   }
 
-  std::optional<std::string_view> getNamespace() const {
+  c10::optional<c10::string_view> getNamespace() const {
     return name_.getNamespace();
   }
 
@@ -567,7 +566,7 @@ inline std::ostream& operator<<(std::ostream& out, const Argument& arg) {
     if (arg.alias_info() && !arg.alias_info()->containedTypes().empty()){
       out << arg.alias_info()->containedTypes()[0];
     }
-    std::string N;
+    std::string N = "";
     if (arg.N()) {
         N = std::to_string(*arg.N());
     }
@@ -623,7 +622,7 @@ inline std::ostream& operator<<(std::ostream& out, const Argument& arg) {
   return out;
 }
 
-TORCH_API std::ostream& operator<<(std::ostream& out, const FunctionSchema& schema);
+inline std::ostream& operator<<(std::ostream& out, const FunctionSchema& schema);
 
 inline std::string toString(const FunctionSchema& schema) {
   std::ostringstream str;
@@ -651,13 +650,11 @@ template<>
       hash = c10::hash_combine(hash, type_hash);
       hash = c10::hash_combine(hash, kwarg_only_hash);
       // hashing optional fields if they exist
-      if (arg.default_value().has_value()) {
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
-        auto default_value_hash = c10::hash<c10::IValue>{}(*arg.default_value());
+      if (arg.default_value()) {
+        auto default_value_hash = c10::hash<c10::IValue>{}(arg.default_value().value());
         hash = c10::hash_combine(hash, default_value_hash);
       }
-      if (arg.N().has_value()) {
-        // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
+      if (arg.N()) {
         auto N_hash = std::hash<int64_t>{}(*arg.N());
         hash = c10::hash_combine(hash, N_hash);
       }

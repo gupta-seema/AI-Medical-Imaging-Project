@@ -1,18 +1,15 @@
-# mypy: allow-untyped-defs
 import argparse
 import os
 from enum import Enum
-from typing import cast, Optional, Union
+from typing import cast, Dict, List, Optional, Union
 
 import torch
 import torch.distributed as dist
 from torch.distributed._shard._utils import narrow_tensor_by_index
 from torch.distributed.checkpoint import FileSystemReader, FileSystemWriter
 from torch.distributed.checkpoint._nested_dict import flatten_state_dict
-from torch.distributed.checkpoint.default_planner import (
-    _EmptyStateDictLoadPlanner,
-    DefaultLoadPlanner,
-)
+from torch.distributed.checkpoint._traverse import set_element
+from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 from torch.distributed.checkpoint.metadata import (
     Metadata,
     STATE_DICT_TYPE,
@@ -34,6 +31,43 @@ __all__ = [
     "BroadcastingTorchSaveReader",
     "DynamicMetaLoadPlanner",
 ]
+
+
+class _EmptyStateDictLoadPlanner(DefaultLoadPlanner):
+    """
+    Extension of DefaultLoadPlanner, which rebuilds state_dict from the saved metadata.
+    Useful for loading in state_dict without first initializing a model, such as
+    when converting a DCP checkpoint into a Torch save file.
+
+    . N.B. `state_dict` must be an empty dictionary when used with this LoadPlanner
+
+    .. warning::
+        Because the entire state dict is initialized, It's recommended to only utilize
+        this LoadPlanner on a single rank or process to avoid OOM.
+
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def set_up_planner(
+        self,
+        state_dict: STATE_DICT_TYPE,
+        metadata: Metadata,
+        is_coordinator: bool,
+    ) -> None:
+        assert not state_dict
+
+        # rebuild the state dict from the metadata
+        for k, v in metadata.state_dict_metadata.items():
+            if isinstance(v, TensorStorageMetadata):
+                v = torch.empty(v.size, dtype=v.properties.dtype)  # type: ignore[assignment]
+            if k in metadata.planner_data:
+                set_element(state_dict, metadata.planner_data[k], v)
+            else:
+                state_dict[k] = v
+
+        super().set_up_planner(state_dict, metadata, is_coordinator)
 
 
 class BroadcastingTorchSaveReader(StorageReader):
@@ -84,9 +118,7 @@ class BroadcastingTorchSaveReader(StorageReader):
         # TODO: read on each host, instead of only the coordinator
         if self.is_coordinator:
             assert self.checkpoint_id is not None
-            torch_state_dict = torch.load(
-                self.checkpoint_id, map_location="cpu", weights_only=False
-            )
+            torch_state_dict = torch.load(self.checkpoint_id, map_location="cpu")
             if planner.flatten_state_dict:
                 torch_state_dict, _ = flatten_state_dict(torch_state_dict)
         else:
@@ -101,8 +133,7 @@ class BroadcastingTorchSaveReader(StorageReader):
 
             #  Broadcast the tensor from the coordinator rank
             if self.is_coordinator:
-                pg_device = dist.distributed_c10d._get_pg_default_device()
-                tensor = torch_state_dict[req.storage_index.fqn].to(pg_device)
+                tensor = torch_state_dict[req.storage_index.fqn].cuda()
             else:
                 tensor = torch.empty_like(planner.state_dict[req.storage_index.fqn])
 
@@ -133,7 +164,7 @@ class BroadcastingTorchSaveReader(StorageReader):
         """Implementation of the StorageReader method"""
         return plan
 
-    def prepare_global_plan(self, global_plan: list[LoadPlan]) -> list[LoadPlan]:
+    def prepare_global_plan(self, global_plan: List[LoadPlan]) -> List[LoadPlan]:
         """Implementation of the StorageReader method"""
         return global_plan
 
@@ -171,13 +202,13 @@ class DynamicMetaLoadPlanner(DefaultLoadPlanner):
     def set_up_planner(
         self,
         state_dict: STATE_DICT_TYPE,
-        metadata: Optional[Metadata] = None,
-        is_coordinator: bool = False,
+        metadata: Metadata,
+        is_coordinator: bool,
     ) -> None:
         """Setups of the planner, extnding default behavior by creating the Metadata object from the state dict"""
         super().set_up_planner(state_dict, metadata, is_coordinator)
 
-        state_dict_metadata: dict[str, STORAGE_TYPES] = {}
+        state_dict_metadata: Dict[str, STORAGE_TYPES] = {}
         for key, tensor in self.state_dict.items():
             if not torch.is_tensor(tensor):
                 raise RuntimeError(
@@ -226,14 +257,14 @@ def torch_save_to_dcp(
     Given the location of a torch save file, converts it into a DCP checkpoint.
 
     Args:
-        torch_save_path: Filename of the Torch save file.
-        dcp_checkpoint_dir: Directory to store the DCP checkpoint.
+        torch_save_path: Filename to store the converted Torch save file.
+        dcp_checkpoint_dir: Directory containing the DCP checkpoint.
 
     .. warning::
         To avoid OOM, it's recommended to only run this function on a single rank.
     """
 
-    state_dict = torch.load(torch_save_path, weights_only=False)
+    state_dict = torch.load(torch_save_path)
     # we don't need stateful behavior here because the expectation is anything loaded by
     # torch.load would not contain stateful objects.
     _save_state_dict(

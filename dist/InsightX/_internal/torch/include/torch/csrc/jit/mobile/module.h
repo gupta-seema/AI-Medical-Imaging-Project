@@ -7,7 +7,9 @@
 
 #include <utility>
 
-namespace torch::jit::mobile {
+namespace torch {
+namespace jit {
+namespace mobile {
 using Stack = std::vector<c10::IValue>;
 
 // A CompilationUnit object is the one that gets executed by the lite
@@ -74,7 +76,7 @@ class TORCH_API Module {
   c10::IValue forward(std::vector<c10::IValue> inputs) {
     return get_method("forward")(std::move(inputs));
   }
-  std::optional<Method> find_method(const std::string& basename) const;
+  c10::optional<Method> find_method(const std::string& basename) const;
 
   const std::string name() const {
     return object_->name();
@@ -133,7 +135,7 @@ class TORCH_API Module {
   }
 
   const CompilationUnit& compilation_unit() const {
-    return *cu_;
+    return *cu_.get();
   }
 
   void set_delete_memory(std::shared_ptr<char> delete_mem) {
@@ -190,4 +192,6 @@ struct TORCH_API ModuleInfo {
 };
 TORCH_API ModuleInfo get_module_info(const mobile::Module& module);
 
-} // namespace torch::jit::mobile
+} // namespace mobile
+} // namespace jit
+} // namespace torch

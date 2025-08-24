@@ -5,7 +5,8 @@ namespace at {
 class TensorBase;
 }
 
-namespace at::native {
+namespace at {
+namespace native {
 
 void launch_kthvalue_kernel(
     const TensorBase &values, const TensorBase &indices,
@@ -14,4 +15,4 @@ void launch_median_kernel(
     const TensorBase &vals, const TensorBase &inds,
     const TensorBase &in, int64_t dim, bool ignore_nan);
 
-}  // namespace at::native
+}}  // namespace at::native

@@ -18,11 +18,8 @@ namespace at {
 namespace compositeimplicitautograd {
 
 TORCH_API ::std::tuple<at::Tensor,at::Tensor> kthvalue(const at::Tensor & self, int64_t k, at::Dimname dim, bool keepdim=false);
-TORCH_API ::std::tuple<at::Tensor,at::Tensor> kthvalue_symint(const at::Tensor & self, c10::SymInt k, at::Dimname dim, bool keepdim=false);
 TORCH_API ::std::tuple<at::Tensor &,at::Tensor &> kthvalue_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, int64_t k, at::Dimname dim, bool keepdim=false);
 TORCH_API ::std::tuple<at::Tensor &,at::Tensor &> kthvalue_outf(const at::Tensor & self, int64_t k, at::Dimname dim, bool keepdim, at::Tensor & values, at::Tensor & indices);
-TORCH_API ::std::tuple<at::Tensor &,at::Tensor &> kthvalue_symint_out(at::Tensor & values, at::Tensor & indices, const at::Tensor & self, c10::SymInt k, at::Dimname dim, bool keepdim=false);
-TORCH_API ::std::tuple<at::Tensor &,at::Tensor &> kthvalue_symint_outf(const at::Tensor & self, c10::SymInt k, at::Dimname dim, bool keepdim, at::Tensor & values, at::Tensor & indices);
 
 } // namespace compositeimplicitautograd
 } // namespace at

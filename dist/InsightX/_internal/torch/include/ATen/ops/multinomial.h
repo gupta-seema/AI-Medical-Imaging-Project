@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -23,70 +22,18 @@
 namespace at {
 
 
-// aten::multinomial.out(Tensor self, SymInt num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & multinomial_out(at::Tensor & out, const at::Tensor & self, int64_t num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
+// aten::multinomial.out(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+inline at::Tensor & multinomial_out(at::Tensor & out, const at::Tensor & self, int64_t num_samples, bool replacement=false, c10::optional<at::Generator> generator=c10::nullopt) {
     return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
 }
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor & multinomial_out(at::Tensor & out, const at::Tensor & self, int64_t num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
+// aten::multinomial.out(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
+inline at::Tensor & multinomial_outf(const at::Tensor & self, int64_t num_samples, bool replacement, c10::optional<at::Generator> generator, at::Tensor & out) {
     return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-  }
 }
 
-// aten::multinomial.out(Tensor self, SymInt num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & multinomial_outf(const at::Tensor & self, int64_t num_samples, bool replacement, ::std::optional<at::Generator> generator, at::Tensor & out) {
-    return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor & multinomial_outf(const at::Tensor & self, int64_t num_samples, bool replacement, ::std::optional<at::Generator> generator, at::Tensor & out) {
-    return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-  }
-}
-
-// aten::multinomial.out(Tensor self, SymInt num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & multinomial_symint_out(at::Tensor & out, const at::Tensor & self, c10::SymInt num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
-    return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor & multinomial_out(at::Tensor & out, const at::Tensor & self, c10::SymInt num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
-    return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-  }
-}
-
-// aten::multinomial.out(Tensor self, SymInt num_samples, bool replacement=False, *, Generator? generator=None, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & multinomial_symint_outf(const at::Tensor & self, c10::SymInt num_samples, bool replacement, ::std::optional<at::Generator> generator, at::Tensor & out) {
-    return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor & multinomial_outf(const at::Tensor & self, c10::SymInt num_samples, bool replacement, ::std::optional<at::Generator> generator, at::Tensor & out) {
-    return at::_ops::multinomial_out::call(self, num_samples, replacement, generator, out);
-  }
-}
-
-// aten::multinomial(Tensor self, SymInt num_samples, bool replacement=False, *, Generator? generator=None) -> Tensor
-inline at::Tensor multinomial(const at::Tensor & self, int64_t num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
+// aten::multinomial(Tensor self, int num_samples, bool replacement=False, *, Generator? generator=None) -> Tensor
+inline at::Tensor multinomial(const at::Tensor & self, int64_t num_samples, bool replacement=false, c10::optional<at::Generator> generator=c10::nullopt) {
     return at::_ops::multinomial::call(self, num_samples, replacement, generator);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor multinomial(const at::Tensor & self, int64_t num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
-    return at::_ops::multinomial::call(self, num_samples, replacement, generator);
-  }
-}
-
-// aten::multinomial(Tensor self, SymInt num_samples, bool replacement=False, *, Generator? generator=None) -> Tensor
-inline at::Tensor multinomial_symint(const at::Tensor & self, c10::SymInt num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
-    return at::_ops::multinomial::call(self, num_samples, replacement, generator);
-}
-namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor multinomial(const at::Tensor & self, c10::SymInt num_samples, bool replacement=false, ::std::optional<at::Generator> generator=::std::nullopt) {
-    return at::_ops::multinomial::call(self, num_samples, replacement, generator);
-  }
 }
 
 }

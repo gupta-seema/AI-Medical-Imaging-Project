@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# mypy: allow-untyped-defs
 
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
@@ -7,24 +6,20 @@
 # This source code is licensed under the BSD-style license found in the
 # LICENSE file in the root directory of this source tree.
 import datetime
-import os
 import socket
 from contextlib import closing
-from typing import Optional
 
 import torch.distributed as dist
 from torch.distributed.elastic.utils.logging import get_logger
-from torch.distributed.elastic.utils.store import barrier
 
 
-__all__ = ["create_c10d_store", "get_free_port", "get_socket_with_port"]
-
-logger = get_logger(__name__)
+log = get_logger(__name__)
 
 _ADDRESS_IN_USE = "Address already in use"
 _SOCKET_TIMEOUT = "Socket Timeout"
 
-_TCP_STORE_INIT = "_tcp_store/num_members"
+_MEMBER_CHECKIN = "_tcp_store/num_members"
+_LAST_MEMBER_CHECKIN = "_tcp_store/last_member"
 
 
 def create_c10d_store(
@@ -35,25 +30,14 @@ def create_c10d_store(
     timeout: float = (60 * 10),  # 10 min
     wait_for_workers: bool = True,
     retries=3,
-    use_libuv: Optional[bool] = None,
 ):
-    if use_libuv is not None:
-        logger.warning(
-            "argument use_libuv is deprecated and ignored. Set USE_LIBUV environment "
-            'variable to "0" to disable libuv, or "1" to enable it. If the env var '
-            "is not set, libuv will be used by default."
-        )
-
-    # check os.environ for use_libuv
-    use_libuv = os.environ.get("USE_LIBUV", "1") == "1"  # libuv is the default option
-
     if server_port == -1 and world_size > 1:
         raise ValueError(
             f"server_port must be specified when world_size > 1, got server_port={server_port}, world_size={world_size}"
         )
 
     if server_port != -1:
-        logger.info("sever_port: %s, specified, ignoring retries", server_port)
+        log.info("sever_port: %s, specified, ignoring retries", server_port)
 
     # only retry when server_port is NOT static
     attempt = retries if server_port == -1 else 1
@@ -63,18 +47,12 @@ def create_c10d_store(
         else:
             port = get_free_port()
 
-        logger.info(
+        log.info(
             "Creating c10d store on %s:%s\n"
             "  world_size  : %s\n"
             "  is_server   : %s\n"
-            "  timeout(sec): %s\n"
-            "  use_libuv   : %s\n",
-            server_addr,
-            port,
-            world_size,
-            is_server,
-            timeout,
-            use_libuv,
+            "  timeout(sec): %s\n",
+            server_addr, port, world_size, is_server, timeout
         )
 
         try:
@@ -85,12 +63,11 @@ def create_c10d_store(
                 is_master=is_server,
                 timeout=datetime.timedelta(seconds=timeout),
                 wait_for_workers=wait_for_workers,
-                use_libuv=use_libuv,
             )
             # skips full rank check when we don't have to wait for all workers
             if wait_for_workers:
-                _check_full_rank(store, world_size, timeout=timeout)
-            logger.info("Successfully created c10d store")
+                _check_full_rank(store, world_size)
+            log.info("Successfully created c10d store")
             return store
         except RuntimeError as e:
             # this is brittle, but the underlying exception type is not properly pybinded
@@ -100,11 +77,8 @@ def create_c10d_store(
             # TODO properly map the exceptions in pybind (c10d/init.cpp)
             if str(e) == _ADDRESS_IN_USE:  # this will only happen on the server
                 if attempt < retries:
-                    logger.warning(
-                        "port: %s already in use, attempt: [%s/%s]",
-                        port,
-                        attempt,
-                        retries,
+                    log.warning(
+                        "port: %s already in use, attempt: [%s/%s]", port, attempt, retries
                     )
                     attempt += 1
                 else:
@@ -115,9 +89,13 @@ def create_c10d_store(
                 raise
 
 
-def _check_full_rank(store, world_size, timeout):
+def _check_full_rank(store, world_size):
+    idx = store.add(_MEMBER_CHECKIN, 1)
+    if idx == world_size:
+        store.set(_LAST_MEMBER_CHECKIN, "<val_ignored>")
+
     try:
-        barrier(store, world_size, key_prefix=_TCP_STORE_INIT, barrier_timeout=timeout)
+        store.get(_LAST_MEMBER_CHECKIN)
     except RuntimeError as e:
         if str(e) == _SOCKET_TIMEOUT:
             raise TimeoutError(
@@ -128,24 +106,6 @@ def _check_full_rank(store, world_size, timeout):
 
 
 def get_free_port():
-    """
-    Returns an unused port on localhost.
-
-    This function finds an unused port on localhost by opening to socket to bind
-    to a port and then closing it.
-
-    Returns:
-        int: an unused port on localhost
-
-    Example:
-        >>> # xdoctest: +SKIP("Nondeterministic")
-        >>> get_free_port()
-        63976
-
-    .. note::
-        The port returned by :func:`get_free_port` is not reserved and may be
-        taken by another process after this function returns.
-    """
     sock = get_socket_with_port()
     with closing(sock):
         return sock.getsockname()[1]
@@ -180,5 +140,5 @@ def get_socket_with_port() -> socket.socket:
             return s
         except OSError as e:
             s.close()
-            logger.warning("Socket creation attempt failed.", exc_info=e)
+            log.info("Socket creation attempt failed.", exc_info=e)
     raise RuntimeError("Failed to create a socket")

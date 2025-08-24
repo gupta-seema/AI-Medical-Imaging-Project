@@ -6,11 +6,14 @@
 #include <cstdint>
 #include <type_traits>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 class Module;
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch
 
-namespace torch::detail {
+namespace torch {
+namespace detail {
 /// Detects if a type T has a forward() method.
 template <typename T>
 struct has_forward {
@@ -40,8 +43,8 @@ struct has_forward {
 
 template <typename Head = void, typename... Tail>
 constexpr bool check_not_lvalue_references() {
-  return (!std::is_lvalue_reference_v<Head> ||
-          std::is_const_v<std::remove_reference_t<Head>>) &&
+  return (!std::is_lvalue_reference<Head>::value ||
+          std::is_const<typename std::remove_reference<Head>::type>::value) &&
       check_not_lvalue_references<Tail...>();
 }
 
@@ -52,8 +55,11 @@ inline constexpr bool check_not_lvalue_references<void>() {
 
 /// A type trait whose `value` member is true if `M` derives from `Module`.
 template <typename M>
-using is_module = std::is_base_of<torch::nn::Module, std::decay_t<M>>;
+using is_module =
+    std::is_base_of<torch::nn::Module, typename std::decay<M>::type>;
 
 template <typename M, typename T = void>
-using enable_if_module_t = std::enable_if_t<is_module<M>::value, T>;
-} // namespace torch::detail
+using enable_if_module_t =
+    typename std::enable_if<is_module<M>::value, T>::type;
+} // namespace detail
+} // namespace torch

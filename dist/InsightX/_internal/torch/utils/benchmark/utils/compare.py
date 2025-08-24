@@ -1,13 +1,11 @@
-# mypy: allow-untyped-defs
 """Display class to aggregate and print the results of many measurements."""
 import collections
 import enum
 import itertools as it
-from typing import Optional
+from typing import DefaultDict, List, Optional, Tuple
 
 from torch.utils.benchmark.utils import common
 from torch import tensor as _tensor
-import operator
 
 __all__ = ["Colorize", "Compare"]
 
@@ -29,14 +27,14 @@ class Colorize(enum.Enum):
 class _Column:
     def __init__(
         self,
-        grouped_results: list[tuple[Optional[common.Measurement], ...]],
+        grouped_results: List[Tuple[Optional[common.Measurement], ...]],
         time_scale: float,
         time_unit: str,
         trim_significant_figures: bool,
         highlight_warnings: bool,
     ):
         self._grouped_results = grouped_results
-        self._flat_results = [*it.chain.from_iterable(grouped_results)]
+        self._flat_results = list(it.chain(*grouped_results))
         self._time_scale = time_scale
         self._time_unit = time_unit
         self._trim_significant_figures = trim_significant_figures
@@ -88,10 +86,10 @@ class _Row:
         self._row_name_str_len = row_name_str_len
         self._time_scale = time_scale
         self._colorize = colorize
-        self._columns: tuple[_Column, ...] = ()
+        self._columns: Tuple[_Column, ...] = ()
         self._num_threads = num_threads
 
-    def register_columns(self, columns: tuple[_Column, ...]):
+    def register_columns(self, columns: Tuple[_Column, ...]):
         self._columns = columns
 
     def as_column_strings(self):
@@ -152,7 +150,7 @@ class _Row:
 class Table:
     def __init__(
             self,
-            results: list[common.Measurement],
+            results: List[common.Measurement],
             colorize: Colorize,
             trim_significant_figures: bool,
             highlight_warnings: bool
@@ -169,22 +167,22 @@ class Table:
         )
 
         self.row_keys = common.ordered_unique([self.row_fn(i) for i in results])
-        self.row_keys.sort(key=operator.itemgetter(slice(2)))  # preserve stmt order
+        self.row_keys.sort(key=lambda args: args[:2])  # preserve stmt order
         self.column_keys = common.ordered_unique([self.col_fn(i) for i in results])
         self.rows, self.columns = self.populate_rows_and_columns()
 
     @staticmethod
-    def row_fn(m: common.Measurement) -> tuple[int, Optional[str], str]:
+    def row_fn(m: common.Measurement) -> Tuple[int, Optional[str], str]:
         return m.num_threads, m.env, m.as_row_name
 
     @staticmethod
     def col_fn(m: common.Measurement) -> Optional[str]:
         return m.description
 
-    def populate_rows_and_columns(self) -> tuple[tuple[_Row, ...], tuple[_Column, ...]]:
-        rows: list[_Row] = []
-        columns: list[_Column] = []
-        ordered_results: list[list[Optional[common.Measurement]]] = [
+    def populate_rows_and_columns(self) -> Tuple[Tuple[_Row, ...], Tuple[_Column, ...]]:
+        rows: List[_Row] = []
+        columns: List[_Column] = []
+        ordered_results: List[List[Optional[common.Measurement]]] = [
             [None for _ in self.column_keys]
             for _ in self.row_keys
         ]
@@ -204,7 +202,7 @@ class Table:
         prior_num_threads = -1
         prior_env = ""
         row_group = -1
-        rows_by_group: list[list[list[Optional[common.Measurement]]]] = []
+        rows_by_group: List[List[List[Optional[common.Measurement]]]] = []
         for (num_threads, env, _), row in zip(self.row_keys, ordered_results):
             thread_transition = (num_threads != prior_num_threads)
             if thread_transition:
@@ -244,7 +242,8 @@ class Table:
 
     def render(self) -> str:
         string_rows = [[""] + self.column_keys]
-        string_rows.extend(r.as_column_strings() for r in self.rows)
+        for r in self.rows:
+            string_rows.append(r.as_column_strings())
         num_cols = max(len(i) for i in string_rows)
         for sr in string_rows:
             sr.extend(["" for _ in range(num_cols - len(sr))])
@@ -267,23 +266,8 @@ Times are in {common.unit_to_english(self.time_unit)}s ({self.time_unit}).
 
 
 class Compare:
-    """Helper class for displaying the results of many measurements in a
-    formatted table.
-
-    The table format is based on the information fields provided in
-    :class:`torch.utils.benchmark.Timer` (`description`, `label`, `sub_label`,
-    `num_threads`, etc).
-
-    The table can be directly printed using :meth:`print` or casted as a `str`.
-
-    For a full tutorial on how to use this class, see:
-    https://pytorch.org/tutorials/recipes/recipes/benchmark.html
-
-    Args:
-        results: List of Measurment to display.
-    """
-    def __init__(self, results: list[common.Measurement]):
-        self._results: list[common.Measurement] = []
+    def __init__(self, results: List[common.Measurement]):
+        self._results: List[common.Measurement] = []
         self.extend_results(results)
         self._trim_significant_figures = False
         self._colorize = Colorize.NONE
@@ -293,10 +277,6 @@ class Compare:
         return "\n".join(self._render())
 
     def extend_results(self, results):
-        """Append results to already stored ones.
-
-        All added results must be instances of ``Measurement``.
-        """
         for r in results:
             if not isinstance(r, common.Measurement):
                 raise ValueError(
@@ -305,37 +285,32 @@ class Compare:
         self._results.extend(results)
 
     def trim_significant_figures(self):
-        """Enables trimming of significant figures when building the formatted table."""
         self._trim_significant_figures = True
 
     def colorize(self, rowwise=False):
-        """Colorize formatted table.
-
-        Colorize columnwise by default.
-        """
         self._colorize = Colorize.ROWWISE if rowwise else Colorize.COLUMNWISE
 
     def highlight_warnings(self):
-        """Enables warning highlighting when building formatted table."""
         self._highlight_warnings = True
 
     def print(self):
-        """Print formatted table"""
         print(str(self))
 
     def _render(self):
         results = common.Measurement.merge(self._results)
         grouped_results = self._group_by_label(results)
-        output = [self._layout(group) for group in grouped_results.values()]
+        output = []
+        for group in grouped_results.values():
+            output.append(self._layout(group))
         return output
 
-    def _group_by_label(self, results: list[common.Measurement]):
-        grouped_results: collections.defaultdict[str, list[common.Measurement]] = collections.defaultdict(list)
+    def _group_by_label(self, results: List[common.Measurement]):
+        grouped_results: DefaultDict[str, List[common.Measurement]] = collections.defaultdict(list)
         for r in results:
             grouped_results[r.label].append(r)
         return grouped_results
 
-    def _layout(self, results: list[common.Measurement]):
+    def _layout(self, results: List[common.Measurement]):
         table = Table(
             results,
             self._colorize,

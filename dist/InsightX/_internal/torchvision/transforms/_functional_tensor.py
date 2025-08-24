@@ -1,5 +1,5 @@
 import warnings
-from typing import Optional, Union
+from typing import List, Optional, Tuple, Union
 
 import torch
 from torch import Tensor
@@ -15,14 +15,14 @@ def _assert_image_tensor(img: Tensor) -> None:
         raise TypeError("Tensor is not a torch image.")
 
 
-def get_dimensions(img: Tensor) -> list[int]:
+def get_dimensions(img: Tensor) -> List[int]:
     _assert_image_tensor(img)
     channels = 1 if img.ndim == 2 else img.shape[-3]
     height, width = img.shape[-2:]
     return [channels, height, width]
 
 
-def get_image_size(img: Tensor) -> list[int]:
+def get_image_size(img: Tensor) -> List[int]:
     # Returns (w, h) of tensor image
     _assert_image_tensor(img)
     return [img.shape[-1], img.shape[-2]]
@@ -45,8 +45,6 @@ def _max_value(dtype: torch.dtype) -> int:
         return 127
     elif dtype == torch.int16:
         return 32767
-    elif dtype == torch.uint16:
-        return 65535
     elif dtype == torch.int32:
         return 2147483647
     elif dtype == torch.int64:
@@ -57,7 +55,7 @@ def _max_value(dtype: torch.dtype) -> int:
         return 1
 
 
-def _assert_channels(img: Tensor, permitted: list[int]) -> None:
+def _assert_channels(img: Tensor, permitted: List[int]) -> None:
     c = get_dimensions(img)[0]
     if c not in permitted:
         raise TypeError(f"Input image tensor permitted channel values are {permitted}, but found {c}")
@@ -321,7 +319,7 @@ def _hsv2rgb(img: Tensor) -> Tensor:
     return torch.einsum("...ijk, ...xijk -> ...xjk", mask.to(dtype=img.dtype), a4)
 
 
-def _pad_symmetric(img: Tensor, padding: list[int]) -> Tensor:
+def _pad_symmetric(img: Tensor, padding: List[int]) -> Tensor:
     # padding is left, right, top, bottom
 
     # crop if needed
@@ -352,7 +350,7 @@ def _pad_symmetric(img: Tensor, padding: list[int]) -> Tensor:
         raise RuntimeError("Symmetric padding of N-D tensors are not supported yet")
 
 
-def _parse_pad_padding(padding: Union[int, list[int]]) -> list[int]:
+def _parse_pad_padding(padding: Union[int, List[int]]) -> List[int]:
     if isinstance(padding, int):
         if torch.jit.is_scripting():
             # This maybe unreachable
@@ -373,7 +371,7 @@ def _parse_pad_padding(padding: Union[int, list[int]]) -> list[int]:
 
 
 def pad(
-    img: Tensor, padding: Union[int, list[int]], fill: Optional[Union[int, float]] = 0, padding_mode: str = "constant"
+    img: Tensor, padding: Union[int, List[int]], fill: Optional[Union[int, float]] = 0, padding_mode: str = "constant"
 ) -> Tensor:
     _assert_image_tensor(img)
 
@@ -440,7 +438,7 @@ def pad(
 
 def resize(
     img: Tensor,
-    size: list[int],
+    size: List[int],
     interpolation: str = "bilinear",
     antialias: Optional[bool] = True,
 ) -> Tensor:
@@ -476,11 +474,11 @@ def resize(
 
 def _assert_grid_transform_inputs(
     img: Tensor,
-    matrix: Optional[list[float]],
+    matrix: Optional[List[float]],
     interpolation: str,
-    fill: Optional[Union[int, float, list[float]]],
-    supported_interpolation_modes: list[str],
-    coeffs: Optional[list[float]] = None,
+    fill: Optional[Union[int, float, List[float]]],
+    supported_interpolation_modes: List[str],
+    coeffs: Optional[List[float]] = None,
 ) -> None:
 
     if not (isinstance(img, torch.Tensor)):
@@ -513,7 +511,7 @@ def _assert_grid_transform_inputs(
         raise ValueError(f"Interpolation mode '{interpolation}' is unsupported with Tensor input")
 
 
-def _cast_squeeze_in(img: Tensor, req_dtypes: list[torch.dtype]) -> tuple[Tensor, bool, bool, torch.dtype]:
+def _cast_squeeze_in(img: Tensor, req_dtypes: List[torch.dtype]) -> Tuple[Tensor, bool, bool, torch.dtype]:
     need_squeeze = False
     # make image NCHW
     if img.ndim < 4:
@@ -543,7 +541,7 @@ def _cast_squeeze_out(img: Tensor, need_cast: bool, need_squeeze: bool, out_dtyp
 
 
 def _apply_grid_transform(
-    img: Tensor, grid: Tensor, mode: str, fill: Optional[Union[int, float, list[float]]]
+    img: Tensor, grid: Tensor, mode: str, fill: Optional[Union[int, float, List[float]]]
 ) -> Tensor:
 
     img, need_cast, need_squeeze, out_dtype = _cast_squeeze_in(img, [grid.dtype])
@@ -604,9 +602,9 @@ def _gen_affine_grid(
 
 def affine(
     img: Tensor,
-    matrix: list[float],
+    matrix: List[float],
     interpolation: str = "nearest",
-    fill: Optional[Union[int, float, list[float]]] = None,
+    fill: Optional[Union[int, float, List[float]]] = None,
 ) -> Tensor:
     _assert_grid_transform_inputs(img, matrix, interpolation, fill, ["nearest", "bilinear"])
 
@@ -618,7 +616,7 @@ def affine(
     return _apply_grid_transform(img, grid, interpolation, fill=fill)
 
 
-def _compute_affine_output_size(matrix: list[float], w: int, h: int) -> tuple[int, int]:
+def _compute_affine_output_size(matrix: List[float], w: int, h: int) -> Tuple[int, int]:
 
     # Inspired of PIL implementation:
     # https://github.com/python-pillow/Pillow/blob/11de3318867e4398057373ee9f12dcb33db7335c/src/PIL/Image.py#L2054
@@ -653,10 +651,10 @@ def _compute_affine_output_size(matrix: list[float], w: int, h: int) -> tuple[in
 
 def rotate(
     img: Tensor,
-    matrix: list[float],
+    matrix: List[float],
     interpolation: str = "nearest",
     expand: bool = False,
-    fill: Optional[Union[int, float, list[float]]] = None,
+    fill: Optional[Union[int, float, List[float]]] = None,
 ) -> Tensor:
     _assert_grid_transform_inputs(img, matrix, interpolation, fill, ["nearest", "bilinear"])
     w, h = img.shape[-1], img.shape[-2]
@@ -669,7 +667,7 @@ def rotate(
     return _apply_grid_transform(img, grid, interpolation, fill=fill)
 
 
-def _perspective_grid(coeffs: list[float], ow: int, oh: int, dtype: torch.dtype, device: torch.device) -> Tensor:
+def _perspective_grid(coeffs: List[float], ow: int, oh: int, dtype: torch.dtype, device: torch.device) -> Tensor:
     # https://github.com/python-pillow/Pillow/blob/4634eafe3c695a014267eefdce830b4a825beed7/
     # src/libImaging/Geometry.c#L394
 
@@ -700,9 +698,9 @@ def _perspective_grid(coeffs: list[float], ow: int, oh: int, dtype: torch.dtype,
 
 def perspective(
     img: Tensor,
-    perspective_coeffs: list[float],
+    perspective_coeffs: List[float],
     interpolation: str = "bilinear",
-    fill: Optional[Union[int, float, list[float]]] = None,
+    fill: Optional[Union[int, float, List[float]]] = None,
 ) -> Tensor:
     if not (isinstance(img, torch.Tensor)):
         raise TypeError("Input img should be Tensor.")
@@ -724,10 +722,10 @@ def perspective(
     return _apply_grid_transform(img, grid, interpolation, fill=fill)
 
 
-def _get_gaussian_kernel1d(kernel_size: int, sigma: float, dtype: torch.dtype, device: torch.device) -> Tensor:
+def _get_gaussian_kernel1d(kernel_size: int, sigma: float) -> Tensor:
     ksize_half = (kernel_size - 1) * 0.5
 
-    x = torch.linspace(-ksize_half, ksize_half, steps=kernel_size, dtype=dtype, device=device)
+    x = torch.linspace(-ksize_half, ksize_half, steps=kernel_size)
     pdf = torch.exp(-0.5 * (x / sigma).pow(2))
     kernel1d = pdf / pdf.sum()
 
@@ -735,15 +733,15 @@ def _get_gaussian_kernel1d(kernel_size: int, sigma: float, dtype: torch.dtype, d
 
 
 def _get_gaussian_kernel2d(
-    kernel_size: list[int], sigma: list[float], dtype: torch.dtype, device: torch.device
+    kernel_size: List[int], sigma: List[float], dtype: torch.dtype, device: torch.device
 ) -> Tensor:
-    kernel1d_x = _get_gaussian_kernel1d(kernel_size[0], sigma[0], dtype, device)
-    kernel1d_y = _get_gaussian_kernel1d(kernel_size[1], sigma[1], dtype, device)
+    kernel1d_x = _get_gaussian_kernel1d(kernel_size[0], sigma[0]).to(device, dtype=dtype)
+    kernel1d_y = _get_gaussian_kernel1d(kernel_size[1], sigma[1]).to(device, dtype=dtype)
     kernel2d = torch.mm(kernel1d_y[:, None], kernel1d_x[None, :])
     return kernel2d
 
 
-def gaussian_blur(img: Tensor, kernel_size: list[int], sigma: list[float]) -> Tensor:
+def gaussian_blur(img: Tensor, kernel_size: List[int], sigma: List[float]) -> Tensor:
     if not (isinstance(img, torch.Tensor)):
         raise TypeError(f"img should be Tensor. Got {type(img)}")
 
@@ -902,7 +900,7 @@ def equalize(img: Tensor) -> Tensor:
     return torch.stack([_equalize_single_image(x) for x in img])
 
 
-def normalize(tensor: Tensor, mean: list[float], std: list[float], inplace: bool = False) -> Tensor:
+def normalize(tensor: Tensor, mean: List[float], std: List[float], inplace: bool = False) -> Tensor:
     _assert_image_tensor(tensor)
 
     if not tensor.is_floating_point():
@@ -938,7 +936,7 @@ def erase(img: Tensor, i: int, j: int, h: int, w: int, v: Tensor, inplace: bool 
     return img
 
 
-def _create_identity_grid(size: list[int]) -> Tensor:
+def _create_identity_grid(size: List[int]) -> Tensor:
     hw_space = [torch.linspace((-s + 1) / s, (s - 1) / s, s) for s in size]
     grid_y, grid_x = torch.meshgrid(hw_space, indexing="ij")
     return torch.stack([grid_x, grid_y], -1).unsqueeze(0)  # 1 x H x W x 2
@@ -948,7 +946,7 @@ def elastic_transform(
     img: Tensor,
     displacement: Tensor,
     interpolation: str = "bilinear",
-    fill: Optional[Union[int, float, list[float]]] = None,
+    fill: Optional[Union[int, float, List[float]]] = None,
 ) -> Tensor:
 
     if not (isinstance(img, torch.Tensor)):

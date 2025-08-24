@@ -13,6 +13,10 @@
 #include <c10/util/irange.h>
 
 #include <algorithm>
+#include <memory>
+#include <numeric>
+#include <sstream>
+#include <typeinfo>
 
 #define AT_DISALLOW_COPY_AND_ASSIGN(TypeName) \
   TypeName(const TypeName&) = delete;         \
@@ -25,7 +29,7 @@ TORCH_API int _crash_if_asan(int);
 // Converts a TensorList (i.e. ArrayRef<Tensor> to vector of TensorImpl*)
 // NB: This is ONLY used by legacy TH bindings, and ONLY used by cat.
 // Once cat is ported entirely to ATen this can be deleted!
-inline std::vector<TensorImpl*> checked_dense_tensor_list_unwrap(
+static inline std::vector<TensorImpl*> checked_dense_tensor_list_unwrap(
     ArrayRef<Tensor> tensors,
     const char* name,
     int pos,
@@ -36,8 +40,7 @@ inline std::vector<TensorImpl*> checked_dense_tensor_list_unwrap(
   for (const auto i : c10::irange(tensors.size())) {
     const auto& expr = tensors[i];
     if (expr.layout() != Layout::Strided) {
-      TORCH_CHECK(
-          false,
+      AT_ERROR(
           "Expected dense tensor but got ",
           expr.layout(),
           " for sequence element ",
@@ -49,8 +52,7 @@ inline std::vector<TensorImpl*> checked_dense_tensor_list_unwrap(
           "'");
     }
     if (expr.device().type() != device_type) {
-      TORCH_CHECK(
-          false,
+      AT_ERROR(
           "Expected object of device type ",
           device_type,
           " but got device type ",
@@ -64,8 +66,7 @@ inline std::vector<TensorImpl*> checked_dense_tensor_list_unwrap(
           "'");
     }
     if (expr.scalar_type() != scalar_type) {
-      TORCH_CHECK(
-          false,
+      AT_ERROR(
           "Expected object of scalar type ",
           scalar_type,
           " but got scalar type ",
@@ -99,8 +100,7 @@ std::array<int64_t, N> check_intlist(
     return res;
   }
   if (list.size() != N) {
-    TORCH_CHECK(
-        false,
+    AT_ERROR(
         "Expected a list of ",
         N,
         " ints but got ",

@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -35,20 +34,6 @@ inline at::Tensor & baddbmm_out(at::Tensor & out, const at::Tensor & self, const
 // aten::baddbmm.out(Tensor self, Tensor batch1, Tensor batch2, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
 inline at::Tensor & baddbmm_outf(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, const at::Scalar & beta, const at::Scalar & alpha, at::Tensor & out) {
     return at::_ops::baddbmm_out::call(self, batch1, batch2, beta, alpha, out);
-}
-
-// aten::baddbmm.dtype(Tensor self, Tensor batch1, Tensor batch2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1) -> Tensor
-inline at::Tensor baddbmm(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::ScalarType out_dtype, const at::Scalar & beta=1, const at::Scalar & alpha=1) {
-    return at::_ops::baddbmm_dtype::call(self, batch1, batch2, out_dtype, beta, alpha);
-}
-
-// aten::baddbmm.dtype_out(Tensor self, Tensor batch1, Tensor batch2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & baddbmm_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::ScalarType out_dtype, const at::Scalar & beta=1, const at::Scalar & alpha=1) {
-    return at::_ops::baddbmm_dtype_out::call(self, batch1, batch2, out_dtype, beta, alpha, out);
-}
-// aten::baddbmm.dtype_out(Tensor self, Tensor batch1, Tensor batch2, ScalarType out_dtype, *, Scalar beta=1, Scalar alpha=1, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & baddbmm_outf(const at::Tensor & self, const at::Tensor & batch1, const at::Tensor & batch2, at::ScalarType out_dtype, const at::Scalar & beta, const at::Scalar & alpha, at::Tensor & out) {
-    return at::_ops::baddbmm_dtype_out::call(self, batch1, batch2, out_dtype, beta, alpha, out);
 }
 
 }

@@ -5,7 +5,8 @@ namespace at {
 class TensorBase;
 }
 
-namespace at::native {
+namespace at {
+namespace native {
 
 void launch_fused_mode_kernel(
     const TensorBase &values, const TensorBase &indices,
@@ -15,4 +16,4 @@ void launch_apply_mode_kernel(
     const TensorBase &values, const TensorBase &indices,
     const TensorBase &self, int64_t dim, int64_t ndim);
 
-}  // namespace at::native
+}}  // namespace at::native

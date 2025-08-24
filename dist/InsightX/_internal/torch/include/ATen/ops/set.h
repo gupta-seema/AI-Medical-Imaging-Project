@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,28 +23,28 @@ namespace at {
 
 
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & set_(at::Tensor & self, at::Storage source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride={}) {
     return at::_ops::set__source_Storage_storage_offset::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride));
   }
 }
 
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & set_(at::Tensor & self, at::Storage source, c10::SymInt storage_offset, c10::SymIntArrayRef size, c10::SymIntArrayRef stride={}) {
     return at::_ops::set__source_Storage_storage_offset::call(self, source, storage_offset, size, stride);
   }
 }
 
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & set_(at::Tensor & self, const at::Tensor & source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride={}) {
     return at::_ops::set__source_Tensor_storage_offset::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride));
   }
 }
 
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & set_(at::Tensor & self, const at::Tensor & source, c10::SymInt storage_offset, c10::SymIntArrayRef size, c10::SymIntArrayRef stride={}) {
     return at::_ops::set__source_Tensor_storage_offset::call(self, source, storage_offset, size, stride);
   }
@@ -70,7 +69,7 @@ inline at::Tensor & set_out(at::Tensor & out, const at::Tensor & self, at::Stora
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride), out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & set_out(at::Tensor & out, const at::Tensor & self, at::Storage source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride={}) {
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride), out);
   }
@@ -81,7 +80,7 @@ inline at::Tensor & set_outf(const at::Tensor & self, at::Storage source, int64_
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride), out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & set_outf(const at::Tensor & self, at::Storage source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride, at::Tensor & out) {
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride), out);
   }
@@ -92,7 +91,7 @@ inline at::Tensor & set_symint_out(at::Tensor & out, const at::Tensor & self, at
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, size, stride, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & set_out(at::Tensor & out, const at::Tensor & self, at::Storage source, c10::SymInt storage_offset, c10::SymIntArrayRef size, c10::SymIntArrayRef stride={}) {
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, size, stride, out);
   }
@@ -103,7 +102,7 @@ inline at::Tensor & set_symint_outf(const at::Tensor & self, at::Storage source,
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, size, stride, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & set_outf(const at::Tensor & self, at::Storage source, c10::SymInt storage_offset, c10::SymIntArrayRef size, c10::SymIntArrayRef stride, at::Tensor & out) {
     return at::_ops::set_source_Storage_storage_offset_out::call(self, source, storage_offset, size, stride, out);
   }
@@ -114,7 +113,7 @@ inline at::Tensor set(const at::Tensor & self, at::Storage source, int64_t stora
     return at::_ops::set_source_Storage_storage_offset::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride));
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor set(const at::Tensor & self, at::Storage source, int64_t storage_offset, at::IntArrayRef size, at::IntArrayRef stride={}) {
     return at::_ops::set_source_Storage_storage_offset::call(self, source, storage_offset, c10::fromIntArrayRefSlow(size), c10::fromIntArrayRefSlow(stride));
   }
@@ -125,7 +124,7 @@ inline at::Tensor set_symint(const at::Tensor & self, at::Storage source, c10::S
     return at::_ops::set_source_Storage_storage_offset::call(self, source, storage_offset, size, stride);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor set(const at::Tensor & self, at::Storage source, c10::SymInt storage_offset, c10::SymIntArrayRef size, c10::SymIntArrayRef stride={}) {
     return at::_ops::set_source_Storage_storage_offset::call(self, source, storage_offset, size, stride);
   }

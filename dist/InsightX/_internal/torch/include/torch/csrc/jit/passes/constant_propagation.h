@@ -2,7 +2,8 @@
 
 #include <torch/csrc/jit/ir/ir.h>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 // Runs constant propagation on all objects unless ignore_custom_classes is
 // specified as true, in which case user defined classes are skipped.  This is
@@ -22,9 +23,10 @@ TORCH_API bool ConstantPropagationImmutableTypes(std::shared_ptr<Graph>& graph);
 // make their own determination if constant prop is appropriate - for example
 // non-deterministic ops or ops with side effects.  If ignore_custom_classes is
 // specified, nodes that output user defined classes are not run.
-TORCH_API std::optional<Stack> runNodeIfInputsAreConstant(
+TORCH_API c10::optional<Stack> runNodeIfInputsAreConstant(
     const Node* node,
     bool ignore_custom_classes = false,
     AliasDb* db = nullptr);
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

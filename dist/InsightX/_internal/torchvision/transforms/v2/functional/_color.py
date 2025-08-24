@@ -1,3 +1,5 @@
+from typing import List
+
 import PIL.Image
 import torch
 from torch.nn.functional import conv2d
@@ -64,7 +66,7 @@ def _rgb_to_grayscale_image_pil(image: PIL.Image.Image, num_output_channels: int
 
 
 def grayscale_to_rgb(inpt: torch.Tensor) -> torch.Tensor:
-    """See :class:`~torchvision.transforms.v2.RGB` for details."""
+    """See :class:`~torchvision.transforms.v2.GrayscaleToRgb` for details."""
     if torch.jit.is_scripting():
         return grayscale_to_rgb_image(inpt)
 
@@ -458,9 +460,6 @@ def posterize(inpt: torch.Tensor, bits: int) -> torch.Tensor:
 @_register_kernel_internal(posterize, torch.Tensor)
 @_register_kernel_internal(posterize, tv_tensors.Image)
 def posterize_image(image: torch.Tensor, bits: int) -> torch.Tensor:
-    if not isinstance(bits, int) or not 0 <= bits <= 8:
-        raise TypeError(f"bits must be a positive integer in the range [0, 8], got {bits} instead.")
-
     if image.is_floating_point():
         levels = 1 << bits
         return image.mul(levels).floor_().clamp_(0, levels - 1).mul_(1.0 / levels)
@@ -680,7 +679,7 @@ def invert_video(video: torch.Tensor) -> torch.Tensor:
     return invert_image(video)
 
 
-def permute_channels(inpt: torch.Tensor, permutation: list[int]) -> torch.Tensor:
+def permute_channels(inpt: torch.Tensor, permutation: List[int]) -> torch.Tensor:
     """Permute the channels of the input according to the given permutation.
 
     This function supports plain :class:`~torch.Tensor`'s, :class:`PIL.Image.Image`'s, and
@@ -688,7 +687,7 @@ def permute_channels(inpt: torch.Tensor, permutation: list[int]) -> torch.Tensor
 
     Example:
         >>> rgb_image = torch.rand(3, 256, 256)
-        >>> bgr_image = F.permute_channels(rgb_image, permutation=[2, 1, 0])
+        >>> bgr_image = F.permutate_channels(rgb_image, permutation=[2, 1, 0])
 
     Args:
         permutation (List[int]): Valid permutation of the input channel indices. The index of the element determines the
@@ -713,7 +712,7 @@ def permute_channels(inpt: torch.Tensor, permutation: list[int]) -> torch.Tensor
 
 @_register_kernel_internal(permute_channels, torch.Tensor)
 @_register_kernel_internal(permute_channels, tv_tensors.Image)
-def permute_channels_image(image: torch.Tensor, permutation: list[int]) -> torch.Tensor:
+def permute_channels_image(image: torch.Tensor, permutation: List[int]) -> torch.Tensor:
     shape = image.shape
     num_channels, height, width = shape[-3:]
 
@@ -731,10 +730,10 @@ def permute_channels_image(image: torch.Tensor, permutation: list[int]) -> torch
 
 
 @_register_kernel_internal(permute_channels, PIL.Image.Image)
-def _permute_channels_image_pil(image: PIL.Image.Image, permutation: list[int]) -> PIL.Image.Image:
+def _permute_channels_image_pil(image: PIL.Image.Image, permutation: List[int]) -> PIL.Image:
     return to_pil_image(permute_channels_image(pil_to_tensor(image), permutation=permutation))
 
 
 @_register_kernel_internal(permute_channels, tv_tensors.Video)
-def permute_channels_video(video: torch.Tensor, permutation: list[int]) -> torch.Tensor:
+def permute_channels_video(video: torch.Tensor, permutation: List[int]) -> torch.Tensor:
     return permute_channels_image(video, permutation=permutation)

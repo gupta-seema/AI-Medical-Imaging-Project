@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor cudnn_convolution(const at::Tensor & self, const at::Tensor & 
     return at::_ops::cudnn_convolution::call(self, weight, c10::fromIntArrayRefSlow(padding), c10::fromIntArrayRefSlow(stride), c10::fromIntArrayRefSlow(dilation), groups, benchmark, deterministic, allow_tf32);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor cudnn_convolution(const at::Tensor & self, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, bool allow_tf32) {
     return at::_ops::cudnn_convolution::call(self, weight, c10::fromIntArrayRefSlow(padding), c10::fromIntArrayRefSlow(stride), c10::fromIntArrayRefSlow(dilation), groups, benchmark, deterministic, allow_tf32);
   }
@@ -39,7 +38,7 @@ inline at::Tensor cudnn_convolution_symint(const at::Tensor & self, const at::Te
     return at::_ops::cudnn_convolution::call(self, weight, padding, stride, dilation, groups, benchmark, deterministic, allow_tf32);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor cudnn_convolution(const at::Tensor & self, const at::Tensor & weight, c10::SymIntArrayRef padding, c10::SymIntArrayRef stride, c10::SymIntArrayRef dilation, c10::SymInt groups, bool benchmark, bool deterministic, bool allow_tf32) {
     return at::_ops::cudnn_convolution::call(self, weight, padding, stride, dilation, groups, benchmark, deterministic, allow_tf32);
   }
@@ -50,7 +49,7 @@ inline at::Tensor & cudnn_convolution_out(at::Tensor & out, const at::Tensor & s
     return at::_ops::cudnn_convolution_out::call(self, weight, c10::fromIntArrayRefSlow(padding), c10::fromIntArrayRefSlow(stride), c10::fromIntArrayRefSlow(dilation), groups, benchmark, deterministic, allow_tf32, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & cudnn_convolution_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, bool allow_tf32) {
     return at::_ops::cudnn_convolution_out::call(self, weight, c10::fromIntArrayRefSlow(padding), c10::fromIntArrayRefSlow(stride), c10::fromIntArrayRefSlow(dilation), groups, benchmark, deterministic, allow_tf32, out);
   }
@@ -61,7 +60,7 @@ inline at::Tensor & cudnn_convolution_outf(const at::Tensor & self, const at::Te
     return at::_ops::cudnn_convolution_out::call(self, weight, c10::fromIntArrayRefSlow(padding), c10::fromIntArrayRefSlow(stride), c10::fromIntArrayRefSlow(dilation), groups, benchmark, deterministic, allow_tf32, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & cudnn_convolution_outf(const at::Tensor & self, const at::Tensor & weight, at::IntArrayRef padding, at::IntArrayRef stride, at::IntArrayRef dilation, int64_t groups, bool benchmark, bool deterministic, bool allow_tf32, at::Tensor & out) {
     return at::_ops::cudnn_convolution_out::call(self, weight, c10::fromIntArrayRefSlow(padding), c10::fromIntArrayRefSlow(stride), c10::fromIntArrayRefSlow(dilation), groups, benchmark, deterministic, allow_tf32, out);
   }
@@ -72,7 +71,7 @@ inline at::Tensor & cudnn_convolution_symint_out(at::Tensor & out, const at::Ten
     return at::_ops::cudnn_convolution_out::call(self, weight, padding, stride, dilation, groups, benchmark, deterministic, allow_tf32, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & cudnn_convolution_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & weight, c10::SymIntArrayRef padding, c10::SymIntArrayRef stride, c10::SymIntArrayRef dilation, c10::SymInt groups, bool benchmark, bool deterministic, bool allow_tf32) {
     return at::_ops::cudnn_convolution_out::call(self, weight, padding, stride, dilation, groups, benchmark, deterministic, allow_tf32, out);
   }
@@ -83,7 +82,7 @@ inline at::Tensor & cudnn_convolution_symint_outf(const at::Tensor & self, const
     return at::_ops::cudnn_convolution_out::call(self, weight, padding, stride, dilation, groups, benchmark, deterministic, allow_tf32, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & cudnn_convolution_outf(const at::Tensor & self, const at::Tensor & weight, c10::SymIntArrayRef padding, c10::SymIntArrayRef stride, c10::SymIntArrayRef dilation, c10::SymInt groups, bool benchmark, bool deterministic, bool allow_tf32, at::Tensor & out) {
     return at::_ops::cudnn_convolution_out::call(self, weight, padding, stride, dilation, groups, benchmark, deterministic, allow_tf32, out);
   }

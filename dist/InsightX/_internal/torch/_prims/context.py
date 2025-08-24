@@ -1,31 +1,23 @@
-from __future__ import annotations
-
 import functools
 from contextlib import nullcontext
-from typing import Any, Callable, TYPE_CHECKING, TypeVar
-from typing_extensions import ParamSpec
-
-
-if TYPE_CHECKING:
-    from collections.abc import Sequence
+from typing import Any, Callable, Dict, Optional, Sequence
 
 import torch
+
 import torch._decomp
 import torch._prims
+
 import torch._refs
 import torch._refs.nn
 import torch._refs.nn.functional
 import torch._refs.special
 import torch.overrides
+
 from torch._prims_common import torch_function_passthrough
 
 
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
-
-
-@functools.cache
-def torch_to_refs_map() -> dict[Any, Any]:
+@functools.lru_cache(None)
+def torch_to_refs_map():
     """
     Mapping of torch API functions to torch._refs functions.
     E.g. torch_to_refs_map()[torch.add] == torch._refs.add
@@ -38,7 +30,7 @@ def torch_to_refs_map() -> dict[Any, Any]:
         (torch.fft, torch._refs.fft),
         (torch.linalg, torch._refs.linalg),
     ]
-    r: dict[Any, Any] = {
+    r: Dict[Any, Any] = {
         torch.Tensor.__invert__: torch._refs.bitwise_not,
         torch.Tensor.__xor__: torch._refs.bitwise_xor,
         torch.Tensor.__and__: torch._refs.bitwise_and,
@@ -79,8 +71,8 @@ def torch_to_refs_map() -> dict[Any, Any]:
     return r
 
 
-@functools.cache
-def all_prims() -> set[Any]:
+@functools.lru_cache(None)
+def all_prims():
     """
     Set of all prim functions, e.g., torch._prims.add in all_prims()
     """
@@ -104,21 +96,21 @@ class TorchRefsMode(torch.overrides.TorchFunctionMode):
 
     def __init__(
         self,
-        strict: bool = False,
-        should_fallback_fn: Callable[..., bool] = lambda *_: False,
-        prims_mode_cls: type = nullcontext,
-    ) -> None:
+        strict=False,
+        should_fallback_fn=lambda *_: False,
+        prims_mode_cls=nullcontext,
+    ):
         self.strict = strict
         self.should_fallback_fn = should_fallback_fn
         self.prims_mode_cls = prims_mode_cls
 
     def __torch_function__(
         self,
-        orig_func: Callable[_P, _R],
-        types: Sequence[type],
+        orig_func: Callable,
+        types: Sequence,
         args: Sequence[Any] = (),
-        kwargs: dict[str, Any] | None = None,
-    ) -> Any:
+        kwargs: Optional[Dict] = None,
+    ):
         if kwargs is None:
             kwargs = {}
         # For primitive operations, run them as is without interception
@@ -137,12 +129,6 @@ class TorchRefsMode(torch.overrides.TorchFunctionMode):
         # see https://github.com/pytorch/pytorch/pull/82657#discussion_r939776417
         if func is None and isinstance(orig_func, torch._ops.OpOverload):
             func = torch._decomp.decomposition_table.get(orig_func, None)
-        elif func is None and isinstance(orig_func, torch._ops.OpOverloadPacket):
-            default = getattr(orig_func, "default", None)
-            if default is None and orig_func._dir:
-                default = getattr(orig_func, orig_func._dir[0], None)
-            if default is not None:
-                func = torch._decomp.decomposition_table.get(default, None)
 
         if func is not None:
             # If the ref exists query whether we should use it or not

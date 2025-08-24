@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor reshape(const at::Tensor & self, at::IntArrayRef shape) {
     return at::_ops::reshape::call(self, c10::fromIntArrayRefSlow(shape));
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor reshape(const at::Tensor & self, at::IntArrayRef shape) {
     return at::_ops::reshape::call(self, c10::fromIntArrayRefSlow(shape));
   }
@@ -39,7 +38,7 @@ inline at::Tensor reshape_symint(const at::Tensor & self, c10::SymIntArrayRef sh
     return at::_ops::reshape::call(self, shape);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor reshape(const at::Tensor & self, c10::SymIntArrayRef shape) {
     return at::_ops::reshape::call(self, shape);
   }

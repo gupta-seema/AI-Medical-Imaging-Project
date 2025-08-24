@@ -1,19 +1,20 @@
 #pragma once
 
 #include <c10/core/ScalarType.h>
+#include <c10/util/Optional.h>
 #include <torch/csrc/lazy/backend/backend_interface.h>
 #include <torch/csrc/lazy/core/config.h>
 #include <torch/csrc/lazy/core/ir.h>
 #include <torch/csrc/lazy/core/tensor.h>
 #include <torch/csrc/lazy/core/trie.h>
-#include <optional>
 #include <vector>
 
 // This file is part of the backend interface. So, ops shouldn't be added or
 // removed without due process The exception to this being the view ops which
 // will be removed soon pending functionalization
 
-namespace torch::lazy {
+namespace torch {
+namespace lazy {
 
 template <typename T, typename... Args>
 NodePtr ReuseNode(Args&&... args) {
@@ -60,7 +61,7 @@ struct IrBuilder {
   virtual NodePtr MakeCast(
       const Value& input0,
       const at::ScalarType& dtype,
-      const std::optional<at::ScalarType>& stype = std::nullopt) const = 0;
+      const c10::optional<at::ScalarType>& stype = c10::nullopt) const = 0;
   virtual NodePtr MakeTensorList(const OpList& inputs) const = 0;
   virtual NodePtr MakeGeneric(
       const OpKind& op,
@@ -95,7 +96,7 @@ static inline NodePtr MakeExpand(
 static inline NodePtr MakeCast(
     const Value& input0,
     const at::ScalarType& dtype,
-    const std::optional<at::ScalarType>& stype = std::nullopt) {
+    const c10::optional<at::ScalarType>& stype = c10::nullopt) {
   return getIrBuilder()->MakeCast(input0, dtype, stype);
 }
 static inline NodePtr MakeTensorList(const OpList& inputs) {
@@ -125,7 +126,7 @@ static inline NodePtr MakeSizeDiv(const Value& a, const Value& b) {
   return getIrBuilder()->MakeSizeDiv(a, b);
 }
 
-inline Value GetSymIntValue(const c10::SymInt& a) {
+inline Value GetSymIntValue(c10::SymInt a) {
   if (auto ma = a.maybe_as_int()) {
     return Value(MakeScalar(*ma, at::kLong), 0);
   } else {
@@ -145,4 +146,5 @@ inline std::vector<int64_t> GetSymIntArrayRefValue(c10::SymIntArrayRef arr) {
   return r;
 }
 
-} // namespace torch::lazy
+} // namespace lazy
+} // namespace torch

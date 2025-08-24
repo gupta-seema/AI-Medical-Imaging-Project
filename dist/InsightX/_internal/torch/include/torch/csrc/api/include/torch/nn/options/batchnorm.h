@@ -4,7 +4,8 @@
 #include <torch/csrc/Export.h>
 #include <torch/types.h>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 /// Options for the `BatchNorm` module.
 struct TORCH_API BatchNormOptions {
@@ -20,7 +21,7 @@ struct TORCH_API BatchNormOptions {
 
   /// A momentum multiplier for the mean and variance.
   /// Changing this parameter after construction __is effective__.
-  TORCH_ARG(std::optional<double>, momentum) = 0.1;
+  TORCH_ARG(c10::optional<double>, momentum) = 0.1;
 
   /// Whether to learn a scale and bias that are applied in an affine
   /// transformation on the input.
@@ -81,7 +82,7 @@ struct TORCH_API BatchNormFuncOptions {
 
   /// A momentum multiplier for the mean and variance.
   /// Changing this parameter after construction __is effective__.
-  TORCH_ARG(double, momentum) = 0.1;
+  TORCH_ARG(c10::optional<double>, momentum) = 0.1;
 
   /// The epsilon value added for numerical stability.
   /// Changing this parameter after construction __is effective__.
@@ -90,4 +91,5 @@ struct TORCH_API BatchNormFuncOptions {
 
 } // namespace functional
 
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

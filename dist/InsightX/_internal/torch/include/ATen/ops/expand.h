@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,14 +23,14 @@ namespace at {
 
 
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor expand(const at::Tensor & self, at::IntArrayRef size, bool implicit=false) {
     return at::_ops::expand::call(self, c10::fromIntArrayRefSlow(size), implicit);
   }
 }
 
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor expand(const at::Tensor & self, c10::SymIntArrayRef size, bool implicit=false) {
     return at::_ops::expand::call(self, size, implicit);
   }

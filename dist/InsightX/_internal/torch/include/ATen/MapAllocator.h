@@ -1,7 +1,7 @@
 #pragma once
 
 #include <c10/core/Allocator.h>
-#include <string_view>
+#include <c10/util/string_view.h>
 
 namespace at {
 
@@ -23,10 +23,10 @@ TORCH_API std::string NewProcessWideShmHandle();
 
 class TORCH_API MapAllocator {
  public:
-  MapAllocator(std::string_view filename, int flags, size_t size);
+  MapAllocator(c10::string_view filename, int flags, size_t size);
   MapAllocator(
       WithFd,
-      std::string_view filename,
+      c10::string_view filename,
       int fd,
       int flags,
       size_t size);
@@ -55,13 +55,9 @@ class TORCH_API MapAllocator {
     return base_ptr_;
   }
 
-  int flags() const {
-    return flags_;
-  }
-
   static MapAllocator* fromDataPtr(const at::DataPtr&);
   static at::DataPtr makeDataPtr(
-      std::string_view filename,
+      c10::string_view filename,
       int flags,
       size_t size,
       size_t* actual_size_out);
@@ -112,10 +108,6 @@ class TORCH_API RefcountedMapAllocator : private RefcountedMapAllocatorArgCheck,
       size_t size);
 
   static RefcountedMapAllocator* fromDataPtr(const at::DataPtr&);
-  RefcountedMapAllocator(const RefcountedMapAllocator&) = delete;
-  RefcountedMapAllocator(RefcountedMapAllocator&&) = delete;
-  RefcountedMapAllocator& operator=(const RefcountedMapAllocator&) = delete;
-  RefcountedMapAllocator& operator=(RefcountedMapAllocator&&) = delete;
   static at::DataPtr makeDataPtr(
       const char* filename,
       int flags,

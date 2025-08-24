@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import torch
 from torch.fx.experimental.proxy_tensor import ProxyTorchDispatchMode
 from torch.overrides import TorchFunctionMode
@@ -38,7 +37,6 @@ class AutogradStateOpsFailSafeguard(TorchFunctionMode):
                 raise RuntimeError(
                     f"Encountered autograd state manager op {func} trying to change global autograd state "
                     "while exporting. This is unsafe because we don't capture this op in torch.export "
-                    "today, hence we can't reflect the user intention soundly. You can fix this by "
-                    "adding a torch.no_grad() context around the export call."
+                    "today, hence we can't reflect the user intention soundly."
                 )
         return func(*args, **kwargs)

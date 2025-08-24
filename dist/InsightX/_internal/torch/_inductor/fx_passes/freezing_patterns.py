@@ -1,11 +1,9 @@
-# mypy: allow-untyped-defs
 import functools
 
 import torch
 from torch._inductor.compile_fx import fake_tensor_prop
-from torch._inductor.utils import GPU_TYPES
-
 from ..._dynamo.utils import counters
+
 from .. import config
 from ..pattern_matcher import (
     _return_true,
@@ -20,7 +18,6 @@ from ..pattern_matcher import (
     register_replacement,
     stable_topological_sort,
 )
-
 
 aten = torch.ops.aten
 
@@ -48,9 +45,7 @@ def freezing_passes(gm: torch.fx.GraphModule, aot_example_inputs):
     binary_folding = counters["inductor"]["binary_folding"]
     fake_tensor_prop(gm, aot_example_inputs, True)
 
-    torch._inductor.fx_passes.binary_folding.mark_mixed_dtype_allowed_computation_ops(
-        gm
-    )
+    torch._inductor.fx_passes.binary_folding.mark_mixed_dtype_allowed_convs(gm)
     for _ in range(4):
         constant_fold(gm)
         # Make sure meta['val'] is properly set for all nodes
@@ -62,9 +57,7 @@ def freezing_passes(gm: torch.fx.GraphModule, aot_example_inputs):
             break
         binary_folding = counters["inductor"]["binary_folding"]
 
-    torch._inductor.fx_passes.binary_folding.recover_original_precision_folded_computation_ops(
-        gm
-    )
+    torch._inductor.fx_passes.binary_folding.recover_original_precision_folded_convs(gm)
 
     constant_fold(gm)
     fake_tensor_prop(gm, aot_example_inputs, True)
@@ -102,8 +95,6 @@ def lazy_init():
 
 
 def register_freezing_graph_pattern(pattern, extra_check=_return_true, pass_number=0):
-    while pass_number > len(pass_patterns) - 1:
-        pass_patterns.append(PatternMatcherPass())
     return register_graph_pattern(
         pattern,
         extra_check=extra_check,
@@ -119,103 +110,27 @@ def register_binary_folding_pattern(pattern, extra_check=_return_true):
     )
 
 
-@functools.cache
+@functools.lru_cache(None)
 def addmm_patterns_init():
-    """
-    addmm related patterns.
-    To avoid duplication, also includes int8 WoQ GEMM pattern without bias.
-    """
-    device = next(
-        (gpu for gpu in GPU_TYPES if getattr(torch, gpu).is_available()), "cpu"
-    )
+    if torch.cuda.is_available():
+        # workaround https://github.com/pytorch/pytorch/issues/97894
+        device = "cuda"
+    else:
+        device = "cpu"
     val = functools.partial(torch.empty, (10, 10), device=device, requires_grad=False)
-    scale = functools.partial(torch.empty, (10,), device=device, requires_grad=False)
-
-    def check_int8_woq_concat_linear_weights(match):
-        is_cpu = match.kwargs["inp"].meta["val"].is_cpu
-        if not is_cpu or not config.cpp.enable_concat_linear:
-            # Currently, this pattern is only supported on CPU
-            return False
-
-        weight_inputs = ["w1", "w2"]
-        if "w3" in match.kwargs:
-            weight_inputs.append("w3")
-
-        if not all(
-            match.kwargs[wgt].target == torch.ops.prims.convert_element_type.default
-            for wgt in weight_inputs
-        ):
-            return False
-
-        if not all(
-            next(iter(match.kwargs[wgt]._input_nodes.keys())).meta["val"].dtype
-            is torch.int8
-            for wgt in weight_inputs
-        ):
-            return False
-
-        if not all(
-            match.kwargs[wgt].meta["val"].dtype is torch.bfloat16
-            for wgt in weight_inputs
-        ):
-            return False
-
-        equal_shape_inputs = [weight_inputs]
-        for equal_shape_group in equal_shape_inputs:
-            inps = [match.kwargs[name] for name in equal_shape_group]
-            if not all(
-                inp.meta["val"].shape == inps[0].meta["val"].shape for inp in inps
-            ):
-                return False
-        return True
 
     def check_concat_weights(match):
-        is_cpu = match.kwargs["inp"].meta["val"].is_cpu
-        if is_cpu and not config.cpp.enable_concat_linear:
-            return False
-
-        weight_inputs = ["w1", "w2"]
+        weights = [
+            match.kwargs["w1"],
+            match.kwargs["w2"],
+        ]
         if "w3" in match.kwargs:
-            weight_inputs.append("w3")
+            weights.append(match.kwargs["w3"])
 
-        equal_shape_inputs = [weight_inputs]
-
-        if "b1" in match.kwargs:
-            bias_inputs = ["b1", "b2"]
-            if "b3" in match.kwargs:
-                bias_inputs.append("b3")
-
-            equal_shape_inputs.append(bias_inputs)
-
-        for equal_shape_group in equal_shape_inputs:
-            inps = [match.kwargs[name] for name in equal_shape_group]
-
-            if not all(
-                inp.op == "get_attr"
-                and inp.meta["val"].shape == inps[0].meta["val"].shape
-                for inp in inps
-            ):
-                return False
-        return True
-
-    def int8_woq_fusion_pattern(inp, w1, w2, w3, s1, s2, s3):
-        return ((inp @ w1) * s1, (inp @ w2) * s2, (inp @ w3) * s3)
-
-    def int8_woq_fusion_replacement(inp, w1, w2, w3, s1, s2, s3):
-        cat_w = torch.cat((w1, w2, w3), dim=1)
-        cat_s = torch.cat((s1, s2, s3), dim=0)
-        mm = (inp @ cat_w).mul(cat_s)
-        return mm.chunk(3, dim=1)
-
-    register_replacement(
-        int8_woq_fusion_pattern,
-        int8_woq_fusion_replacement,
-        [val(), val(), val(), val(), scale(), scale(), scale()],
-        fwd_only,
-        pass_patterns[0],
-        extra_check=check_int8_woq_concat_linear_weights,
-        exclusive_arg_names=("w1", "w2", "w3", "s1", "s2", "s3"),
-    )
+        return all(
+            w.op == "get_attr" and w.meta["val"].shape == weights[0].meta["val"].shape
+            for w in weights
+        )
 
     def matmul_fuse_pattern(inp, w1, w2, w3):
         return (inp @ w1, inp @ w2, inp @ w3)
@@ -293,5 +208,5 @@ def unnecessary_dtype_convert(match: Match, **kwargs):
     """Remove unnecessary dtype conversion op, probably left as a result of Conv-Bn folding"""
     graph = match.graph
     node = match.output_node()
-    node.replace_all_uses_with(node.args[0])  # type: ignore[arg-type]
+    node.replace_all_uses_with(node.args[0])
     graph.erase_node(node)

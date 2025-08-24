@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 # !/usr/bin/env python3
 
 # Copyright (c) Facebook, Inc. and its affiliates.
@@ -15,7 +14,6 @@ import os
 import sys
 from contextlib import contextmanager
 from functools import partial
-
 
 IS_WINDOWS = sys.platform == "win32"
 IS_MACOS = sys.platform == "darwin"

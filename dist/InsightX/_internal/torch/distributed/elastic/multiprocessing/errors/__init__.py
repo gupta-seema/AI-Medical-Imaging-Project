@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# mypy: allow-untyped-defs
 
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
@@ -54,37 +53,29 @@ import os
 import signal
 import socket
 import time
+import warnings
 from dataclasses import dataclass, field
 from datetime import datetime
 from functools import wraps
 from string import Template
-from typing import Any, Callable, Optional, TypeVar, Union
-from typing_extensions import ParamSpec
+from typing import Any, Callable, Dict, List, Optional, Tuple, TypeVar
 
 from torch.distributed.elastic.utils.logging import get_logger
 
 from .error_handler import ErrorHandler  # noqa: F401
 from .handlers import get_error_handler  # noqa: F401
 
+__all__ = ["ProcessFailure", "ChildFailedError", "record", "ErrorHandler", "get_error_handler"]
 
-__all__ = [
-    "ProcessFailure",
-    "ChildFailedError",
-    "record",
-    "ErrorHandler",
-    "get_error_handler",
-]
-
-logger = get_logger(__name__)
+log = get_logger(__name__)
 
 
-JSON = dict
+JSON = Dict
 
 _EMPTY_ERROR_DATA = {"message": "<NONE>"}
 _NOT_AVAILABLE = "<N/A>"
 
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
+T = TypeVar("T")
 
 
 @dataclass
@@ -120,15 +111,14 @@ class ProcessFailure:
             try:
                 with open(self.error_file) as fp:
                     self.error_file_data = json.load(fp)
-                    logger.debug(
-                        "User process failed with error data: %s",
-                        json.dumps(self.error_file_data, indent=2),
+                    log.debug(
+                        "User process failed with error data: %s", json.dumps(self.error_file_data, indent=2)
                     )
                     self.message, self.timestamp = self._get_error_data(
                         self.error_file_data
                     )
             except Exception:
-                logger.exception("Failed to parse reply file: %s", self.error_file)
+                log.exception("Failed to parse reply file: %s", self.error_file)
                 raise
         else:
             self._set_no_reply_file()
@@ -144,7 +134,7 @@ class ProcessFailure:
             else:
                 self.message = "To enable traceback see: https://pytorch.org/docs/stable/elastic/errors.html"
 
-    def _get_error_data(self, error_file_data: dict[str, Any]) -> tuple[str, int]:
+    def _get_error_data(self, error_file_data: Dict[str, Any]) -> Tuple[str, int]:
         message = error_file_data["message"]
         if isinstance(message, str):
             timestamp = int(error_file_data.get("timestamp", 0))
@@ -232,7 +222,7 @@ class ChildFailedError(Exception):
     of trainer 1's error file to the scheduler's init process.
     """
 
-    def __init__(self, name: str, failures: dict[GlobalRank, ProcessFailure]):
+    def __init__(self, name: str, failures: Dict[GlobalRank, ProcessFailure]):
         self.name = name
         self.failures = failures
         assert (
@@ -240,16 +230,16 @@ class ChildFailedError(Exception):
         )  # does not make sense to create a ChildFaileError with no failures
         super().__init__(self.format_msg())
 
-    def get_first_failure(self) -> tuple[GlobalRank, ProcessFailure]:
+    def get_first_failure(self) -> Tuple[GlobalRank, ProcessFailure]:
         rank = min(self.failures.keys(), key=lambda r: self.failures[r].timestamp)
         return rank, self.failures[rank]
 
     def format_msg(self, boarder_delim="=", section_delim="-"):
         title = f"{self.name} FAILED"
-        root_rank, _root_failure = self.get_first_failure()
+        root_rank, root_failure = self.get_first_failure()
 
         root_failure_fmt: str = ""
-        other_failures_fmt: list[str] = []
+        other_failures_fmt: List[str] = []
         width = len(title)
         for idx, (rank, failure) in enumerate(self.failures.items()):
             fmt, w = self._format_failure(idx, rank, failure)
@@ -272,7 +262,8 @@ class ChildFailedError(Exception):
 
     def _format_failure(
         self, idx: int, rank: int, failure: ProcessFailure
-    ) -> tuple[str, int]:
+    ) -> Tuple[str, int]:
+
         # failure.message is either a str (when the failure does not generate a traceback - e.g. signals)
         # or a dict (json) of the form
         # {"message": $ERROR_MSG, "extraInfo": {"py_callstack": $TRACEBACK, timestamp: $TS}}
@@ -307,8 +298,8 @@ class ChildFailedError(Exception):
 
 
 def record(
-    fn: Callable[_P, _R], error_handler: Optional[ErrorHandler] = None
-) -> Callable[_P, Union[_R, None]]:
+    fn: Callable[..., T], error_handler: Optional[ErrorHandler] = None
+) -> Callable[..., T]:
     """
     Syntactic sugar to record errors/exceptions that happened in the decorated
     function using the provided ``error_handler``.
@@ -320,14 +311,14 @@ def record(
      error_handler = get_error_handler()
      error_handler.initialize()
      try:
-         foobar()
+        foobar()
      except ChildFailedError as e:
-         _, failure = e.get_first_failure()
-         error_handler.dump_error_file(failure.error_file, failure.exitcode)
-         raise
+        _, failure = e.get_first_failure()
+        error_handler.dump_error_file(failure.error_file, failure.exitcode)
+        raise
      except Exception as e:
-         error_handler.record_exception(e)
-         raise
+        error_handler.record(e)
+        raise
 
     .. important:: use this decorator once per process at the top level method,
                    typically this is the main method.
@@ -340,17 +331,16 @@ def record(
      def main():
          pass
 
-
-     if __name__ == "__main__":
-         main()
+     if __name__=="__main__":
+        main()
 
     """
     if not error_handler:
         error_handler = get_error_handler()
 
-    def wrap(f: Callable[_P, _R]) -> Callable[_P, Union[_R, None]]:
+    def wrap(f):
         @wraps(f)
-        def wrapper(*args: _P.args, **kwargs: _P.kwargs):
+        def wrapper(*args, **kwargs):
             assert error_handler is not None  # assertion for mypy type checker
             error_handler.initialize()
             try:
@@ -367,12 +357,12 @@ def record(
                 if failure.error_file != _NOT_AVAILABLE:
                     error_handler.dump_error_file(failure.error_file, failure.exitcode)
                 else:
-                    logger.info(
+                    log.info(
                         (
                             "local_rank %s FAILED with no error file."
                             " Decorate your entrypoint fn with @record for traceback info."
                             " See: https://pytorch.org/docs/stable/elastic/errors.html",
-                            rank,
+                            rank
                         )
                     )
                 raise

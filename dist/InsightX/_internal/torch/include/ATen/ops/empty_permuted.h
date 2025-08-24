@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,19 +27,19 @@ inline at::Tensor empty_permuted(at::IntArrayRef size, at::IntArrayRef physical_
     return at::_ops::empty_permuted::call(c10::fromIntArrayRefSlow(size), physical_layout, c10::optTypeMetaToScalarType(options.dtype_opt()), options.layout_opt(), options.device_opt(), options.pinned_memory_opt());
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor empty_permuted(at::IntArrayRef size, at::IntArrayRef physical_layout, at::TensorOptions options={}) {
     return at::_ops::empty_permuted::call(c10::fromIntArrayRefSlow(size), physical_layout, c10::optTypeMetaToScalarType(options.dtype_opt()), options.layout_opt(), options.device_opt(), options.pinned_memory_opt());
   }
 }
 
 // aten::empty_permuted(SymInt[] size, int[] physical_layout, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-inline at::Tensor empty_permuted(at::IntArrayRef size, at::IntArrayRef physical_layout, ::std::optional<at::ScalarType> dtype, ::std::optional<at::Layout> layout, ::std::optional<at::Device> device, ::std::optional<bool> pin_memory) {
+inline at::Tensor empty_permuted(at::IntArrayRef size, at::IntArrayRef physical_layout, c10::optional<at::ScalarType> dtype, c10::optional<at::Layout> layout, c10::optional<at::Device> device, c10::optional<bool> pin_memory) {
     return at::_ops::empty_permuted::call(c10::fromIntArrayRefSlow(size), physical_layout, dtype, layout, device, pin_memory);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
-  at::Tensor empty_permuted(at::IntArrayRef size, at::IntArrayRef physical_layout, ::std::optional<at::ScalarType> dtype, ::std::optional<at::Layout> layout, ::std::optional<at::Device> device, ::std::optional<bool> pin_memory) {
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
+  at::Tensor empty_permuted(at::IntArrayRef size, at::IntArrayRef physical_layout, c10::optional<at::ScalarType> dtype, c10::optional<at::Layout> layout, c10::optional<at::Device> device, c10::optional<bool> pin_memory) {
     return at::_ops::empty_permuted::call(c10::fromIntArrayRefSlow(size), physical_layout, dtype, layout, device, pin_memory);
   }
 }
@@ -50,19 +49,19 @@ inline at::Tensor empty_permuted_symint(c10::SymIntArrayRef size, at::IntArrayRe
     return at::_ops::empty_permuted::call(size, physical_layout, c10::optTypeMetaToScalarType(options.dtype_opt()), options.layout_opt(), options.device_opt(), options.pinned_memory_opt());
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor empty_permuted(c10::SymIntArrayRef size, at::IntArrayRef physical_layout, at::TensorOptions options={}) {
     return at::_ops::empty_permuted::call(size, physical_layout, c10::optTypeMetaToScalarType(options.dtype_opt()), options.layout_opt(), options.device_opt(), options.pinned_memory_opt());
   }
 }
 
 // aten::empty_permuted(SymInt[] size, int[] physical_layout, *, ScalarType? dtype=None, Layout? layout=None, Device? device=None, bool? pin_memory=None) -> Tensor
-inline at::Tensor empty_permuted_symint(c10::SymIntArrayRef size, at::IntArrayRef physical_layout, ::std::optional<at::ScalarType> dtype, ::std::optional<at::Layout> layout, ::std::optional<at::Device> device, ::std::optional<bool> pin_memory) {
+inline at::Tensor empty_permuted_symint(c10::SymIntArrayRef size, at::IntArrayRef physical_layout, c10::optional<at::ScalarType> dtype, c10::optional<at::Layout> layout, c10::optional<at::Device> device, c10::optional<bool> pin_memory) {
     return at::_ops::empty_permuted::call(size, physical_layout, dtype, layout, device, pin_memory);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
-  at::Tensor empty_permuted(c10::SymIntArrayRef size, at::IntArrayRef physical_layout, ::std::optional<at::ScalarType> dtype, ::std::optional<at::Layout> layout, ::std::optional<at::Device> device, ::std::optional<bool> pin_memory) {
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
+  at::Tensor empty_permuted(c10::SymIntArrayRef size, at::IntArrayRef physical_layout, c10::optional<at::ScalarType> dtype, c10::optional<at::Layout> layout, c10::optional<at::Device> device, c10::optional<bool> pin_memory) {
     return at::_ops::empty_permuted::call(size, physical_layout, dtype, layout, device, pin_memory);
   }
 }
@@ -72,7 +71,7 @@ inline at::Tensor & empty_permuted_out(at::Tensor & out, at::IntArrayRef size, a
     return at::_ops::empty_permuted_out::call(c10::fromIntArrayRefSlow(size), physical_layout, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & empty_permuted_out(at::Tensor & out, at::IntArrayRef size, at::IntArrayRef physical_layout) {
     return at::_ops::empty_permuted_out::call(c10::fromIntArrayRefSlow(size), physical_layout, out);
   }
@@ -83,7 +82,7 @@ inline at::Tensor & empty_permuted_outf(at::IntArrayRef size, at::IntArrayRef ph
     return at::_ops::empty_permuted_out::call(c10::fromIntArrayRefSlow(size), physical_layout, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & empty_permuted_outf(at::IntArrayRef size, at::IntArrayRef physical_layout, at::Tensor & out) {
     return at::_ops::empty_permuted_out::call(c10::fromIntArrayRefSlow(size), physical_layout, out);
   }
@@ -94,7 +93,7 @@ inline at::Tensor & empty_permuted_symint_out(at::Tensor & out, c10::SymIntArray
     return at::_ops::empty_permuted_out::call(size, physical_layout, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & empty_permuted_out(at::Tensor & out, c10::SymIntArrayRef size, at::IntArrayRef physical_layout) {
     return at::_ops::empty_permuted_out::call(size, physical_layout, out);
   }
@@ -105,7 +104,7 @@ inline at::Tensor & empty_permuted_symint_outf(c10::SymIntArrayRef size, at::Int
     return at::_ops::empty_permuted_out::call(size, physical_layout, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & empty_permuted_outf(c10::SymIntArrayRef size, at::IntArrayRef physical_layout, at::Tensor & out) {
     return at::_ops::empty_permuted_out::call(size, physical_layout, out);
   }

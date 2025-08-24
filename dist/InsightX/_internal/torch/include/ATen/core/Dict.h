@@ -6,7 +6,7 @@
 #include <c10/util/TypeList.h>
 #include <c10/util/intrusive_ptr.h>
 #include <c10/util/order_preserving_flat_hash_map.h>
-#include <optional>
+#include <c10/util/Optional.h>
 #include <ATen/core/TensorBody.h>
 #include <ATen/core/jit_type_base.h>
 
@@ -80,10 +80,9 @@ public:
 
   template<class Value_>
   void setValue(Value_&& value) const {
-    static_assert(std::is_constructible_v<Value, Value_>, "Wrong type for the value argument of setValue()");
+    static_assert(std::is_constructible<Value, Value_>::value, "Wrong type for the value argument of setValue()");
     iterator_->second = Value(std::forward<Value_>(value));
   }
-  ~DictEntryRef() = default;
 
 private:
   // allow copying and moving, but only our friends (i.e. the Dict class) can do
@@ -116,7 +115,10 @@ public:
 
   DictIterator(const DictIterator& rhs): entryRef_(rhs.entryRef_) {}
   DictIterator(DictIterator&& rhs) noexcept: entryRef_(std::move(rhs.entryRef_)) {}
-  DictIterator& operator=(const DictIterator& rhs) = default;
+  DictIterator& operator=(const DictIterator& rhs) {
+    entryRef_ = rhs.entryRef_;
+    return *this;
+  }
   DictIterator& operator=(DictIterator&& rhs) noexcept {
     entryRef_ = std::move(rhs.entryRef_);
     return *this;
@@ -203,10 +205,9 @@ template<class Key, class Value> Dict<IValue, IValue> toGenericDict(Dict<Key, Va
  * for the kernel API.
  */
 template<class Key, class Value>
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class Dict final {
 private:
-  static_assert((std::is_same_v<IValue, Key> && std::is_same_v<IValue, Value>) || guts::typelist::contains<impl::valid_dict_key_types, Key>::value, "Invalid Key type for Dict. We only support int64_t, double, bool, and string.");
+  static_assert((std::is_same<IValue, Key>::value && std::is_same<IValue, Value>::value) || guts::typelist::contains<impl::valid_dict_key_types, Key>::value, "Invalid Key type for Dict. We only support int64_t, double, bool, and string.");
 
   // impl_ stores the underlying map as a ska_ordered::order_preserving_flat_hash_map.
   // We intentionally don't offer conversion from/to
@@ -313,7 +314,7 @@ public:
    *
    * @return The number of elements removed. This is either '1' if an element with the key existed, or '0' if it didn't.
    */
-  [[nodiscard]] size_t erase(const Key& key) const;
+  C10_NODISCARD size_t erase(const Key& key) const;
 
   /**
    * Returns the mapped value of the element with key equivalent to key.
@@ -363,7 +364,7 @@ public:
   bool is(const Dict& rhs) const;
 
   // private API for now because the return type will change to TypePtr
-  // instead of std::optional<TypePtr> once types are mandatory.
+  // instead of optional<TypePtr> once types are mandatory.
   TypePtr keyType() const;
   TypePtr valueType() const;
 

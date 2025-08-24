@@ -1,6 +1,5 @@
-from collections.abc import Sequence
 from functools import partial
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 import torch
 from torch import nn, Tensor
@@ -64,7 +63,7 @@ class InvertedResidual(nn.Module):
 
         self.use_res_connect = cnf.stride == 1 and cnf.input_channels == cnf.out_channels
 
-        layers: list[nn.Module] = []
+        layers: List[nn.Module] = []
         activation_layer = nn.Hardswish if cnf.use_hs else nn.ReLU
 
         # expand
@@ -118,7 +117,7 @@ class InvertedResidual(nn.Module):
 class MobileNetV3(nn.Module):
     def __init__(
         self,
-        inverted_residual_setting: list[InvertedResidualConfig],
+        inverted_residual_setting: List[InvertedResidualConfig],
         last_channel: int,
         num_classes: int = 1000,
         block: Optional[Callable[..., nn.Module]] = None,
@@ -154,7 +153,7 @@ class MobileNetV3(nn.Module):
         if norm_layer is None:
             norm_layer = partial(nn.BatchNorm2d, eps=0.001, momentum=0.01)
 
-        layers: list[nn.Module] = []
+        layers: List[nn.Module] = []
 
         # building first layer
         firstconv_output_channels = inverted_residual_setting[0].input_channels
@@ -271,7 +270,7 @@ def _mobilenet_v3_conf(
 
 
 def _mobilenet_v3(
-    inverted_residual_setting: list[InvertedResidualConfig],
+    inverted_residual_setting: List[InvertedResidualConfig],
     last_channel: int,
     weights: Optional[WeightsEnum],
     progress: bool,

@@ -1,6 +1,5 @@
 import warnings
-from collections.abc import Sequence
-from typing import Any, Callable, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Sequence, Type, Union
 
 import PIL.Image
 
@@ -15,7 +14,7 @@ from ._utils import _parse_labels_getter, _setup_number_or_seq, _setup_size, get
 
 # TODO: do we want/need to expose this?
 class Identity(Transform):
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         return inpt
 
 
@@ -30,12 +29,12 @@ class Lambda(Transform):
 
     _transformed_types = (object,)
 
-    def __init__(self, lambd: Callable[[Any], Any], *types: type):
+    def __init__(self, lambd: Callable[[Any], Any], *types: Type):
         super().__init__()
         self.lambd = lambd
         self.types = types or self._transformed_types
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         if isinstance(inpt, self.types):
             return self.lambd(inpt)
         else:
@@ -100,11 +99,11 @@ class LinearTransformation(Transform):
         self.transformation_matrix = transformation_matrix
         self.mean_vector = mean_vector
 
-    def check_inputs(self, sample: Any) -> Any:
+    def _check_inputs(self, sample: Any) -> Any:
         if has_any(sample, PIL.Image.Image):
             raise TypeError(f"{type(self).__name__}() does not support PIL images.")
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         shape = inpt.shape
         n = shape[-3] * shape[-2] * shape[-1]
         if n != self.transformation_matrix.shape[0]:
@@ -158,11 +157,11 @@ class Normalize(Transform):
         self.std = list(std)
         self.inplace = inplace
 
-    def check_inputs(self, sample: Any) -> Any:
+    def _check_inputs(self, sample: Any) -> Any:
         if has_any(sample, PIL.Image.Image):
             raise TypeError(f"{type(self).__name__}() does not support PIL images.")
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         return self._call_kernel(F.normalize, inpt, mean=self.mean, std=self.std, inplace=self.inplace)
 
 
@@ -198,39 +197,12 @@ class GaussianBlur(Transform):
         if not 0.0 < self.sigma[0] <= self.sigma[1]:
             raise ValueError(f"sigma values should be positive and of the form (min, max). Got {self.sigma}")
 
-    def make_params(self, flat_inputs: list[Any]) -> dict[str, Any]:
+    def _get_params(self, flat_inputs: List[Any]) -> Dict[str, Any]:
         sigma = torch.empty(1).uniform_(self.sigma[0], self.sigma[1]).item()
         return dict(sigma=[sigma, sigma])
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         return self._call_kernel(F.gaussian_blur, inpt, self.kernel_size, **params)
-
-
-class GaussianNoise(Transform):
-    """Add gaussian noise to images or videos.
-
-    The input tensor is expected to be in [..., 1 or 3, H, W] format,
-    where ... means it can have an arbitrary number of leading dimensions.
-    Each image or frame in a batch will be transformed independently i.e. the
-    noise added to each image will be different.
-
-    The input tensor is also expected to be of float dtype in ``[0, 1]``.
-    This transform does not support PIL images.
-
-    Args:
-        mean (float): Mean of the sampled normal distribution. Default is 0.
-        sigma (float): Standard deviation of the sampled normal distribution. Default is 0.1.
-        clip (bool, optional): Whether to clip the values in ``[0, 1]`` after adding noise. Default is True.
-    """
-
-    def __init__(self, mean: float = 0.0, sigma: float = 0.1, clip=True) -> None:
-        super().__init__()
-        self.mean = mean
-        self.sigma = sigma
-        self.clip = clip
-
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
-        return self._call_kernel(F.gaussian_noise, inpt, mean=self.mean, sigma=self.sigma, clip=self.clip)
 
 
 class ToDtype(Transform):
@@ -253,7 +225,7 @@ class ToDtype(Transform):
     _transformed_types = (torch.Tensor,)
 
     def __init__(
-        self, dtype: Union[torch.dtype, dict[Union[type, str], Optional[torch.dtype]]], scale: bool = False
+        self, dtype: Union[torch.dtype, Dict[Union[Type, str], Optional[torch.dtype]]], scale: bool = False
     ) -> None:
         super().__init__()
 
@@ -273,7 +245,7 @@ class ToDtype(Transform):
         self.dtype = dtype
         self.scale = scale
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         if isinstance(self.dtype, torch.dtype):
             # For consistency / BC with ConvertImageDtype, we only care about images or videos when dtype
             # is a simple torch.dtype
@@ -336,7 +308,7 @@ class ConvertImageDtype(Transform):
         super().__init__()
         self.dtype = dtype
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         return self._call_kernel(F.to_dtype, inpt, dtype=self.dtype, scale=True)
 
 
@@ -345,7 +317,7 @@ class SanitizeBoundingBoxes(Transform):
 
     This transform removes bounding boxes and their associated labels/masks that:
 
-    - are below a given ``min_size`` or ``min_area``: by default this also removes degenerate boxes that have e.g. X2 <= X1.
+    - are below a given ``min_size``: by default this also removes degenerate boxes that have e.g. X2 <= X1.
     - have any coordinate outside of their corresponding image. You may want to
       call :class:`~torchvision.transforms.v2.ClampBoundingBoxes` first to avoid undesired removals.
 
@@ -360,8 +332,7 @@ class SanitizeBoundingBoxes(Transform):
     cases.
 
     Args:
-        min_size (float, optional): The size below which bounding boxes are removed. Default is 1.
-        min_area (float, optional): The area below which bounding boxes are removed. Default is 1.
+        min_size (float, optional) The size below which bounding boxes are removed. Default is 1.
         labels_getter (callable or str or None, optional): indicates how to identify the labels in the input
             (or anything else that needs to be sanitized along with the bounding boxes).
             By default, this will try to find a "labels" key in the input (case-insensitive), if
@@ -381,7 +352,6 @@ class SanitizeBoundingBoxes(Transform):
     def __init__(
         self,
         min_size: float = 1.0,
-        min_area: float = 1.0,
         labels_getter: Union[Callable[[Any], Any], str, None] = "default",
     ) -> None:
         super().__init__()
@@ -389,10 +359,6 @@ class SanitizeBoundingBoxes(Transform):
         if min_size < 1:
             raise ValueError(f"min_size must be >= 1, got {min_size}.")
         self.min_size = min_size
-
-        if min_area < 1:
-            raise ValueError(f"min_area must be >= 1, got {min_area}.")
-        self.min_area = min_area
 
         self.labels_getter = labels_getter
         self._labels_getter = _parse_labels_getter(labels_getter)
@@ -429,15 +395,13 @@ class SanitizeBoundingBoxes(Transform):
             format=boxes.format,
             canvas_size=boxes.canvas_size,
             min_size=self.min_size,
-            min_area=self.min_area,
         )
-
         params = dict(valid=valid, labels=labels)
-        flat_outputs = [self.transform(inpt, params) for inpt in flat_inputs]
+        flat_outputs = [self._transform(inpt, params) for inpt in flat_inputs]
 
         return tree_unflatten(flat_outputs, spec)
 
-    def transform(self, inpt: Any, params: dict[str, Any]) -> Any:
+    def _transform(self, inpt: Any, params: Dict[str, Any]) -> Any:
         is_label = params["labels"] is not None and any(inpt is label for label in params["labels"])
         is_bounding_boxes_or_mask = isinstance(inpt, (tv_tensors.BoundingBoxes, tv_tensors.Mask))
 

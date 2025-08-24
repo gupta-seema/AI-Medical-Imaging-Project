@@ -5,7 +5,8 @@
 #include <torch/enum.h>
 #include <torch/types.h>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 /// Options for the `Embedding` module.
 ///
@@ -27,10 +28,10 @@ struct TORCH_API EmbeddingOptions {
   /// Embedding, the embedding vector at `padding_idx` will default to all
   /// zeros, but can be updated to another value to be used as the padding
   /// vector.
-  TORCH_ARG(std::optional<int64_t>, padding_idx) = std::nullopt;
+  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
   /// If given, each embedding vector with norm larger than `max_norm` is
   /// renormalized to have norm `max_norm`.
-  TORCH_ARG(std::optional<double>, max_norm) = std::nullopt;
+  TORCH_ARG(c10::optional<double>, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(double, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the
@@ -54,10 +55,10 @@ struct TORCH_API EmbeddingFromPretrainedOptions {
   /// If specified, the entries at `padding_idx` do not contribute to the
   /// gradient; therefore, the embedding vector at `padding_idx` is not updated
   /// during training, i.e. it remains as a fixed "pad".
-  TORCH_ARG(std::optional<int64_t>, padding_idx) = std::nullopt;
+  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
   /// If given, each embedding vector with norm larger than `max_norm` is
   /// renormalized to have norm `max_norm`.
-  TORCH_ARG(std::optional<double>, max_norm) = std::nullopt;
+  TORCH_ARG(c10::optional<double>, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(double, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the
@@ -83,10 +84,10 @@ struct TORCH_API EmbeddingFuncOptions {
   /// If specified, the entries at `padding_idx` do not contribute to the
   /// gradient; therefore, the embedding vector at `padding_idx` is not updated
   /// during training, i.e. it remains as a fixed "pad".
-  TORCH_ARG(std::optional<int64_t>, padding_idx) = std::nullopt;
+  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
   /// If given, each embedding vector with norm larger than `max_norm` is
   /// renormalized to have norm `max_norm`.
-  TORCH_ARG(std::optional<double>, max_norm) = std::nullopt;
+  TORCH_ARG(c10::optional<double>, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(double, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the
@@ -119,7 +120,7 @@ struct TORCH_API EmbeddingBagOptions {
   TORCH_ARG(int64_t, embedding_dim);
   /// If given, each embedding vector with norm larger than `max_norm` is
   /// renormalized to have norm `max_norm`.
-  TORCH_ARG(std::optional<double>, max_norm) = std::nullopt;
+  TORCH_ARG(c10::optional<double>, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(double, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the
@@ -147,7 +148,7 @@ struct TORCH_API EmbeddingBagOptions {
   /// zeros, but can be updated to another value to be used as the padding
   /// vector. Note that the embedding vector at `padding_idx` is excluded from
   /// the reduction.
-  TORCH_ARG(std::optional<int64_t>, padding_idx) = std::nullopt;
+  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
 };
 
 // ============================================================================
@@ -160,7 +161,7 @@ struct TORCH_API EmbeddingBagFromPretrainedOptions {
   TORCH_ARG(bool, freeze) = true;
   /// If given, each embedding vector with norm larger than `max_norm` is
   /// renormalized to have norm `max_norm`.
-  TORCH_ARG(std::optional<double>, max_norm) = std::nullopt;
+  TORCH_ARG(c10::optional<double>, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(double, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the
@@ -183,7 +184,7 @@ struct TORCH_API EmbeddingBagFromPretrainedOptions {
   /// gradient; therefore, the embedding vector at padding_idx is not updated
   /// during training, i.e. it remains as a fixed "pad". Note that the embedding
   /// vector at `padding_idx` is excluded from the reduction.
-  TORCH_ARG(std::optional<int64_t>, padding_idx) = std::nullopt;
+  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
 };
 
 // ============================================================================
@@ -204,7 +205,7 @@ struct TORCH_API EmbeddingBagFuncOptions {
   TORCH_ARG(torch::Tensor, offsets) = Tensor();
   /// If given, each embedding vector with norm larger than `max_norm` is
   /// renormalized to have norm `max_norm`.
-  TORCH_ARG(std::optional<double>, max_norm) = std::nullopt;
+  TORCH_ARG(c10::optional<double>, max_norm) = c10::nullopt;
   /// The p of the p-norm to compute for the `max_norm` option. Default ``2``.
   TORCH_ARG(double, norm_type) = 2.;
   /// If given, this will scale gradients by the inverse of frequency of the
@@ -232,9 +233,10 @@ struct TORCH_API EmbeddingBagFuncOptions {
   /// gradient; therefore, the embedding vector at padding_idx is not updated
   /// during training, i.e. it remains as a fixed "pad". Note that the embedding
   /// vector at `padding_idx` is excluded from the reduction.
-  TORCH_ARG(std::optional<int64_t>, padding_idx) = std::nullopt;
+  TORCH_ARG(c10::optional<int64_t>, padding_idx) = c10::nullopt;
 };
 
 } // namespace functional
 
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

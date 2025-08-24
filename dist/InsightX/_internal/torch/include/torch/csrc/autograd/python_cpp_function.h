@@ -1,6 +1,5 @@
 #pragma once
 
-#include <torch/csrc/Export.h>
 #include <torch/csrc/python_headers.h>
 #include <memory>
 #include <typeinfo>
@@ -12,12 +11,11 @@
 namespace torch::autograd {
 
 struct THPCppFunction {
-  PyObject_HEAD
-  std::shared_ptr<Node> cdata;
+  PyObject_HEAD std::shared_ptr<Node> cdata;
 };
 
 template <typename Ctor>
-TORCH_PYTHON_API PyObject* CppFunction_pynew(
+PyObject* CppFunction_pynew(
     PyTypeObject* type,
     PyObject* args,
     PyObject* kwds) {
@@ -53,64 +51,43 @@ TORCH_PYTHON_API PyObject* CppFunction_pynew(
     (char*)"_set_sequence_nr", THPCppFunction_set_sequence_nr, METH_O, nullptr \
   }
 
-#define THP_FUNCTION_DEFAULT_PROPERTIES                                        \
-  {(char*)"next_functions",                                                    \
-   THPCppFunction_next_functions,                                              \
-   nullptr,                                                                    \
-   nullptr,                                                                    \
-   nullptr},                                                                   \
-      {(char*)"requires_grad",                                                 \
-       THPCppFunction_requires_grad,                                           \
-       nullptr,                                                                \
-       nullptr,                                                                \
-       nullptr},                                                               \
-      {(char*)"metadata", THPCppFunction_metadata, nullptr, nullptr, nullptr}, \
-  {                                                                            \
-    (char*)"_input_metadata", THPCppFunction_input_metadata, nullptr, nullptr, \
-        nullptr                                                                \
+#define THP_FUNCTION_DEFAULT_PROPERTIES                                   \
+  {(char*)"next_functions",                                               \
+   THPCppFunction_next_functions,                                         \
+   nullptr,                                                               \
+   nullptr,                                                               \
+   nullptr},                                                              \
+      {(char*)"requires_grad",                                            \
+       THPCppFunction_requires_grad,                                      \
+       nullptr,                                                           \
+       nullptr,                                                           \
+       nullptr},                                                          \
+  {                                                                       \
+    (char*)"metadata", THPCppFunction_metadata, nullptr, nullptr, nullptr \
   }
 
-TORCH_PYTHON_API PyObject* THPCppFunction_next_functions(
-    PyObject* self,
-    void* _unused);
-TORCH_PYTHON_API PyObject* THPCppFunction_metadata(
-    PyObject* self,
-    void* _unused);
-TORCH_PYTHON_API PyObject* THPCppFunction_requires_grad(
-    PyObject* self,
-    void* _unused);
-TORCH_PYTHON_API PyObject* THPCppFunction_register_hook_dict(
-    PyObject* self,
-    PyObject* _var);
-TORCH_PYTHON_API PyObject* THPCppFunction_register_hook(
-    PyObject* self,
-    PyObject* hook);
-TORCH_PYTHON_API PyObject* THPCppFunction_register_prehook(
-    PyObject* self,
-    PyObject* hook);
+PyObject* THPCppFunction_next_functions(PyObject* self, void* _unused);
+PyObject* THPCppFunction_metadata(PyObject* self, void* _unused);
+PyObject* THPCppFunction_requires_grad(PyObject* self, void* _unused);
+PyObject* THPCppFunction_register_hook_dict(PyObject* self, PyObject* _var);
+PyObject* THPCppFunction_register_hook(PyObject* self, PyObject* hook);
+PyObject* THPCppFunction_register_prehook(PyObject* self, PyObject* hook);
 
-TORCH_PYTHON_API PyObject* THPCppFunction_name(
-    PyObject* self,
-    PyObject* noargs);
-TORCH_PYTHON_API PyObject* THPCppFunction_sequence_nr(
-    PyObject* self,
-    PyObject* noargs);
-TORCH_PYTHON_API PyObject* THPCppFunction_input_metadata(
-    PyObject* self,
-    void* _unused);
+PyObject* THPCppFunction_name(PyObject* self, PyObject* noargs);
+PyObject* THPCppFunction_sequence_nr(PyObject* self, PyObject* noargs);
 
-TORCH_PYTHON_API PyTypeObject* _initFunctionPyTypeObject(
+PyTypeObject* _initFunctionPyTypeObject(
     PyTypeObject& type,
     const char* name,
     PyGetSetDef* function_properties,
     PyMethodDef* function_methods);
 
-TORCH_PYTHON_API PyObject* registerFunctionHook(Node& fn, PyObject* hook);
+PyObject* registerFunctionHook(Node& fn, PyObject* hook);
 
-TORCH_PYTHON_API PyObject* registerFunctionPreHook(Node& fn, PyObject* hook);
+PyObject* registerFunctionPreHook(Node& fn, PyObject* hook);
 
 template <typename Ctor>
-TORCH_PYTHON_API PyTypeObject* createForwardFunctionPyTypeObject(
+PyTypeObject* createForwardFunctionPyTypeObject(
     PyTypeObject& type,
     const char* name,
     PyGetSetDef* function_properties = nullptr,
@@ -120,12 +97,9 @@ TORCH_PYTHON_API PyTypeObject* createForwardFunctionPyTypeObject(
       type, name, function_properties, function_methods);
 }
 
-TORCH_PYTHON_API void registerCppFunction(
-    const std::type_info& type,
-    PyTypeObject* pytype);
-TORCH_PYTHON_API PyObject* functionToPyObject(
-    const std::shared_ptr<Node>& cdata);
+void registerCppFunction(const std::type_info& type, PyTypeObject* pytype);
+PyObject* functionToPyObject(const std::shared_ptr<Node>& cdata);
 
-TORCH_PYTHON_API bool THPCppFunction_Check(PyObject* obj);
+bool THPCppFunction_Check(PyObject* obj);
 
 } // namespace torch::autograd

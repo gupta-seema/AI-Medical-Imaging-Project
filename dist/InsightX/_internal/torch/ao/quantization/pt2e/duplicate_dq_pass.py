@@ -1,12 +1,13 @@
-# mypy: allow-untyped-defs
 import logging
 import operator
 
 import torch
+
 from torch.ao.quantization.pt2e.utils import (
     _filter_sym_size_users,
     _is_valid_annotation,
 )
+
 from torch.fx.node import map_arg
 from torch.fx.passes.infra.pass_base import PassBase, PassResult
 
@@ -33,7 +34,7 @@ def _maybe_duplicate_dq(
     gm: torch.fx.GraphModule, dq_node: torch.fx.Node, user: torch.fx.Node
 ):
     annotation = user.meta.get("quantization_annotation", None)
-    if not _is_valid_annotation(annotation):  # type: ignore[arg-type]
+    if not _is_valid_annotation(annotation):
         return
     with gm.graph.inserting_after(dq_node):
         new_node = gm.graph.node_copy(dq_node)
@@ -46,8 +47,8 @@ def _maybe_duplicate_dq(
 
         new_args = map_arg(user.args, maybe_replace_node)
         new_kwargs = map_arg(user.kwargs, maybe_replace_node)
-        user.args = new_args  # type: ignore[assignment]
-        user.kwargs = new_kwargs  # type: ignore[assignment]
+        user.args = new_args
+        user.kwargs = new_kwargs
 
 
 class DuplicateDQPass(PassBase):

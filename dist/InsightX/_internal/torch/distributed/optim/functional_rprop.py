@@ -1,16 +1,11 @@
-# mypy: allow-untyped-defs
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.optim._functional as F
+
 from torch import Tensor
-from torch.distributed.optim._deprecation_warning import (
-    _scripted_functional_optimizer_deprecation_warning,
-)
 
-
-__all__: list[str] = []
-
+__all__: List[str] = []
 
 # Define a TorchScript compatible Functional Rprop Optimizer
 # where we use these optimizer in a functional way.
@@ -25,15 +20,14 @@ __all__: list[str] = []
 class _FunctionalRprop:
     def __init__(
         self,
-        params: list[Tensor],
+        params: List[Tensor],
         lr: float = 1e-2,
-        etas: tuple[float, float] = (0.5, 1.2),
-        step_sizes: tuple[float, float] = (1e-6, 50),
+        etas: Tuple[float, float] = (0.5, 1.2),
+        step_sizes: Tuple[float, float] = (1e-6, 50),
         foreach: bool = False,
         maximize: bool = False,
         _allow_empty_param_list: bool = False,
     ):
-        _scripted_functional_optimizer_deprecation_warning(stacklevel=2)
         self.defaults = {
             "lr": lr,
         }
@@ -49,15 +43,14 @@ class _FunctionalRprop:
         # param group as it's not a common use case.
         self.param_group = {"params": params}
 
-        self.state = torch.jit.annotate(dict[torch.Tensor, dict[str, torch.Tensor]], {})
+        self.state = torch.jit.annotate(Dict[torch.Tensor, Dict[str, torch.Tensor]], {})
 
-    def step(self, gradients: list[Optional[Tensor]]):
+    def step(self, gradients: List[Optional[Tensor]]):
         params = self.param_group["params"]
         params_with_grad = []
         grads = []
         prevs = []
         step_sizes = []
-        state_steps = []
         lr = self.defaults["lr"]
         etaminus, etaplus = self.etas
         step_size_min, step_size_max = self.step_sizes
@@ -88,7 +81,8 @@ class _FunctionalRprop:
                 state = self.state[param]
                 prevs.append(state["prev"])
                 step_sizes.append(state["step_size"])
-                state_steps.append(state["step"])
+
+                state["step"] += 1
 
         with torch.no_grad():
             F.rprop(
@@ -96,7 +90,6 @@ class _FunctionalRprop:
                 grads,
                 prevs,
                 step_sizes,
-                state_steps,
                 step_size_min=step_size_min,
                 step_size_max=step_size_max,
                 etaminus=etaminus,

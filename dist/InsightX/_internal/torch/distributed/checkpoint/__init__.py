@@ -1,8 +1,7 @@
-from . import _extension
 from .api import CheckpointException
 from .default_planner import DefaultLoadPlanner, DefaultSavePlanner
 from .filesystem import FileSystemReader, FileSystemWriter
-from .hf_storage import HuggingFaceStorageReader, HuggingFaceStorageWriter
+from .fsspec import FsspecReader, FsspecWriter
 from .metadata import (
     BytesStorageMetadata,
     ChunkStorageMetadata,

@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor view_copy(const at::Tensor & self, at::IntArrayRef size) {
     return at::_ops::view_copy::call(self, c10::fromIntArrayRefSlow(size));
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor view_copy(const at::Tensor & self, at::IntArrayRef size) {
     return at::_ops::view_copy::call(self, c10::fromIntArrayRefSlow(size));
   }
@@ -39,7 +38,7 @@ inline at::Tensor view_copy_symint(const at::Tensor & self, c10::SymIntArrayRef 
     return at::_ops::view_copy::call(self, size);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor view_copy(const at::Tensor & self, c10::SymIntArrayRef size) {
     return at::_ops::view_copy::call(self, size);
   }
@@ -55,7 +54,7 @@ inline at::Tensor & view_copy_out(at::Tensor & out, const at::Tensor & self, at:
     return at::_ops::view_copy_out::call(self, c10::fromIntArrayRefSlow(size), out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & view_copy_out(at::Tensor & out, const at::Tensor & self, at::IntArrayRef size) {
     return at::_ops::view_copy_out::call(self, c10::fromIntArrayRefSlow(size), out);
   }
@@ -66,7 +65,7 @@ inline at::Tensor & view_copy_outf(const at::Tensor & self, at::IntArrayRef size
     return at::_ops::view_copy_out::call(self, c10::fromIntArrayRefSlow(size), out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & view_copy_outf(const at::Tensor & self, at::IntArrayRef size, at::Tensor & out) {
     return at::_ops::view_copy_out::call(self, c10::fromIntArrayRefSlow(size), out);
   }
@@ -77,7 +76,7 @@ inline at::Tensor & view_copy_symint_out(at::Tensor & out, const at::Tensor & se
     return at::_ops::view_copy_out::call(self, size, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & view_copy_out(at::Tensor & out, const at::Tensor & self, c10::SymIntArrayRef size) {
     return at::_ops::view_copy_out::call(self, size, out);
   }
@@ -88,7 +87,7 @@ inline at::Tensor & view_copy_symint_outf(const at::Tensor & self, c10::SymIntAr
     return at::_ops::view_copy_out::call(self, size, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & view_copy_outf(const at::Tensor & self, c10::SymIntArrayRef size, at::Tensor & out) {
     return at::_ops::view_copy_out::call(self, size, out);
   }

@@ -1,29 +1,18 @@
 set(PYTORCH_FOUND_HIP FALSE)
 
-# If ROCM_PATH is set, assume intention is to compile with
-# ROCm support and error out if the ROCM_PATH does not exist.
-# Else ROCM_PATH does not exist, assume a default of /opt/rocm
-# In the latter case, if /opt/rocm does not exist emit status
-# message and return.
-if(DEFINED ENV{ROCM_PATH})
-  set(ROCM_PATH $ENV{ROCM_PATH})
-  if(NOT EXISTS ${ROCM_PATH})
-    message(FATAL_ERROR
-      "ROCM_PATH environment variable is set to ${ROCM_PATH} but does not exist.\n"
-      "Set a valid ROCM_PATH or unset ROCM_PATH environment variable to fix.")
-  endif()
+if(NOT DEFINED ENV{ROCM_PATH})
+  set(ROCM_PATH /opt/rocm)
 else()
-  if(UNIX)
-    set(ROCM_PATH /opt/rocm)
-  else() # Win32
-    set(ROCM_PATH C:/opt/rocm)
-  endif()
-  if(NOT EXISTS ${ROCM_PATH})
-    message(STATUS
-        "ROCM_PATH environment variable is not set and ${ROCM_PATH} does not exist.\n"
-        "Building without ROCm support.")
-    return()
-  endif()
+  set(ROCM_PATH $ENV{ROCM_PATH})
+endif()
+if(NOT DEFINED ENV{ROCM_INCLUDE_DIRS})
+  set(ROCM_INCLUDE_DIRS ${ROCM_PATH}/include)
+else()
+  set(ROCM_INCLUDE_DIRS $ENV{ROCM_INCLUDE_DIRS})
+endif()
+
+if(NOT EXISTS ${ROCM_PATH})
+  return()
 endif()
 
 # MAGMA_HOME
@@ -34,16 +23,6 @@ else()
   set(MAGMA_HOME $ENV{MAGMA_HOME})
 endif()
 
-# MIOpen isn't a part of HIP-SDK for Windows and hence, may have a different
-# installation directory.
-if(WIN32)
-  if(NOT DEFINED ENV{MIOPEN_PATH})
-    set(miopen_DIR C:/opt/miopen/lib/cmake/miopen)
-  else()
-    set(miopen_DIR $ENV{MIOPEN_PATH}/lib/cmake/miopen)
-  endif()
-endif()
-
 torch_hip_get_arch_list(PYTORCH_ROCM_ARCH)
 if(PYTORCH_ROCM_ARCH STREQUAL "")
   message(FATAL_ERROR "No GPU arch specified for ROCm build. Please use PYTORCH_ROCM_ARCH environment variable to specify GPU archs to build for.")
@@ -51,101 +30,78 @@ endif()
 message("Building PyTorch for GPU arch: ${PYTORCH_ROCM_ARCH}")
 
 # Add HIP to the CMAKE Module Path
-# needed because the find_package call to this module uses the Module mode search
-# https://cmake.org/cmake/help/latest/command/find_package.html#search-modes
-if(UNIX)
-  set(CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip ${CMAKE_MODULE_PATH})
-else() # Win32
-  set(CMAKE_MODULE_PATH ${ROCM_PATH}/cmake/ ${CMAKE_MODULE_PATH})
-endif()
-
-# Add ROCM_PATH to CMAKE_PREFIX_PATH, needed because the find_package
-# call to individual ROCM components uses the Config mode search
-list(APPEND CMAKE_PREFIX_PATH ${ROCM_PATH})
+set(CMAKE_MODULE_PATH ${ROCM_PATH}/lib/cmake/hip ${CMAKE_MODULE_PATH})
 
 macro(find_package_and_print_version PACKAGE_NAME)
   find_package("${PACKAGE_NAME}" ${ARGN})
-  if(NOT ${PACKAGE_NAME}_FOUND)
-    message("Optional package ${PACKAGE_NAME} not found")
-  else()
-    message("${PACKAGE_NAME} VERSION: ${${PACKAGE_NAME}_VERSION}")
-    if(${PACKAGE_NAME}_INCLUDE_DIR)
-      list(APPEND ROCM_INCLUDE_DIRS ${${PACKAGE_NAME}_INCLUDE_DIR})
-    endif()
-  endif()
+  message("${PACKAGE_NAME} VERSION: ${${PACKAGE_NAME}_VERSION}")
 endmacro()
 
 # Find the HIP Package
-# MODULE argument is added for clarity that CMake is searching
-# for FindHIP.cmake in Module mode
-find_package_and_print_version(HIP 1.0 MODULE)
+find_package_and_print_version(HIP 1.0)
 
 if(HIP_FOUND)
   set(PYTORCH_FOUND_HIP TRUE)
-  find_package_and_print_version(hip REQUIRED CONFIG)
+  set(FOUND_ROCM_VERSION_H FALSE)
 
-  # The rocm-core package was only introduced in ROCm 6.4, so we make it optional.
-  find_package(rocm-core CONFIG)
+  set(PROJECT_RANDOM_BINARY_DIR "${PROJECT_BINARY_DIR}")
+  set(file "${PROJECT_BINARY_DIR}/detect_rocm_version.cc")
 
-  # Some old consumer HIP SDKs do not distribute rocm_version.h, so we allow
-  # falling back to the hip version, which everyone should have.
-  # rocm_version.h lives in the rocm-core package and hip_version.h lives in the
-  # hip (lower-case) package. Both are probed above and will be in
-  # ROCM_INCLUDE_DIRS if available.
-  find_file(ROCM_VERSION_HEADER_PATH
-    NAMES rocm-core/rocm_version.h
-    NO_DEFAULT_PATH
-    PATHS ${ROCM_INCLUDE_DIRS}
-  )
-  set(ROCM_LIB_NAME "ROCM")
-  if(NOT ROCM_VERSION_HEADER_PATH)
-    find_file(ROCM_VERSION_HEADER_PATH
-      NAMES hip/hip_version.h
-      NO_DEFAULT_PATH
-      PATHS ${ROCM_INCLUDE_DIRS}
-    )
-    set(ROCM_LIB_NAME "HIP")
-  endif()
-  if(NOT ROCM_VERSION_HEADER_PATH)
-    message(FATAL_ERROR "Could not find hip/hip_version.h or rocm-core/rocm_version.h in ${ROCM_INCLUDE_DIRS}")
-  endif()
-  get_filename_component(ROCM_HEADER_NAME ${ROCM_VERSION_HEADER_PATH} NAME)
-
-  if(EXISTS ${ROCM_VERSION_HEADER_PATH})
-    set(ROCM_HEADER_FILE ${ROCM_VERSION_HEADER_PATH})
+  # Find ROCM version for checks
+  # ROCM 5.0 and later will have header api for version management
+  if(EXISTS ${ROCM_INCLUDE_DIRS}/rocm_version.h)
+    set(FOUND_ROCM_VERSION_H TRUE)
+    file(WRITE ${file} ""
+      "#include <rocm_version.h>\n"
+      )
+  elseif(EXISTS ${ROCM_INCLUDE_DIRS}/rocm-core/rocm_version.h)
+    set(FOUND_ROCM_VERSION_H TRUE)
+    file(WRITE ${file} ""
+      "#include <rocm-core/rocm_version.h>\n"
+      )
   else()
-    message(FATAL_ERROR "********************* ${ROCM_HEADER_NAME} could not be found ******************\n")
+    message("********************* rocm_version.h couldnt be found ******************\n")
   endif()
 
-  # Read the ROCM headerfile into a variable
-  message(STATUS "Reading ROCM version from: ${ROCM_HEADER_FILE}")
-  message(STATUS "Content: ${ROCM_HEADER_CONTENT}")
-  file(READ "${ROCM_HEADER_FILE}" ROCM_HEADER_CONTENT)
+  if(FOUND_ROCM_VERSION_H)
+    file(APPEND ${file} ""
+      "#include <cstdio>\n"
 
-  # Below we use a RegEx to find ROCM version numbers.
-  # Note that CMake does not support \s for blank space. That is
-  # why in the regular expressions below we have a blank space in
-  # the square brackets.
-  # There are three steps:
-  # 1. Match regular expression
-  # 2. Strip the non-numerical part of the string
-  # 3. Strip leading and trailing spaces
+      "#ifndef ROCM_VERSION_PATCH\n"
+      "#define ROCM_VERSION_PATCH 0\n"
+      "#endif\n"
+      "#define STRINGIFYHELPER(x) #x\n"
+      "#define STRINGIFY(x) STRINGIFYHELPER(x)\n"
+      "int main() {\n"
+      "  printf(\"%d.%d.%s\", ROCM_VERSION_MAJOR, ROCM_VERSION_MINOR, STRINGIFY(ROCM_VERSION_PATCH));\n"
+      "  return 0;\n"
+      "}\n"
+      )
 
-  string(REGEX MATCH "${ROCM_LIB_NAME}_VERSION_MAJOR[ ]+[0-9]+" TEMP1 ${ROCM_HEADER_CONTENT})
-  string(REPLACE "${ROCM_LIB_NAME}_VERSION_MAJOR" "" TEMP2 ${TEMP1})
-  string(STRIP ${TEMP2} ROCM_VERSION_DEV_MAJOR)
-  string(REGEX MATCH "${ROCM_LIB_NAME}_VERSION_MINOR[ ]+[0-9]+" TEMP1 ${ROCM_HEADER_CONTENT})
-  string(REPLACE "${ROCM_LIB_NAME}_VERSION_MINOR" "" TEMP2 ${TEMP1})
-  string(STRIP ${TEMP2} ROCM_VERSION_DEV_MINOR)
-  string(REGEX MATCH "${ROCM_LIB_NAME}_VERSION_PATCH[ ]+[0-9]+" TEMP1 ${ROCM_HEADER_CONTENT})
-  string(REPLACE "${ROCM_LIB_NAME}_VERSION_PATCH" "" TEMP2 ${TEMP1})
-  string(STRIP ${TEMP2} ROCM_VERSION_DEV_PATCH)
+    try_run(run_result compile_result ${PROJECT_RANDOM_BINARY_DIR} ${file}
+      CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
+      RUN_OUTPUT_VARIABLE rocm_version_from_header
+      COMPILE_OUTPUT_VARIABLE output_var
+      )
+    # We expect the compile to be successful if the include directory exists.
+    if(NOT compile_result)
+      message(FATAL_ERROR "Caffe2: Couldn't determine version from header: " ${output_var})
+    endif()
+    message(STATUS "Caffe2: Header version is: " ${rocm_version_from_header})
+    set(ROCM_VERSION_DEV_RAW ${rocm_version_from_header})
+    message("\n***** ROCm version from rocm_version.h ****\n")
+  endif()
 
-  # Create ROCM_VERSION_DEV_INT which is later used as a preprocessor macros
-  set(ROCM_VERSION_DEV "${ROCM_VERSION_DEV_MAJOR}.${ROCM_VERSION_DEV_MINOR}.${ROCM_VERSION_DEV_PATCH}")
-  math(EXPR ROCM_VERSION_DEV_INT "(${ROCM_VERSION_DEV_MAJOR}*10000) + (${ROCM_VERSION_DEV_MINOR}*100) + ${ROCM_VERSION_DEV_PATCH}")
+  string(REGEX MATCH "^([0-9]+)\.([0-9]+)\.([0-9]+).*$" ROCM_VERSION_DEV_MATCH ${ROCM_VERSION_DEV_RAW})
 
-  message("\n***** ROCm version from ${ROCM_HEADER_NAME} ****\n")
+  if(ROCM_VERSION_DEV_MATCH)
+    set(ROCM_VERSION_DEV_MAJOR ${CMAKE_MATCH_1})
+    set(ROCM_VERSION_DEV_MINOR ${CMAKE_MATCH_2})
+    set(ROCM_VERSION_DEV_PATCH ${CMAKE_MATCH_3})
+    set(ROCM_VERSION_DEV "${ROCM_VERSION_DEV_MAJOR}.${ROCM_VERSION_DEV_MINOR}.${ROCM_VERSION_DEV_PATCH}")
+    math(EXPR ROCM_VERSION_DEV_INT "(${ROCM_VERSION_DEV_MAJOR}*10000) + (${ROCM_VERSION_DEV_MINOR}*100) + ${ROCM_VERSION_DEV_PATCH}")
+  endif()
+
   message("ROCM_VERSION_DEV: ${ROCM_VERSION_DEV}")
   message("ROCM_VERSION_DEV_MAJOR: ${ROCM_VERSION_DEV_MAJOR}")
   message("ROCM_VERSION_DEV_MINOR: ${ROCM_VERSION_DEV_MINOR}")
@@ -157,94 +113,189 @@ if(HIP_FOUND)
   message("HIP_VERSION_MINOR: ${HIP_VERSION_MINOR}")
   message("TORCH_HIP_VERSION: ${TORCH_HIP_VERSION}")
 
-  # Find ROCM components using Config mode
-  # These components will be searced for recursively in ${ROCM_PATH}
+  message("\n***** Library versions from dpkg *****\n")
+  execute_process(COMMAND dpkg -l COMMAND grep rocm-dev COMMAND awk "{print $2 \" VERSION: \" $3}")
+  execute_process(COMMAND dpkg -l COMMAND grep rocm-libs COMMAND awk "{print $2 \" VERSION: \" $3}")
+  execute_process(COMMAND dpkg -l COMMAND grep hsakmt-roct COMMAND awk "{print $2 \" VERSION: \" $3}")
+  execute_process(COMMAND dpkg -l COMMAND grep rocr-dev COMMAND awk "{print $2 \" VERSION: \" $3}")
+  execute_process(COMMAND dpkg -l COMMAND grep -w hcc COMMAND awk "{print $2 \" VERSION: \" $3}")
+  execute_process(COMMAND dpkg -l COMMAND grep hip-base COMMAND awk "{print $2 \" VERSION: \" $3}")
+  execute_process(COMMAND dpkg -l COMMAND grep hip_hcc COMMAND awk "{print $2 \" VERSION: \" $3}")
+
   message("\n***** Library versions from cmake find_package *****\n")
+
+  set(CMAKE_HIP_CLANG_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG})
+  set(CMAKE_HIP_CLANG_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE})
+  ### Remove setting of Flags when FindHIP.CMake PR #558 is accepted.###
+
+  set(hip_DIR ${ROCM_PATH}/lib/cmake/hip)
+  set(hsa-runtime64_DIR ${ROCM_PATH}/lib/cmake/hsa-runtime64)
+  set(AMDDeviceLibs_DIR ${ROCM_PATH}/lib/cmake/AMDDeviceLibs)
+  set(amd_comgr_DIR ${ROCM_PATH}/lib/cmake/amd_comgr)
+  set(rocrand_DIR ${ROCM_PATH}/lib/cmake/rocrand)
+  set(hiprand_DIR ${ROCM_PATH}/lib/cmake/hiprand)
+  set(rocblas_DIR ${ROCM_PATH}/lib/cmake/rocblas)
+  set(hipblas_DIR ${ROCM_PATH}/lib/cmake/hipblas)
+  set(hipblaslt_DIR ${ROCM_PATH}/lib/cmake/hipblaslt)
+  set(miopen_DIR ${ROCM_PATH}/lib/cmake/miopen)
+  set(rocfft_DIR ${ROCM_PATH}/lib/cmake/rocfft)
+  set(hipfft_DIR ${ROCM_PATH}/lib/cmake/hipfft)
+  set(hipsparse_DIR ${ROCM_PATH}/lib/cmake/hipsparse)
+  set(rccl_DIR ${ROCM_PATH}/lib/cmake/rccl)
+  set(rocprim_DIR ${ROCM_PATH}/lib/cmake/rocprim)
+  set(hipcub_DIR ${ROCM_PATH}/lib/cmake/hipcub)
+  set(rocthrust_DIR ${ROCM_PATH}/lib/cmake/rocthrust)
+  set(hipsolver_DIR ${ROCM_PATH}/lib/cmake/hipsolver)
+
+
+  find_package_and_print_version(hip REQUIRED)
+  find_package_and_print_version(hsa-runtime64 REQUIRED)
   find_package_and_print_version(amd_comgr REQUIRED)
   find_package_and_print_version(rocrand REQUIRED)
   find_package_and_print_version(hiprand REQUIRED)
   find_package_and_print_version(rocblas REQUIRED)
   find_package_and_print_version(hipblas REQUIRED)
+  if(ROCM_VERSION_DEV VERSION_GREATER_EQUAL "5.7.0")
+    find_package_and_print_version(hipblaslt REQUIRED)
+  endif()
   find_package_and_print_version(miopen REQUIRED)
-  find_package_and_print_version(hipfft REQUIRED)
+  if(ROCM_VERSION_DEV VERSION_GREATER_EQUAL "4.1.0")
+    find_package_and_print_version(hipfft REQUIRED)
+  else()
+    find_package_and_print_version(rocfft REQUIRED)
+  endif()
   find_package_and_print_version(hipsparse REQUIRED)
+  find_package_and_print_version(rccl)
   find_package_and_print_version(rocprim REQUIRED)
   find_package_and_print_version(hipcub REQUIRED)
   find_package_and_print_version(rocthrust REQUIRED)
   find_package_and_print_version(hipsolver REQUIRED)
-  find_package_and_print_version(rocsolver REQUIRED)
-  # workaround cmake 4 build issue
-  if(CMAKE_VERSION VERSION_GREATER_EQUAL "4.0.0")
-    message(WARNING "Work around hiprtc cmake failure for cmake >= 4")
-    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
-    find_package_and_print_version(hiprtc REQUIRED)
-    unset(CMAKE_POLICY_VERSION_MINIMUM)
+
+
+  find_library(PYTORCH_HIP_LIBRARIES amdhip64 HINTS ${ROCM_PATH}/lib)
+  # TODO: miopen_LIBRARIES should return fullpath to the library file,
+  # however currently it's just the lib name
+  if(TARGET ${miopen_LIBRARIES})
+    set(PYTORCH_MIOPEN_LIBRARIES ${miopen_LIBRARIES})
   else()
-    find_package_and_print_version(hiprtc REQUIRED)
+    find_library(PYTORCH_MIOPEN_LIBRARIES ${miopen_LIBRARIES} HINTS ${ROCM_PATH}/lib)
   endif()
-  find_package_and_print_version(hipblaslt REQUIRED)
-
-  if(UNIX)
-    find_package_and_print_version(rccl)
-    find_package_and_print_version(hsa-runtime64 REQUIRED)
+  # TODO: rccl_LIBRARIES should return fullpath to the library file,
+  # however currently it's just the lib name
+  if(TARGET ${rccl_LIBRARIES})
+    set(PYTORCH_RCCL_LIBRARIES ${rccl_LIBRARIES})
+  else()
+    find_library(PYTORCH_RCCL_LIBRARIES ${rccl_LIBRARIES} HINTS ${ROCM_PATH}/lib)
   endif()
+  find_library(ROCM_HIPRTC_LIB hiprtc HINTS ${ROCM_PATH}/lib)
+  # roctx is part of roctracer
+  find_library(ROCM_ROCTX_LIB roctx64 HINTS ${ROCM_PATH}/lib)
 
-  # Optional components.
-  find_package_and_print_version(hipsparselt)  # Will be required when ready.
+  if(ROCM_VERSION_DEV VERSION_GREATER_EQUAL "5.7.0")
+    # check whether hipblaslt is using its own datatype
+    set(file "${PROJECT_BINARY_DIR}/hipblaslt_test_data_type.cc")
+    file(WRITE ${file} ""
+      "#include <hipblaslt/hipblaslt.h>\n"
+      "int main() {\n"
+      "    hipblasltDatatype_t bar = HIPBLASLT_R_16F;\n"
+      "    return 0;\n"
+      "}\n"
+      )
 
-  list(REMOVE_DUPLICATES ROCM_INCLUDE_DIRS)
+    try_compile(hipblaslt_compile_result_custom_datatype ${PROJECT_RANDOM_BINARY_DIR} ${file}
+      CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
+      COMPILE_DEFINITIONS -D__HIP_PLATFORM_AMD__ -D__HIP_PLATFORM_HCC__
+      OUTPUT_VARIABLE hipblaslt_compile_output)
 
-  if(UNIX)
-    # roctx is part of roctracer
-    find_library(ROCM_ROCTX_LIB roctx64 HINTS ${ROCM_PATH}/lib)
+    if(hipblaslt_compile_result_custom_datatype)
+      set(HIPBLASLT_CUSTOM_DATA_TYPE ON)
+      #message("hipblaslt is using custom data type: ${hipblaslt_compile_output}")
+      message("hipblaslt is using custom data type")
+    else()
+      set(HIPBLASLT_CUSTOM_DATA_TYPE OFF)
+      #message("hipblaslt is NOT using custom data type: ${hipblaslt_compile_output}")
+      message("hipblaslt is NOT using custom data type")
+    endif()
 
-    set(PROJECT_RANDOM_BINARY_DIR "${PROJECT_BINARY_DIR}")
+    # check whether hipblaslt is using its own compute type
+    set(file "${PROJECT_BINARY_DIR}/hipblaslt_test_compute_type.cc")
+    file(WRITE ${file} ""
+      "#include <hipblaslt/hipblaslt.h>\n"
+      "int main() {\n"
+      "    hipblasLtComputeType_t baz = HIPBLASLT_COMPUTE_F32;\n"
+      "    return 0;\n"
+      "}\n"
+      )
 
-    if(ROCM_VERSION_DEV VERSION_GREATER_EQUAL "5.7.0")
-      # check whether hipblaslt provides HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F
-      set(file "${PROJECT_BINARY_DIR}/hipblaslt_test_outer_vec.cc")
-      file(WRITE ${file} ""
-        "#define LEGACY_HIPBLAS_DIRECT\n"
-        "#include <hipblaslt/hipblaslt.h>\n"
-        "int main() {\n"
-        "    hipblasLtMatmulMatrixScale_t attr = HIPBLASLT_MATMUL_MATRIX_SCALE_OUTER_VEC_32F;\n"
-        "    return 0;\n"
-        "}\n"
-        )
-      try_compile(hipblaslt_compile_result_outer_vec ${PROJECT_RANDOM_BINARY_DIR} ${file}
-        CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
-        COMPILE_DEFINITIONS -D__HIP_PLATFORM_AMD__ -D__HIP_PLATFORM_HCC__
-        OUTPUT_VARIABLE hipblaslt_compile_output_outer_vec)
+    try_compile(hipblaslt_compile_result_custom_compute_type ${PROJECT_RANDOM_BINARY_DIR} ${file}
+      CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
+      COMPILE_DEFINITIONS -D__HIP_PLATFORM_AMD__ -D__HIP_PLATFORM_HCC__
+      OUTPUT_VARIABLE hipblaslt_compile_output)
 
-      # check whether hipblaslt provides HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER_VEC_EXT
-      set(file "${PROJECT_BINARY_DIR}/hipblaslt_test_vec_ext.cc")
-      file(WRITE ${file} ""
-        "#define LEGACY_HIPBLAS_DIRECT\n"
-        "#include <hipblaslt/hipblaslt.h>\n"
-        "int main() {\n"
-        "    hipblasLtMatmulDescAttributes_t attr = HIPBLASLT_MATMUL_DESC_A_SCALE_POINTER_VEC_EXT;\n"
-        "    return 0;\n"
-        "}\n"
-        )
-      try_compile(hipblaslt_compile_result_vec_ext ${PROJECT_RANDOM_BINARY_DIR} ${file}
-        CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
-        COMPILE_DEFINITIONS -D__HIP_PLATFORM_AMD__ -D__HIP_PLATFORM_HCC__
-        OUTPUT_VARIABLE hipblaslt_compile_output_vec_ext)
+    if(hipblaslt_compile_result_custom_compute_type)
+      set(HIPBLASLT_CUSTOM_COMPUTE_TYPE ON)
+      #message("hipblaslt is using custom compute type: ${hipblaslt_compile_output}")
+      message("hipblaslt is using custom compute type")
+    else()
+      set(HIPBLASLT_CUSTOM_COMPUTE_TYPE OFF)
+      #message("hipblaslt is NOT using custom compute type: ${hipblaslt_compile_output}")
+      message("hipblaslt is NOT using custom compute type")
+    endif()
 
-      if(hipblaslt_compile_result_outer_vec)
-        set(HIPBLASLT_OUTER_VEC ON)
-        set(HIPBLASLT_VEC_EXT OFF)
-        message("hipblaslt is using scale pointer outer vec")
-      elseif(hipblaslt_compile_result_vec_ext)
-        set(HIPBLASLT_OUTER_VEC OFF)
-        set(HIPBLASLT_VEC_EXT ON)
-        message("hipblaslt is using scale pointer vec ext")
-      else()
-        set(HIPBLASLT_OUTER_VEC OFF)
-        set(HIPBLASLT_VEC_EXT OFF)
-        message("hipblaslt is NOT using scale pointer outer vec: ${hipblaslt_compile_output_outer_vec}")
-        message("hipblaslt is NOT using scale pointer vec ext: ${hipblaslt_compile_output_vec_ext}")
-      endif()
+    # check whether hipblaslt provides getIndexFromAlgo
+    set(file "${PROJECT_BINARY_DIR}/hipblaslt_test_getIndexFromAlgo.cc")
+    file(WRITE ${file} ""
+      "#include <hipblaslt/hipblaslt.h>\n"
+      "#include <hipblaslt/hipblaslt-ext.hpp>\n"
+      "int main() {\n"
+      "    hipblasLtMatmulAlgo_t algo;\n"
+      "    return hipblaslt_ext::getIndexFromAlgo(algo);\n"
+      "    return 0;\n"
+      "}\n"
+      )
+
+    try_compile(hipblaslt_compile_result_getindexfromalgo ${PROJECT_RANDOM_BINARY_DIR} ${file}
+      CMAKE_FLAGS
+        "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
+        "-DLINK_DIRECTORIES=${ROCM_PATH}/lib"
+      LINK_LIBRARIES ${hipblaslt_LIBRARIES}
+      COMPILE_DEFINITIONS -D__HIP_PLATFORM_AMD__ -D__HIP_PLATFORM_HCC__
+      OUTPUT_VARIABLE hipblaslt_compile_output)
+
+    if(hipblaslt_compile_result_getindexfromalgo)
+      set(HIPBLASLT_HAS_GETINDEXFROMALGO ON)
+      #message("hipblaslt provides getIndexFromAlgo: ${hipblaslt_compile_output}")
+      message("hipblaslt provides getIndexFromAlgo")
+    else()
+      set(HAS_GETINDEXFROMALGO OFF)
+      #message("hipblaslt does not provide getIndexFromAlgo: ${hipblaslt_compile_output}")
+      message("hipblaslt does not provide getIndexFromAlgo")
     endif()
   endif()
+
+  # check whether HIP declares new types
+  set(file "${PROJECT_BINARY_DIR}/hip_new_types.cc")
+  file(WRITE ${file} ""
+    "#include <hip/library_types.h>\n"
+    "int main() {\n"
+    "    hipDataType baz = HIP_R_8F_E4M3_FNUZ;\n"
+    "    return 0;\n"
+    "}\n"
+    )
+
+  try_compile(hipblaslt_compile_result ${PROJECT_RANDOM_BINARY_DIR} ${file}
+    CMAKE_FLAGS "-DINCLUDE_DIRECTORIES=${ROCM_INCLUDE_DIRS}"
+    COMPILE_DEFINITIONS -D__HIP_PLATFORM_AMD__ -D__HIP_PLATFORM_HCC__
+    OUTPUT_VARIABLE hipblaslt_compile_output)
+
+  if(hipblaslt_compile_result)
+    set(HIP_NEW_TYPE_ENUMS ON)
+    #message("HIP is using new type enums: ${hipblaslt_compile_output}")
+    message("HIP is using new type enums")
+  else()
+    set(HIP_NEW_TYPE_ENUMS OFF)
+    #message("HIP is NOT using new type enums: ${hipblaslt_compile_output}")
+    message("HIP is NOT using new type enums")
+  endif()
+
 endif()

@@ -9,7 +9,9 @@
 
 struct CUevent_st;
 
-namespace torch::profiler::impl {
+namespace torch {
+namespace profiler {
+namespace impl {
 
 // ----------------------------------------------------------------------------
 // -- Annotation --------------------------------------------------------------
@@ -33,7 +35,7 @@ struct TORCH_API ProfilerStubs {
   }
   virtual void onEachDevice(std::function<void(int)> op) const = 0;
   virtual void synchronize() const = 0;
-  virtual ~ProfilerStubs() = default;
+  virtual ~ProfilerStubs();
 };
 
 TORCH_API void registerCUDAMethods(ProfilerStubs* stubs);
@@ -50,4 +52,6 @@ using vulkan_id_t = strong::type<
     strong::convertible_to<int64_t>,
     strong::hashable>;
 
-} // namespace torch::profiler::impl
+} // namespace impl
+} // namespace profiler
+} // namespace torch

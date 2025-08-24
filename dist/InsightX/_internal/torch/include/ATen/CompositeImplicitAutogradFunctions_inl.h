@@ -17,6 +17,7 @@
 #endif
 
 #include <ATen/ops/_add_batch_dim_compositeimplicitautograd_dispatch.h>
+#include <ATen/ops/_assert_tensor_metadata_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_autocast_to_full_precision_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_autocast_to_reduced_precision_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_backward_compositeimplicitautograd_dispatch.h>
@@ -40,6 +41,7 @@
 #include <ATen/ops/_cufft_set_plan_cache_max_size_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_debug_has_internal_overlap_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_dim_arange_compositeimplicitautograd_dispatch.h>
+#include <ATen/ops/_embedding_bag_backward_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_embedding_bag_sparse_backward_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_gather_sparse_backward_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_grid_sampler_2d_cpu_fallback_backward_compositeimplicitautograd_dispatch.h>
@@ -97,8 +99,6 @@
 #include <ATen/ops/_version_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_weight_norm_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/_weight_norm_differentiable_backward_compositeimplicitautograd_dispatch.h>
-#include <ATen/ops/_wrapped_linear_prepack_compositeimplicitautograd_dispatch.h>
-#include <ATen/ops/_wrapped_quantized_linear_prepacked_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/absolute_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/adaptive_avg_pool1d_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/adaptive_avg_pool2d_compositeimplicitautograd_dispatch.h>
@@ -388,7 +388,6 @@
 #include <ATen/ops/result_type_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/retain_grad_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/retains_grad_compositeimplicitautograd_dispatch.h>
-#include <ATen/ops/rms_norm_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/rnn_relu_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/rnn_relu_cell_compositeimplicitautograd_dispatch.h>
 #include <ATen/ops/rnn_tanh_compositeimplicitautograd_dispatch.h>

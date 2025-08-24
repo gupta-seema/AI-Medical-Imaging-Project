@@ -3,7 +3,9 @@
 #include <torch/nn/options/conv.h>
 #include <torch/types.h>
 
-namespace torch::nn::functional {
+namespace torch {
+namespace nn {
+namespace functional {
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS
 namespace detail {
@@ -40,7 +42,7 @@ inline Tensor conv1d(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.conv1d
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.conv1d
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::Conv1dFuncOptions` class
@@ -86,7 +88,7 @@ inline Tensor conv2d(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.conv2d
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.conv2d
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::Conv2dFuncOptions` class
@@ -132,7 +134,7 @@ inline Tensor conv3d(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.conv3d
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.conv3d
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for `torch::nn::functional::Conv3dFuncOptions` class
@@ -177,7 +179,7 @@ inline Tensor conv_transpose1d(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.conv_transpose1d
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.conv_transpose1d
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for
@@ -222,7 +224,7 @@ inline Tensor conv_transpose2d(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.conv_transpose2d
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.conv_transpose2d
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for
@@ -267,7 +269,7 @@ inline Tensor conv_transpose3d(
 #endif /* DOXYGEN_SHOULD_SKIP_THIS */
 
 /// See
-/// https://pytorch.org/docs/main/nn.functional.html#torch.nn.functional.conv_transpose3d
+/// https://pytorch.org/docs/master/nn.functional.html#torch.nn.functional.conv_transpose3d
 /// about the exact behavior of this functional.
 ///
 /// See the documentation for
@@ -294,4 +296,6 @@ inline Tensor conv_transpose3d(
       options.dilation());
 }
 
-} // namespace torch::nn::functional
+} // namespace functional
+} // namespace nn
+} // namespace torch

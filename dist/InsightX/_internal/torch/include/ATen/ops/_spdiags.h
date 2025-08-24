@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,16 +23,16 @@ namespace at {
 
 
 // aten::_spdiags(Tensor diagonals, Tensor offsets, int[] shape, Layout? layout=None) -> Tensor
-inline at::Tensor _spdiags(const at::Tensor & diagonals, const at::Tensor & offsets, at::IntArrayRef shape, ::std::optional<at::Layout> layout=::std::nullopt) {
+inline at::Tensor _spdiags(const at::Tensor & diagonals, const at::Tensor & offsets, at::IntArrayRef shape, c10::optional<at::Layout> layout=c10::nullopt) {
     return at::_ops::_spdiags::call(diagonals, offsets, shape, layout);
 }
 
 // aten::_spdiags.out(Tensor diagonals, Tensor offsets, int[] shape, Layout? layout=None, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & _spdiags_out(at::Tensor & out, const at::Tensor & diagonals, const at::Tensor & offsets, at::IntArrayRef shape, ::std::optional<at::Layout> layout=::std::nullopt) {
+inline at::Tensor & _spdiags_out(at::Tensor & out, const at::Tensor & diagonals, const at::Tensor & offsets, at::IntArrayRef shape, c10::optional<at::Layout> layout=c10::nullopt) {
     return at::_ops::_spdiags_out::call(diagonals, offsets, shape, layout, out);
 }
 // aten::_spdiags.out(Tensor diagonals, Tensor offsets, int[] shape, Layout? layout=None, *, Tensor(a!) out) -> Tensor(a!)
-inline at::Tensor & _spdiags_outf(const at::Tensor & diagonals, const at::Tensor & offsets, at::IntArrayRef shape, ::std::optional<at::Layout> layout, at::Tensor & out) {
+inline at::Tensor & _spdiags_outf(const at::Tensor & diagonals, const at::Tensor & offsets, at::IntArrayRef shape, c10::optional<at::Layout> layout, at::Tensor & out) {
     return at::_ops::_spdiags_out::call(diagonals, offsets, shape, layout, out);
 }
 

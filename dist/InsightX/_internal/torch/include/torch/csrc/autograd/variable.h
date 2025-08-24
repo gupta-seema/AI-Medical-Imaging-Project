@@ -45,7 +45,7 @@ namespace torch::autograd {
 /// If you change this, update the doc at the top of the
 /// torch/autograd/__init__.py file and
 /// "test_set_requires_grad_only_for_continuous_types" in test/test_autograd.py
-inline bool isDifferentiableType(at::ScalarType t) {
+static inline bool isDifferentiableType(at::ScalarType t) {
   return isFloatingType(t) || isComplexType(t);
 }
 
@@ -329,7 +329,7 @@ struct TORCH_API AutogradMeta : public c10::AutogradMetaInterface {
 /// e.g. fake-ification, where we want to use symbolic values or fake tensors
 /// instead.
 struct TORCH_API ViewFunc {
-  virtual ~ViewFunc() = default;
+  virtual ~ViewFunc() {}
   /// Returns any SymInts in the saved state.
   virtual std::vector<c10::SymInt> get_symints() const {
     return {};
@@ -351,19 +351,17 @@ struct TORCH_API ViewFunc {
   /// Returns a clone of this ViewFunc, optionally with the specified saved
   /// state.
   virtual std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = std::nullopt,
-      std::optional<std::vector<at::Tensor>> = std::nullopt) const = 0;
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const = 0;
 
  protected:
   /// Sets the values of any SymInts in the saved state. The input vector size
   /// must match the number of SymInts in the saved state (i.e. the size of the
   /// list returned by get_symints()).
-  /// NOLINTNEXTLINE(performance-unnecessary-value-param)
   virtual void set_symints(std::vector<c10::SymInt>) {}
   /// Sets the values of any Tensors in the saved state. The input vector size
   /// must match the number of Tensors in the saved state (i.e. the size of the
   /// list returned by get_tensors()).
-  /// NOLINTNEXTLINE(performance-unnecessary-value-param)
   virtual void set_tensors(std::vector<at::Tensor>) {}
 };
 
@@ -373,19 +371,19 @@ struct ChainedViewFunc : public ViewFunc {
       std::unique_ptr<ViewFunc> first,
       std::unique_ptr<ViewFunc> second)
       : first(std::move(first)), second(std::move(second)) {}
-  ~ChainedViewFunc() override = default;
-  std::vector<c10::SymInt> get_symints() const override;
-  size_t num_symints() const override {
+  virtual ~ChainedViewFunc() override{};
+  virtual std::vector<c10::SymInt> get_symints() const override;
+  virtual size_t num_symints() const override {
     return first->num_symints() + second->num_symints();
   }
-  std::vector<at::Tensor> get_tensors() const override;
-  size_t num_tensors() const override {
+  virtual std::vector<at::Tensor> get_tensors() const override;
+  virtual size_t num_tensors() const override {
     return first->num_tensors() + second->num_tensors();
   }
-  at::Tensor operator()(const at::Tensor&) const override;
-  std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = std::nullopt,
-      std::optional<std::vector<at::Tensor>> = std::nullopt) const override;
+  virtual at::Tensor operator()(const at::Tensor&) const override;
+  virtual std::unique_ptr<ViewFunc> clone_and_set(
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override;
 
  private:
   std::unique_ptr<ViewFunc> first;
@@ -394,14 +392,14 @@ struct ChainedViewFunc : public ViewFunc {
 
 /// ViewFunc that errors with a specified error message when called.
 struct ErroringViewFunc : public ViewFunc {
-  ErroringViewFunc(std::string error_msg) : error_msg(std::move(error_msg)) {}
-  ~ErroringViewFunc() override = default;
-  at::Tensor operator()(const at::Tensor&) const override {
+  ErroringViewFunc(const std::string& error_msg) : error_msg(error_msg) {}
+  virtual ~ErroringViewFunc() override{};
+  virtual at::Tensor operator()(const at::Tensor&) const override {
     TORCH_CHECK(false, error_msg);
   }
-  std::unique_ptr<ViewFunc> clone_and_set(
-      std::optional<std::vector<c10::SymInt>> = std::nullopt,
-      std::optional<std::vector<at::Tensor>> = std::nullopt) const override {
+  virtual std::unique_ptr<ViewFunc> clone_and_set(
+      std::optional<std::vector<c10::SymInt>> = c10::nullopt,
+      std::optional<std::vector<at::Tensor>> = c10::nullopt) const override {
     return std::make_unique<ErroringViewFunc>(error_msg);
   }
 
@@ -683,9 +681,9 @@ TORCH_API void handle_view_on_rebase(
 
 struct TORCH_API DifferentiableViewMeta : public AutogradMeta {
  private:
-  /// Information about the views
-  std::optional<ViewInfo> backward_info_;
-  std::optional<ViewInfo> forward_info_;
+  /// Informations about the views
+  c10::optional<ViewInfo> backward_info_;
+  c10::optional<ViewInfo> forward_info_;
 
   // Optimization to reduce the number of ViewInfo we create.
   // In the (very common) case where backward_info_ == forward_info_, we only
@@ -726,7 +724,6 @@ struct TORCH_API DifferentiableViewMeta : public AutogradMeta {
   const ViewInfo& get_backward_view() const {
     TORCH_CHECK(
         has_bw_view(), "backward view info can only exist for backward views.");
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return backward_info_.value();
   }
 
@@ -764,14 +761,13 @@ struct TORCH_API DifferentiableViewMeta : public AutogradMeta {
     TORCH_CHECK(
         !shared_view_info_ || has_bw_view(),
         "forward view info can only exist for forward views.");
-    // NOLINTNEXTLINE(bugprone-unchecked-optional-access)
     return shared_view_info_ ? backward_info_.value() : forward_info_.value();
   }
 
   DifferentiableViewMeta(
       at::TensorImpl* self_impl,
-      std::optional<ViewInfo> backward_info,
-      std::optional<ViewInfo> forward_info,
+      c10::optional<ViewInfo> backward_info,
+      c10::optional<ViewInfo> forward_info,
       bool shared_view_info,
       CreationMeta creation_meta = CreationMeta::DEFAULT);
 };
@@ -800,8 +796,8 @@ struct TORCH_API DifferentiableViewMeta : public AutogradMeta {
 // Differentiable view. Track history with DifferentiableViewMeta.
 inline Variable make_variable_differentiable_view(
     const at::Tensor& data,
-    std::optional<ViewInfo> backward_info,
-    std::optional<ViewInfo> forward_info,
+    c10::optional<ViewInfo> backward_info,
+    c10::optional<ViewInfo> forward_info,
     bool shared_view_info,
     CreationMeta creation_meta,
     bool allow_tensor_metadata_change = true) {
@@ -883,7 +879,7 @@ inline Variable make_variable(
       } else {
         data_impl_copy->set_autograd_meta(nullptr);
       }
-      return Variable(std::move(data_impl_copy));
+      return Variable(data_impl_copy);
     }
   }
   return Variable();
@@ -931,8 +927,8 @@ struct VariableHooks final : at::impl::VariableHooksInterface {
   void _backward(
       const at::Tensor& self,
       at::TensorList inputs,
-      const std::optional<at::Tensor>& gradient,
-      std::optional<bool> keep_graph,
+      const c10::optional<at::Tensor>& gradient,
+      c10::optional<bool> keep_graph,
       bool create_graph) const override;
   void requires_grad_(const at::TensorBase& self, bool _requires_grad)
       const override;

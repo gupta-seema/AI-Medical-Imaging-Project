@@ -1,10 +1,8 @@
-# mypy: allow-untyped-defs
 import argparse
 import glob
 import os
 from pathlib import Path
 from zipfile import ZipFile
-
 
 # Exclude some standard library modules to:
 # 1. Slim down the final zipped file size

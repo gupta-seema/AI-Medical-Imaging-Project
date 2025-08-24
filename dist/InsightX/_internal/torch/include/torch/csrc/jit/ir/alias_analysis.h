@@ -7,9 +7,8 @@
 #include <torch/csrc/jit/passes/create_functional_graphs.h>
 #include <torch/csrc/jit/passes/utils/memory_dag.h>
 
-namespace torch::jit {
-
-class ValueAndMemoryLocationSet;
+namespace torch {
+namespace jit {
 
 /**
  * Alias analysis pass.
@@ -71,12 +70,6 @@ class AliasDb {
   // Does `n` write to an alias of one of the values in `vs`?
   // if `recurseBlocks` is true, consider writes on the nodes in `n`s sub-blocks
   TORCH_API bool writesToAlias(Node* n, const ValueSet& vs) const;
-
-  // Does `n` write to any of the values in `vls`?
-  TORCH_API bool writesToAlias(Node* n, const ValueAndMemoryLocationSet& vls)
-      const;
-
-  TORCH_API ValueAndMemoryLocationSet getValueAndMemoryLocationSet() const;
 
   // Does `a` and `b` potentially share a memory location or do either
   // hold in memory any element that exists in the other
@@ -178,7 +171,6 @@ class AliasDb {
   void enablePreciseTupleContainerAnalysis();
 
   friend struct MutationRemover;
-  friend class ValueAndMemoryLocationSet;
 
  private:
   // Helper for topologically-safe node moves.
@@ -206,13 +198,12 @@ class AliasDb {
   // if `recurseBlocks` is true, gather reads on the nodes in `n`s sub-blocks
   MemoryLocations getReads(Node* n) const;
   void getReadsImpl(Node* n, MemoryLocations& ret) const;
-  MemoryLocations getMemoryLocations(Value* v) const;
 
   /**
    * Wildcard methods
    */
   // Register `v` as a wildcard value.
-  std::optional<Element*> setWildcard(const Value* v);
+  c10::optional<Element*> setWildcard(const Value* v);
 
   // Is this a value which will not alias?
   bool nonAliasingValue(const Value* elem) const;
@@ -226,7 +217,7 @@ class AliasDb {
   void analyzeImpl(Node* node);
   void analyzeIf(Node* node);
   void analyzeLoop(Node* node);
-  void analyzeSubgraph(Node* node, const std::shared_ptr<Graph>& subgraph);
+  void analyzeSubgraph(Node* node, std::shared_ptr<Graph> subgraph);
   void analyzeSubgraph(Node* node);
   void analyzeCreator(Node* node);
   void analyzeExtractor(Node* node);
@@ -283,7 +274,7 @@ class AliasDb {
   // All wildcard Elements (one for each unique mutable type)
   ska::flat_hash_map<TypePtr, Element*, HashType, EqualType> wildcardIndex_;
   Element* getWildcard(const TypePtr& type) const;
-  std::optional<Element*> tryGetOrCreateWildcard(const TypePtr& type);
+  c10::optional<Element*> tryGetOrCreateWildcard(const TypePtr& type);
   void addContainedTypesToFreshElement(
       Element* container_elem,
       const AliasTypeSet& mut_types);
@@ -310,9 +301,9 @@ class AliasDb {
 
   // Map of nodes to the memory locations that they write to
   using TWriteIndex = ska::flat_hash_map<Node*, MemoryLocations>;
-  std::optional<TWriteIndex> writeIndex_;
+  c10::optional<TWriteIndex> writeIndex_;
   // Collection of all memory locations that are written to.
-  std::optional<MemoryLocations> writtenToLocationsIndex_;
+  c10::optional<MemoryLocations> writtenToLocationsIndex_;
   void buildWrittenToLocationsIndex();
 
   std::unordered_set<const Value*> wildcards_;
@@ -327,37 +318,5 @@ class AliasDb {
 // the right thing.
 TORCH_API void Lint(const AliasDb* db);
 
-/**
- * ValueAndMemoryLocationSet
- *
- * A insert-only set of values which also maintains a MemoryLocations bitset
- * of the memory locations that the values alias. It is insert-only. It
- * should be constructed by calling aliasDb.getValueAndMemoryLocationSet().
- *
- * WARNING:
- *  * The AliasDb must not be mutated after construction of a
- *    ValueAndMemoryLocationsSet, or else the MemoryLocations stored in the
- *    ValueAndMemoryLocationSet will no longer be accurate.
- *  * A ValueAndMemoryLocationsSet is tied to an instsance of AliasDb but
- *    does not own the AliasDb. It is the user's responsibility to ensure
- *    that the AliasDb outlives the ValuesAndMemoryLocationsSet.
- *
- * The use case for this is to be able to implement writesToAlias
- * more efficiently for a set of values.
- */
-class ValueAndMemoryLocationSet {
- public:
-  TORCH_API void insert(Value* v);
-  TORCH_API ValueSet& getValueSet();
-
-  friend class AliasDb;
-
- private:
-  ValueAndMemoryLocationSet(const AliasDb* db) : aliasDb_(db) {}
-
-  const AliasDb* aliasDb_;
-  ValueSet valueSet_;
-  MemoryLocations memoryLocations_;
-};
-
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

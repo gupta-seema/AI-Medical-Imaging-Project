@@ -6,7 +6,8 @@ namespace at {
 class TensorBase;
 }
 
-namespace at::native {
+namespace at {
+namespace native {
 
 void launch_grid_sampler_2d_forward_kernel(
     const TensorBase &output, const TensorBase &input, const TensorBase &grid,
@@ -28,4 +29,4 @@ void launch_grid_sampler_3d_backward_kernel(
     const TensorBase &grid, int64_t interpolation_mode, int64_t padding_mode,
     bool align_corners, std::array<bool, 2> output_mask);
 
-}  // namespace at::native
+}}  // namespace at::native

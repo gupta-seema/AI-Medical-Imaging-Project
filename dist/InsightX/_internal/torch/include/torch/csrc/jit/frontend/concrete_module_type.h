@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-namespace torch::jit {
+namespace torch {
+namespace jit {
 
 enum class IterableModuleKind { NONE, LIST, DICT, PARAMLIST, PARAMDICT };
 class ConcreteModuleType;
@@ -194,15 +195,15 @@ class VISIBILITY_HIDDEN ConcreteModuleType {
   static std::shared_ptr<ConcreteModuleType> fromJitType(TypePtr type);
 
   TypePtr getJitType() const;
-  std::optional<py::object> getPyClass() const;
+  c10::optional<py::object> getPyClass() const;
   IterableModuleKind getIterableModuleKind() const;
-  std::optional<std::vector<std::string>> findOverloads(
+  c10::optional<std::vector<std::string>> findOverloads(
       const std::string& name) const;
-  std::optional<Function*> findFunctionAttribute(const std::string& name) const;
-  std::optional<c10::Symbol> findBuiltinFunction(const std::string& name) const;
+  c10::optional<Function*> findFunctionAttribute(const std::string& name) const;
+  c10::optional<c10::Symbol> findBuiltinFunction(const std::string& name) const;
   std::shared_ptr<ConcreteModuleType> findSubmoduleConcreteType(
       const std::string& name) const;
-  std::optional<std::string> findFailedAttribute(const std::string& name) const;
+  c10::optional<std::string> findFailedAttribute(const std::string& name) const;
   bool isIgnoredAttribute(const std::string& name) const;
 
   // These getters are only here to return things as types that can be
@@ -236,4 +237,5 @@ class VISIBILITY_HIDDEN ConcreteModuleType {
   TypePtr jitType_;
 };
 
-} // namespace torch::jit
+} // namespace jit
+} // namespace torch

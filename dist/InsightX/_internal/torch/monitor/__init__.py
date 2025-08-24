@@ -1,11 +1,10 @@
-from typing import TYPE_CHECKING
-
 from torch._C._monitor import *  # noqa: F403
-from torch._C._monitor import _WaitCounter, _WaitCounterTracker
 
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from torch.utils.tensorboard import SummaryWriter
+
 
 STAT_EVENT = "torch.monitor.Stat"
 
@@ -26,7 +25,6 @@ class TensorboardEventHandler:
         >>> writer = SummaryWriter("log_dir")
         >>> register_event_handler(TensorboardEventHandler(writer))
     """
-
     def __init__(self, writer: "SummaryWriter") -> None:
         """
         Constructs the ``TensorboardEventHandler``.

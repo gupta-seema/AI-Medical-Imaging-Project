@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 import ast
 import builtins
 import dis
@@ -7,9 +6,12 @@ import inspect
 import re
 import typing
 import warnings
+
 from textwrap import dedent
+from typing import Type
 
 import torch
+
 from torch._C import (
     _GeneratorType,
     AnyType,
@@ -33,7 +35,8 @@ from torch._C import (
     TupleType,
     UnionType,
 )
-from torch._jit_internal import (  # type: ignore[attr-defined]
+from torch._sources import get_source_lines_and_file
+from .._jit_internal import (  # type: ignore[attr-defined]
     _Await,
     _qualified_name,
     Any,
@@ -55,14 +58,11 @@ from torch._jit_internal import (  # type: ignore[attr-defined]
     Tuple,
     Union,
 )
-from torch._sources import get_source_lines_and_file
-
 from ._state import _get_script_class
-
 
 if torch.distributed.rpc.is_available():
     from torch._C import RRefType
-    from torch._jit_internal import is_rref, RRef
+    from .._jit_internal import is_rref, RRef
 
 from torch._ops import OpOverloadPacket
 
@@ -321,7 +321,7 @@ def split_type_line(type_line):
         arrow_pos = type_line.index("->")
     except ValueError:
         raise RuntimeError(
-            "Syntax error in type annotation (couldn't find `->`)"
+            "Syntax error in type annotation (cound't find `->`)"
         ) from None
     return type_line[start_offset:arrow_pos].strip(), type_line[arrow_pos + 2 :].strip()
 
@@ -331,7 +331,7 @@ def try_real_annotations(fn, loc):
     try:
         # Note: anything annotated as `Optional[T]` will automatically
         # be returned as `Union[T, None]` per
-        # https://github.com/python/cpython/blob/main/Lib/typing.py#L732
+        # https://github.com/python/typing/blob/master/src/typing.py#L850
         sig = inspect.signature(fn)
     except ValueError:
         return None
@@ -349,7 +349,7 @@ def try_real_annotations(fn, loc):
 
 # Finds common type for enum values belonging to an Enum class. If not all
 # values have the same type, AnyType is returned.
-def get_enum_value_type(e: type[enum.Enum], loc):
+def get_enum_value_type(e: Type[enum.Enum], loc):
     enum_values: List[enum.Enum] = list(e)
     if not enum_values:
         raise ValueError(f"No enum values defined for: '{e.__class__}'")
@@ -486,9 +486,6 @@ def try_ann_to_type(ann, loc, rcb=None):
         return StreamObjType.get()
     if ann is torch.dtype:
         return IntType.get()  # dtype not yet bound in as its own type
-    if ann is torch.qscheme:
-        return IntType.get()  # qscheme not yet bound in as its own type
-
     if inspect.isclass(ann) and issubclass(ann, enum.Enum):
         if _get_script_class(ann) is None:
             scripted_class = torch.jit._script._recursive_compile_class(ann, loc)

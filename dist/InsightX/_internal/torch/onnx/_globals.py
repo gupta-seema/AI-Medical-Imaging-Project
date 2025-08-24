@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 """Globals used internally by the ONNX exporter.
 
 Do not use this module outside of `torch.onnx` and its tests.
@@ -6,7 +5,6 @@ Do not use this module outside of `torch.onnx` and its tests.
 Be very judicious when adding any new global variables. Do not create new global
 variables unless they are absolutely necessary.
 """
-
 import torch._C._onnx as _C_onnx
 
 # This module should only depend on _constants and nothing else in torch.onnx to keep
@@ -21,7 +19,7 @@ class _InternalGlobals:
     global variables unless they are absolutely necessary.
     """
 
-    def __init__(self) -> None:
+    def __init__(self):
         self._export_onnx_opset_version = _constants.ONNX_DEFAULT_OPSET
         self._training_mode: _C_onnx.TrainingMode = _C_onnx.TrainingMode.EVAL
         self._in_onnx_export: bool = False
@@ -54,6 +52,11 @@ class _InternalGlobals:
 
     @export_onnx_opset_version.setter
     def export_onnx_opset_version(self, value: int):
+        supported_versions = range(
+            _constants.ONNX_MIN_OPSET, _constants.ONNX_MAX_OPSET + 1
+        )
+        if value not in supported_versions:
+            raise ValueError(f"Unsupported ONNX opset version: {value}")
         self._export_onnx_opset_version = value
 
     @property

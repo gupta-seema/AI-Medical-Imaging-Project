@@ -1,6 +1,4 @@
-# mypy: allow-untyped-defs
 import sys
-
 
 __all__ = ["register_after_fork"]
 

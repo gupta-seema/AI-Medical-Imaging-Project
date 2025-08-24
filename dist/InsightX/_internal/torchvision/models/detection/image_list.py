@@ -1,3 +1,5 @@
+from typing import List, Tuple
+
 import torch
 from torch import Tensor
 
@@ -14,7 +16,7 @@ class ImageList:
         image_sizes (list[tuple[int, int]]): List of Tuples each containing size of images.
     """
 
-    def __init__(self, tensors: Tensor, image_sizes: list[tuple[int, int]]) -> None:
+    def __init__(self, tensors: Tensor, image_sizes: List[Tuple[int, int]]) -> None:
         self.tensors = tensors
         self.image_sizes = image_sizes
 

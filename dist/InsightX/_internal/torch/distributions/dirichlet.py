@@ -1,14 +1,8 @@
-# mypy: allow-untyped-defs
-from typing import Optional
-
 import torch
-from torch import Tensor
 from torch.autograd import Function
 from torch.autograd.function import once_differentiable
 from torch.distributions import constraints
 from torch.distributions.exp_family import ExponentialFamily
-from torch.types import _size
-
 
 __all__ = ["Dirichlet"]
 
@@ -49,18 +43,13 @@ class Dirichlet(ExponentialFamily):
         concentration (Tensor): concentration parameter of the distribution
             (often referred to as alpha)
     """
-
     arg_constraints = {
         "concentration": constraints.independent(constraints.positive, 1)
     }
     support = constraints.simplex
     has_rsample = True
 
-    def __init__(
-        self,
-        concentration: Tensor,
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, concentration, validate_args=None):
         if concentration.dim() < 1:
             raise ValueError(
                 "`concentration` parameter must be at least one-dimensional."
@@ -79,7 +68,7 @@ class Dirichlet(ExponentialFamily):
         new._validate_args = self._validate_args
         return new
 
-    def rsample(self, sample_shape: _size = ()) -> Tensor:
+    def rsample(self, sample_shape=()):
         shape = self._extended_shape(sample_shape)
         concentration = self.concentration.expand(shape)
         return _Dirichlet.apply(concentration)
@@ -94,21 +83,21 @@ class Dirichlet(ExponentialFamily):
         )
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return self.concentration / self.concentration.sum(-1, True)
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         concentrationm1 = (self.concentration - 1).clamp(min=0.0)
         mode = concentrationm1 / concentrationm1.sum(-1, True)
-        mask = (self.concentration < 1).all(dim=-1)
+        mask = (self.concentration < 1).all(axis=-1)
         mode[mask] = torch.nn.functional.one_hot(
-            mode[mask].argmax(dim=-1), concentrationm1.shape[-1]
+            mode[mask].argmax(axis=-1), concentrationm1.shape[-1]
         ).to(mode)
         return mode
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         con0 = self.concentration.sum(-1, True)
         return (
             self.concentration
@@ -127,7 +116,7 @@ class Dirichlet(ExponentialFamily):
         )
 
     @property
-    def _natural_params(self) -> tuple[Tensor]:
+    def _natural_params(self):
         return (self.concentration,)
 
     def _log_normalizer(self, x):

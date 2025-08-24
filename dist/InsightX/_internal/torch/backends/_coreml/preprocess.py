@@ -1,6 +1,6 @@
-# mypy: allow-untyped-defs
 import hashlib
 import json
+from typing import Dict, Tuple
 
 import coremltools as ct  # type: ignore[import]
 from coremltools.converters.mil.input_types import TensorType  # type: ignore[import]
@@ -8,7 +8,6 @@ from coremltools.converters.mil.mil import types  # type: ignore[import]
 from coremltools.models.neural_network import quantization_utils  # type: ignore[import]
 
 import torch
-
 
 CT_METADATA_VERSION = "com.github.apple.coremltools.version"
 CT_METADATA_SOURCE = "com.github.apple.coremltools.source"
@@ -55,7 +54,6 @@ def CompileSpec(
     allow_low_precision=True,
     quantization_mode=CoreMLQuantizationMode.NONE,
     mlmodel_export_path=None,
-    convert_to=None,
 ):
     return (
         inputs,
@@ -64,7 +62,6 @@ def CompileSpec(
         allow_low_precision,
         quantization_mode,
         mlmodel_export_path,
-        convert_to,
     )
 
 
@@ -84,7 +81,7 @@ def _convert_to_mil_type(shape, dtype, name: str):
     return ml_type
 
 
-def preprocess(script_module: torch._C.ScriptObject, compile_spec: dict[str, tuple]):
+def preprocess(script_module: torch._C.ScriptObject, compile_spec: Dict[str, Tuple]):
     spec = compile_spec["forward"]
     (
         input_specs,
@@ -93,7 +90,6 @@ def preprocess(script_module: torch._C.ScriptObject, compile_spec: dict[str, tup
         allow_low_precision,
         quantization_mode,
         mlmodel_export_path,
-        convert_to,
     ) = spec
     mil_inputs = []
     inputs = []
@@ -104,7 +100,7 @@ def preprocess(script_module: torch._C.ScriptObject, compile_spec: dict[str, tup
         ml_type = _convert_to_mil_type(shape, dtype, name)
         mil_inputs.append(ml_type)
     model = torch.jit.RecursiveScriptModule._construct(script_module, lambda x: None)
-    mlmodel = ct.convert(model, inputs=mil_inputs, convert_to=convert_to)
+    mlmodel = ct.convert(model, inputs=mil_inputs)
 
     if quantization_mode != CoreMLQuantizationMode.NONE:
         quant_model_spec = quantization_utils.quantize_weights(

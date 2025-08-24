@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor embedding(const at::Tensor & weight, const at::Tensor & indice
     return at::_ops::embedding::call(weight, indices, padding_idx, scale_grad_by_freq, sparse);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor embedding(const at::Tensor & weight, const at::Tensor & indices, int64_t padding_idx=-1, bool scale_grad_by_freq=false, bool sparse=false) {
     return at::_ops::embedding::call(weight, indices, padding_idx, scale_grad_by_freq, sparse);
   }
@@ -39,7 +38,7 @@ inline at::Tensor embedding_symint(const at::Tensor & weight, const at::Tensor &
     return at::_ops::embedding::call(weight, indices, padding_idx, scale_grad_by_freq, sparse);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor embedding(const at::Tensor & weight, const at::Tensor & indices, c10::SymInt padding_idx=-1, bool scale_grad_by_freq=false, bool sparse=false) {
     return at::_ops::embedding::call(weight, indices, padding_idx, scale_grad_by_freq, sparse);
   }
@@ -50,7 +49,7 @@ inline at::Tensor & embedding_out(at::Tensor & out, const at::Tensor & weight, c
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & embedding_out(at::Tensor & out, const at::Tensor & weight, const at::Tensor & indices, int64_t padding_idx=-1, bool scale_grad_by_freq=false, bool sparse=false) {
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
   }
@@ -61,7 +60,7 @@ inline at::Tensor & embedding_outf(const at::Tensor & weight, const at::Tensor &
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & embedding_outf(const at::Tensor & weight, const at::Tensor & indices, int64_t padding_idx, bool scale_grad_by_freq, bool sparse, at::Tensor & out) {
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
   }
@@ -72,7 +71,7 @@ inline at::Tensor & embedding_symint_out(at::Tensor & out, const at::Tensor & we
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & embedding_out(at::Tensor & out, const at::Tensor & weight, const at::Tensor & indices, c10::SymInt padding_idx=-1, bool scale_grad_by_freq=false, bool sparse=false) {
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
   }
@@ -83,7 +82,7 @@ inline at::Tensor & embedding_symint_outf(const at::Tensor & weight, const at::T
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & embedding_outf(const at::Tensor & weight, const at::Tensor & indices, c10::SymInt padding_idx, bool scale_grad_by_freq, bool sparse, at::Tensor & out) {
     return at::_ops::embedding_out::call(weight, indices, padding_idx, scale_grad_by_freq, sparse, out);
   }

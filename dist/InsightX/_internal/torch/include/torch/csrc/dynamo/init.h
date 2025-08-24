@@ -6,6 +6,8 @@
 
 #include <Python.h>
 
-namespace torch::dynamo {
+namespace torch {
+namespace dynamo {
 void initDynamoBindings(PyObject* torch);
 }
+} // namespace torch

@@ -4,7 +4,6 @@
 #include <c10/util/Exception.h>
 
 namespace at {
-// NOLINTNEXTLINE(cppcoreguidelines-special-member-functions)
 class TORCH_API OptionalTensorRef {
  public:
   OptionalTensorRef() = default;
@@ -21,7 +20,6 @@ class TORCH_API OptionalTensorRef {
   OptionalTensorRef(const OptionalTensorRef& rhs)
       : ref_(Tensor::unsafe_borrow_t{}, rhs.ref_) {}
 
-  OptionalTensorRef(OptionalTensorRef&& rhs) = default;
   OptionalTensorRef& operator=(OptionalTensorRef rhs) {
     std::swap(ref_, rhs.ref_);
     return *this;
@@ -61,10 +59,6 @@ class TORCH_API TensorRef {
 
   TensorRef(const TensorBase& src)
       : ref_(Tensor::unsafe_borrow_t{}, src) {}
-  TensorRef(TensorRef&& other) = default;
-  TensorRef(const TensorRef&) = default;
-  TensorRef& operator=(const TensorRef&) = default;
-  TensorRef& operator=(TensorRef&&) = default;
 
   const Tensor& operator*() const & {
     return ref_;
@@ -77,7 +71,7 @@ template <typename T>
 auto Tensor::register_hook(T&& hook) const -> Tensor::hook_return_void_t<T> {
   // Return the grad argument in case of a hook with void return type to have an
   // std::function with Tensor return type
-  static_assert(std::is_same_v<decltype(hook(Tensor())), void>,
+  static_assert(std::is_same<decltype(hook(Tensor())), void>::value,
                 "Expected hook to return void");
   return _register_hook([fn=std::forward<T>(hook)](const TensorBase& grad_base) {
     TensorRef grad(grad_base);

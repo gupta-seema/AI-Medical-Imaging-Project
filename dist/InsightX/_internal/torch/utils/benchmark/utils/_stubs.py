@@ -1,5 +1,4 @@
-from typing import Any, Callable
-from typing_extensions import Protocol, runtime_checkable
+from typing import Any, Callable, Dict, Protocol, runtime_checkable
 
 
 class TimerClass(Protocol):
@@ -9,7 +8,7 @@ class TimerClass(Protocol):
         stmt: str,
         setup: str,
         timer: Callable[[], float],
-        globals: dict[str, Any],
+        globals: Dict[str, Any],
         **kwargs: Any,
     ) -> None:
         ...

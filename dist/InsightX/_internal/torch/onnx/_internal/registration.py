@@ -1,13 +1,20 @@
-# mypy: allow-untyped-defs
 """Module for handling symbolic function registration."""
 
 import warnings
-from collections.abc import Collection, Sequence
-from typing import Callable, Generic, Optional, TypeVar, Union
-from typing_extensions import ParamSpec
+from typing import (
+    Callable,
+    Collection,
+    Dict,
+    Generic,
+    Optional,
+    Sequence,
+    Set,
+    TypeVar,
+    Union,
+)
 
 from torch.onnx import _constants, errors
-
+from torch.onnx._internal import _beartype
 
 OpsetVersion = int
 
@@ -52,21 +59,19 @@ def _dispatch_opset_version(
 
 _K = TypeVar("_K")
 _V = TypeVar("_V")
-_R = TypeVar("_R")
-_P = ParamSpec("_P")
 
 
-class OverrideDict(Collection[_K], Generic[_K, _V]):
+class OverrideDict(Generic[_K, _V], Collection[_K]):
     """A dictionary that merges built-in and custom symbolic functions.
 
     It supports overriding and un-overriding built-in symbolic functions with custom
     ones.
     """
 
-    def __init__(self) -> None:
-        self._base: dict[_K, _V] = {}
-        self._overrides: dict[_K, _V] = {}
-        self._merged: dict[_K, _V] = {}
+    def __init__(self):
+        self._base: Dict[_K, _V] = {}
+        self._overrides: Dict[_K, _V] = {}
+        self._merged: Dict[_K, _V] = {}
 
     def set_base(self, key: _K, value: _V) -> None:
         self._base[key] = value
@@ -203,7 +208,7 @@ class SymbolicRegistry:
     """
 
     def __init__(self) -> None:
-        self._registry: dict[str, _SymbolicFunctionGroup] = {}
+        self._registry: Dict[str, _SymbolicFunctionGroup] = {}
 
     def register(
         self, name: str, opset: OpsetVersion, func: Callable, custom: bool = False
@@ -254,11 +259,12 @@ class SymbolicRegistry:
             return False
         return functions.get(version) is not None
 
-    def all_functions(self) -> set[str]:
+    def all_functions(self) -> Set[str]:
         """Returns the set of all registered function names."""
         return set(self._registry)
 
 
+@_beartype.beartype
 def onnx_symbolic(
     name: str,
     opset: Union[OpsetVersion, Sequence[OpsetVersion]],
@@ -270,13 +276,10 @@ def onnx_symbolic(
     Usage::
 
     ```
-    @onnx_symbolic(
-        "aten::symbolic_b",
-        opset=10,
-        decorate=[quantized_aten_handler(scale=1 / 128, zero_point=0)],
-    )
+    @onnx_symbolic("aten::symbolic_b", opset=10, decorate=[quantized_aten_handler(scale=1/128, zero_point=0)])
     @symbolic_helper.parse_args("v", "v", "b")
-    def symbolic_b(g: _C.Graph, x: _C.Value, y: _C.Value, arg1: bool) -> _C.Value: ...
+    def symbolic_b(g: _C.Graph, x: _C.Value, y: _C.Value, arg1: bool) -> _C.Value:
+        ...
     ```
 
     Args:
@@ -290,7 +293,7 @@ def onnx_symbolic(
         ValueError: If the separator '::' is not in the name.
     """
 
-    def wrapper(func: Callable[_P, _R]) -> Callable[_P, _R]:
+    def wrapper(func: Callable) -> Callable:
         decorated = func
         if decorate is not None:
             for decorate_func in decorate:
@@ -310,6 +313,7 @@ def onnx_symbolic(
     return wrapper
 
 
+@_beartype.beartype
 def custom_onnx_symbolic(
     name: str,
     opset: Union[OpsetVersion, Sequence[OpsetVersion]],

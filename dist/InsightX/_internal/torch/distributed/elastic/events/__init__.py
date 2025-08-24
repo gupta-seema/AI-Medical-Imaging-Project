@@ -14,10 +14,7 @@ Example of usage:
 ::
 
   from torch.distributed.elastic import events
-
-  event = events.Event(
-      name="test_event", source=events.EventSource.WORKER, metadata={...}
-  )
+  event = events.Event(name="test_event", source=events.EventSource.WORKER, metadata={...})
   events.get_logging_handler(destination="console").info(event)
 
 """
@@ -27,7 +24,8 @@ import logging
 import os
 import socket
 import traceback
-from typing import Optional
+from enum import Enum
+from typing import Dict, Optional
 
 from torch.distributed.elastic.events.handlers import get_logging_handler
 
@@ -39,9 +37,7 @@ from .api import (  # noqa: F401
     RdzvEvent,
 )
 
-
-_events_loggers: dict[str, logging.Logger] = {}
-
+_events_loggers: Dict[str, logging.Logger] = {}
 
 def _get_or_create_logger(destination: str = "null") -> logging.Logger:
     """
@@ -75,7 +71,6 @@ def _get_or_create_logger(destination: str = "null") -> logging.Logger:
 def record(event: Event, destination: str = "null") -> None:
     _get_or_create_logger(destination).info(event.serialize())
 
-
 def record_rdzv_event(event: RdzvEvent) -> None:
     _get_or_create_logger("dynamic_rendezvous").info(event.serialize())
 
@@ -91,40 +86,6 @@ def construct_and_record_rdzv_event(
     local_id: Optional[int] = None,
     rank: Optional[int] = None,
 ) -> None:
-    """
-    Initialize rendezvous event object and record its operations.
-
-    Args:
-        run_id (str): The run id of the rendezvous.
-        message (str): The message describing the event.
-        node_state (NodeState): The state of the node (INIT, RUNNING, SUCCEEDED, FAILED).
-        name (str): Event name. (E.g. Current action being performed).
-        hostname (str): Hostname of the node.
-        pid (Optional[int]): The process id of the node.
-        master_endpoint (str): The master endpoint for the rendezvous store, if known.
-        local_id (Optional[int]):  The local_id of the node, if defined in dynamic_rendezvous.py
-        rank (Optional[int]): The rank of the node, if known.
-    Returns:
-        None
-    Example:
-        >>> # See DynamicRendezvousHandler class
-        >>> def _record(
-        ...     self,
-        ...     message: str,
-        ...     node_state: NodeState = NodeState.RUNNING,
-        ...     rank: Optional[int] = None,
-        ... ) -> None:
-        ...     construct_and_record_rdzv_event(
-        ...         name=f"{self.__class__.__name__}.{get_method_name()}",
-        ...         run_id=self._settings.run_id,
-        ...         message=message,
-        ...         node_state=node_state,
-        ...         hostname=self._this_node.addr,
-        ...         pid=self._this_node.pid,
-        ...         local_id=self._this_node.local_id,
-        ...         rank=rank,
-        ...     )
-    """
     # We don't want to perform an extra computation if not needed.
     if isinstance(get_logging_handler("dynamic_rendezvous"), logging.NullHandler):
         return

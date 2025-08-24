@@ -3,11 +3,9 @@ import warnings
 from modulefinder import Module
 
 import torch
+from torchvision import _meta_registrations, datasets, io, models, ops, transforms, utils
 
-# Don't re-order these, we need to load the _C extension (done when importing
-# .extensions) before entering _meta_registrations.
-from .extension import _HAS_OPS  # usort:skip
-from torchvision import _meta_registrations, datasets, io, models, ops, transforms, utils  # usort:skip
+from .extension import _HAS_OPS
 
 try:
     from .version import __version__  # noqa: F401
@@ -72,7 +70,7 @@ def set_video_backend(backend):
     global _video_backend
     if backend not in ["pyav", "video_reader", "cuda"]:
         raise ValueError("Invalid video backend '%s'. Options are 'pyav', 'video_reader' and 'cuda'" % backend)
-    if backend == "video_reader" and not io._HAS_CPU_VIDEO_DECODER:
+    if backend == "video_reader" and not io._HAS_VIDEO_OPT:
         # TODO: better messages
         message = "video_reader video backend is not available. Please compile torchvision from source and try again"
         raise RuntimeError(message)

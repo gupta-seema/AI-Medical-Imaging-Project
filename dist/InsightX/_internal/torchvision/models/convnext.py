@@ -1,6 +1,5 @@
-from collections.abc import Sequence
 from functools import partial
-from typing import Any, Callable, Optional
+from typing import Any, Callable, List, Optional, Sequence
 
 import torch
 from torch import nn, Tensor
@@ -91,7 +90,7 @@ class CNBlockConfig:
 class ConvNeXt(nn.Module):
     def __init__(
         self,
-        block_setting: list[CNBlockConfig],
+        block_setting: List[CNBlockConfig],
         stochastic_depth_prob: float = 0.0,
         layer_scale: float = 1e-6,
         num_classes: int = 1000,
@@ -113,7 +112,7 @@ class ConvNeXt(nn.Module):
         if norm_layer is None:
             norm_layer = partial(LayerNorm2d, eps=1e-6)
 
-        layers: list[nn.Module] = []
+        layers: List[nn.Module] = []
 
         # Stem
         firstconv_output_channels = block_setting[0].input_channels
@@ -134,7 +133,7 @@ class ConvNeXt(nn.Module):
         stage_block_id = 0
         for cnf in block_setting:
             # Bottlenecks
-            stage: list[nn.Module] = []
+            stage: List[nn.Module] = []
             for _ in range(cnf.num_layers):
                 # adjust stochastic depth probability based on the depth of the stage block
                 sd_prob = stochastic_depth_prob * stage_block_id / (total_stage_blocks - 1.0)
@@ -178,7 +177,7 @@ class ConvNeXt(nn.Module):
 
 
 def _convnext(
-    block_setting: list[CNBlockConfig],
+    block_setting: List[CNBlockConfig],
     stochastic_depth_prob: float,
     weights: Optional[WeightsEnum],
     progress: bool,

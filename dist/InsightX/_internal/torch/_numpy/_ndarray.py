@@ -5,7 +5,7 @@ from __future__ import annotations
 import builtins
 import math
 import operator
-from collections.abc import Sequence
+from typing import Sequence
 
 import torch
 
@@ -16,7 +16,6 @@ from ._normalizations import (
     normalizer,
     NotImplementedType,
 )
-
 
 newaxis = None
 
@@ -435,7 +434,7 @@ class ndarray:
     def item(self, *args):
         # Mimic NumPy's implementation with three special cases (no arguments,
         # a flat index and a multi-index):
-        # https://github.com/numpy/numpy/blob/main/numpy/_core/src/multiarray/methods.c#L702
+        # https://github.com/numpy/numpy/blob/main/numpy/core/src/multiarray/methods.c#L702
         if args == ():
             return self.tensor.item()
         elif len(args) == 1:
@@ -513,7 +512,7 @@ def array(obj, dtype=None, *, copy=True, order="K", subok=False, ndmin=0, like=N
     if like is not None:
         raise NotImplementedError("'like' parameter is not supported.")
     if order != "K":
-        raise NotImplementedError
+        raise NotImplementedError()
 
     # a happy path
     if (

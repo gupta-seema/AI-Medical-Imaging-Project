@@ -1,13 +1,14 @@
-# mypy: allow-untyped-defs
-"""Locally Optimal Block Preconditioned Conjugate Gradient methods."""
+"""Locally Optimal Block Preconditioned Conjugate Gradient methods.
+"""
 # Author: Pearu Peterson
 # Created: February 2020
 
-from typing import Optional
+from typing import Dict, Optional, Tuple
 
 import torch
-from torch import _linalg_utils as _utils, Tensor
-from torch.overrides import handle_torch_function, has_torch_function
+from torch import Tensor
+from . import _linalg_utils as _utils
+from .overrides import handle_torch_function, has_torch_function
 
 
 __all__ = ["lobpcg"]
@@ -268,10 +269,10 @@ class LOBPCGAutogradFunction(torch.autograd.Function):
         largest: Optional[bool] = None,
         method: Optional[str] = None,
         tracker: None = None,
-        ortho_iparams: Optional[dict[str, int]] = None,
-        ortho_fparams: Optional[dict[str, float]] = None,
-        ortho_bparams: Optional[dict[str, bool]] = None,
-    ) -> tuple[Tensor, Tensor]:
+        ortho_iparams: Optional[Dict[str, int]] = None,
+        ortho_fparams: Optional[Dict[str, float]] = None,
+        ortho_bparams: Optional[Dict[str, bool]] = None,
+    ) -> Tuple[Tensor, Tensor]:
         # makes sure that input is contiguous for efficiency.
         # Note: autograd does not support dense gradients for sparse input yet.
         A = A.contiguous() if (not A.is_sparse) else A
@@ -354,10 +355,10 @@ def lobpcg(
     largest: Optional[bool] = None,
     method: Optional[str] = None,
     tracker: None = None,
-    ortho_iparams: Optional[dict[str, int]] = None,
-    ortho_fparams: Optional[dict[str, float]] = None,
-    ortho_bparams: Optional[dict[str, bool]] = None,
-) -> tuple[Tensor, Tensor]:
+    ortho_iparams: Optional[Dict[str, int]] = None,
+    ortho_fparams: Optional[Dict[str, float]] = None,
+    ortho_bparams: Optional[Dict[str, bool]] = None,
+) -> Tuple[Tensor, Tensor]:
     """Find the k largest (or smallest) eigenvalues and the corresponding
     eigenvectors of a symmetric positive definite generalized
     eigenvalue problem using matrix-free LOBPCG methods.
@@ -498,7 +499,7 @@ def lobpcg(
       [DuerschEtal2018] Jed A. Duersch, Meiyue Shao, Chao Yang, Ming
       Gu. (2018) A Robust and Efficient Implementation of LOBPCG.
       SIAM J. Sci. Comput., 40(5), C655-C676. (22 pages)
-      https://arxiv.org/abs/1704.07458
+      https://epubs.siam.org/doi/abs/10.1137/17M1129830
 
     """
 
@@ -591,10 +592,10 @@ def _lobpcg(
     largest: Optional[bool] = None,
     method: Optional[str] = None,
     tracker: None = None,
-    ortho_iparams: Optional[dict[str, int]] = None,
-    ortho_fparams: Optional[dict[str, float]] = None,
-    ortho_bparams: Optional[dict[str, bool]] = None,
-) -> tuple[Tensor, Tensor]:
+    ortho_iparams: Optional[Dict[str, int]] = None,
+    ortho_fparams: Optional[Dict[str, float]] = None,
+    ortho_bparams: Optional[Dict[str, bool]] = None,
+) -> Tuple[Tensor, Tensor]:
     # A must be square:
     assert A.shape[-2] == A.shape[-1], A.shape
     if B is not None:
@@ -697,9 +698,9 @@ class LOBPCG:
         B: Optional[Tensor],
         X: Tensor,
         iK: Optional[Tensor],
-        iparams: dict[str, int],
-        fparams: dict[str, float],
-        bparams: dict[str, bool],
+        iparams: Dict[str, int],
+        fparams: Dict[str, float],
+        bparams: Dict[str, bool],
         method: str,
         tracker: None,
     ) -> None:
@@ -720,10 +721,10 @@ class LOBPCG:
         self.E = torch.zeros((n,), dtype=X.dtype, device=X.device)
         self.R = torch.zeros((m, n), dtype=X.dtype, device=X.device)
         self.S = torch.zeros((m, 3 * n), dtype=X.dtype, device=X.device)
-        self.tvars: dict[str, Tensor] = {}
-        self.ivars: dict[str, int] = {"istep": 0}
-        self.fvars: dict[str, float] = {"_": 0.0}
-        self.bvars: dict[str, bool] = {"_": False}
+        self.tvars: Dict[str, Tensor] = {}
+        self.ivars: Dict[str, int] = {"istep": 0}
+        self.fvars: Dict[str, float] = {"_": 0.0}
+        self.bvars: Dict[str, bool] = {"_": False}
 
     def __str__(self):
         lines = ["LOPBCG:"]
@@ -783,8 +784,9 @@ class LOBPCG:
         A_norm = self.fvars["A_norm"]
         B_norm = self.fvars["B_norm"]
         E, X, R = self.E, self.X, self.R
-        rerr = torch.norm(R, 2, (0,)) / (
-            torch.norm(X, 2, (0,)) * (A_norm + torch.abs(E[: X.shape[-1]]) * B_norm)
+        rerr = (
+            torch.norm(R, 2, (0,))
+            * (torch.norm(X, 2, (0,)) * (A_norm + E[: X.shape[-1]] * B_norm)) ** -1
         )
         converged = rerr < tol
         count = 0
@@ -794,9 +796,9 @@ class LOBPCG:
                 # strict ordering of eigenpairs
                 break
             count += 1
-        assert count >= prev_count, (
-            f"the number of converged eigenpairs (was {prev_count}, got {count}) cannot decrease"
-        )
+        assert (
+            count >= prev_count
+        ), f"the number of converged eigenpairs (was {prev_count}, got {count}) cannot decrease"
         self.ivars["converged_count"] = count
         self.tvars["rerr"] = rerr
         return count
@@ -840,6 +842,7 @@ class LOBPCG:
         compiling functions using lobpcg.
         """
         # do nothing when in TorchScript mode
+        pass
 
     # Internal methods
 
@@ -899,7 +902,7 @@ class LOBPCG:
         if self.ivars["istep"] == 0:
             Ri = self._get_rayleigh_ritz_transform(self.X)
             M = _utils.qform(_utils.qform(self.A, self.X), Ri)
-            _E, Z = _utils.symeig(M, largest)
+            E, Z = _utils.symeig(M, largest)
             self.X = mm(self.X, mm(Ri, Z))
             self.update_residual()
             np = 0
@@ -917,7 +920,13 @@ class LOBPCG:
             # Update E, X, P
             self.X[:, nc:] = mm(S_, Z[:, : n - nc])
             self.E[nc:] = E_[: n - nc]
-            P = mm(S_, mm(Z[:, n - nc :], _utils.basis(Z[: n - nc, n - nc :].mT)))
+            P = mm(
+                S_,
+                mm(
+                    Z[:, n - nc :],
+                    _utils.basis(_utils.transpose(Z[: n - nc, n - nc :])),
+                ),
+            )
             np = P.shape[-1]
 
             # check convergence
@@ -977,6 +986,7 @@ class LOBPCG:
 
         """
         B = self.B
+        mm = torch.matmul
         SBS = _utils.qform(B, S)
         d_row = SBS.diagonal(0, -2, -1) ** -0.5
         d_col = d_row.reshape(d_row.shape[0], 1)
@@ -986,7 +996,9 @@ class LOBPCG:
             R, d_row.diag_embed(), upper=True, left=False
         )
 
-    def _get_svqb(self, U: Tensor, drop: bool, tau: float) -> Tensor:
+    def _get_svqb(
+        self, U: Tensor, drop: bool, tau: float  # Tensor  # bool  # float
+    ) -> Tensor:
         """Return B-orthonormal U.
 
         .. note:: When `drop` is `False` then `svqb` is based on the
@@ -1033,7 +1045,7 @@ class LOBPCG:
 
         # The original algorithm 4 from [DuerschPhD2015].
         d_col = (d**-0.5).reshape(d.shape[0], 1)
-        DUBUD = (UBU * d_col) * d_col.mT
+        DUBUD = (UBU * d_col) * _utils.transpose(d_col)
         E, Z = _utils.symeig(DUBUD)
         t = tau * abs(E).max()
         if drop:
@@ -1045,7 +1057,7 @@ class LOBPCG:
         else:
             E[(torch.where(E < t))[0]] = t
 
-        return torch.matmul(U * d_col.mT, Z * E**-0.5)
+        return torch.matmul(U * _utils.transpose(d_col), Z * E**-0.5)
 
     def _get_ortho(self, U, V):
         """Return B-orthonormal U with columns are B-orthogonal to V.
@@ -1093,8 +1105,9 @@ class LOBPCG:
 
         BV_norm = torch.norm(mm_B(self.B, V))
         BU = mm_B(self.B, U)
-        VBU = mm(V.mT, BU)
+        VBU = mm(_utils.transpose(V), BU)
         i = j = 0
+        stats = ""
         for i in range(i_max):
             U = U - mm(V, VBU)
             drop = False
@@ -1112,7 +1125,7 @@ class LOBPCG:
                     self.ivars["ortho_j"] = j
                     return U
                 BU = mm_B(self.B, U)
-                UBU = mm(U.mT, BU)
+                UBU = mm(_utils.transpose(U), BU)
                 U_norm = torch.norm(U)
                 BU_norm = torch.norm(BU)
                 R = UBU - torch.eye(UBU.shape[-1], device=UBU.device, dtype=UBU.dtype)
@@ -1123,7 +1136,7 @@ class LOBPCG:
                 self.fvars[vkey] = rerr
                 if rerr < tau_ortho:
                     break
-            VBU = mm(V.mT, BU)
+            VBU = mm(_utils.transpose(V), BU)
             VBU_norm = torch.norm(VBU)
             U_norm = torch.norm(U)
             rerr = float(VBU_norm) * float(BV_norm * U_norm) ** -1

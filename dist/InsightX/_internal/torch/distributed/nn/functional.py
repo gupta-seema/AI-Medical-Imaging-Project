@@ -1,13 +1,10 @@
-# mypy: allow-untyped-defs
 import torch
 import torch.distributed as dist
 from torch.autograd import Function
-
 # The two imports below are not always available depending on the
 # USE_DISTRIBUTED compile flag. Make sure they raise import error
 # if we're trying to use them.
 from torch.distributed import group, ReduceOp
-
 
 def broadcast(tensor, src, group=group.WORLD):
     """
@@ -117,7 +114,6 @@ def all_gather(tensor, group=group.WORLD):
 
     """
     return _AllGather.apply(group, tensor)
-
 
 def _all_gather_base(output_tensor, input_tensor, group=group.WORLD):
     """
@@ -343,7 +339,6 @@ class _AllGather(Function):
             gx = torch.sum(torch.stack(gxs), dim=0)
         return (None, gx)
 
-
 class _AllGatherBase(Function):
     @staticmethod
     def forward(ctx, output_tensor, input_tensor, group):
@@ -358,18 +353,15 @@ class _AllGatherBase(Function):
             out_size = list(grad_output.size())
             if out_size[0] % world_size != 0:
                 raise RuntimeError(
-                    f"Tensor with dimensions: {out_size} does "
-                    f"not have first dimension divisible by world_size: {world_size}"
+                    f'Tensor with dimensions: {out_size} does '
+                    f'not have first dimension divisible by world_size: {world_size}'
                 )
             out_size[0] = out_size[0] // dist.get_world_size(group=ctx.group)
-            gx = torch.empty(
-                out_size, device=grad_output.device, dtype=grad_output.dtype
-            )
+            gx = torch.empty(out_size, device=grad_output.device, dtype=grad_output.dtype)
             dist._reduce_scatter_base(gx, grad_output, ReduceOp.SUM, ctx.group)
         else:
             raise RuntimeError("Backend not supported!")
         return (None, gx, None)
-
 
 class _AlltoAll(Function):
     @staticmethod
@@ -398,9 +390,7 @@ class _AlltoAll(Function):
     @staticmethod
     def backward(ctx, *grad_outputs):
         tensor_list = [
-            torch.empty(
-                size, device=grad_outputs[0].device, dtype=grad_outputs[0].dtype
-            )
+            torch.empty(size, device=grad_outputs[0].device, dtype=grad_outputs[0].dtype)
             for size in ctx.input_tensor_size_list
         ]
         return (None, None) + _AlltoAll.apply(ctx.group, tensor_list, *grad_outputs)
@@ -424,9 +414,7 @@ class _AlltoAllSingle(Function):
 
     @staticmethod
     def backward(ctx, grad_output):
-        tensor = torch.empty(
-            ctx.input_size, device=grad_output.device, dtype=grad_output.dtype
-        )
+        tensor = torch.empty(ctx.input_size, device=grad_output.device, dtype=grad_output.dtype)
         return (None, None, None, None) + (
             _AlltoAllSingle.apply(
                 ctx.group,
@@ -443,7 +431,7 @@ class _AllReduce(Function):
     def forward(ctx, op, group, tensor):
         ctx.group = group
         ctx.op = op
-        tensor = tensor.clone(memory_format=torch.contiguous_format)
+        tensor = tensor.clone()
         dist.all_reduce(tensor, op=op, group=group)
         return tensor
 

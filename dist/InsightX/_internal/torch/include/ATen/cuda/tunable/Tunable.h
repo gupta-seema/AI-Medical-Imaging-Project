@@ -10,42 +10,40 @@
 #pragma once
 
 #include <c10/util/CallOnce.h>
-#include <c10/util/StringUtil.h>
-#include <c10/util/env.h>
 
-#include <fstream>
 #include <functional>
 #include <iostream>
 #include <memory>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <unordered_map>
-#include <unordered_set>
 #include <utility>
-
-#define TUNABLE_LOGV(LEVEL, ...) getTuningContext()->Log(LEVEL, __VA_ARGS__)
-#define TUNABLE_LOG1(...) TUNABLE_LOGV(1, __VA_ARGS__)
-#define TUNABLE_LOG2(...) TUNABLE_LOGV(2, __VA_ARGS__)
-#define TUNABLE_LOG3(...) TUNABLE_LOGV(3, __VA_ARGS__)
+#include <vector>
 
 namespace at::cuda::tunable {
 
-enum TORCH_CUDA_CPP_API TuningStatus {
+static void TunableLog(const std::string& msg) {
+  static const char *env = getenv("PYTORCH_TUNABLEOP_VERBOSE");
+  if (env != nullptr && strcmp(env, "1") == 0) {
+    std::cerr << msg << std::endl;
+  }
+}
+#define TUNABLE_LOG(...) TunableLog(c10::str(__VA_ARGS__))
+
+enum TuningStatus {
   OK = 0,
   FAIL = 1,
   UNSUPPORTED = 2,
 };
 
 // Mapping from params signature to kernel id
-class TORCH_CUDA_CPP_API ResultEntry {
+class ResultEntry {
   public:
-    explicit ResultEntry(std::string  key, double time) : key_(std::move(key)), time_(time) {}
-    explicit ResultEntry(std::string  key, double time, std::string blas_sig ) : key_(std::move(key)), time_(time), blas_sig_(std::move(blas_sig)) {}
-    bool operator==(const ResultEntry& other) const { return key_ == other.key_; }
-    bool operator!=(const ResultEntry& other) const { return key_ != other.key_; }
+    explicit ResultEntry(const std::string& key, double time) : key_(key), time_(time) {}
+    bool operator==(const ResultEntry& other) { return key_ == other.key_; }
+    bool operator!=(const ResultEntry& other) { return key_ != other.key_; }
     operator std::string () { return key_; }
-    std::string GetKey() const { return key_; }
-    double GetTime() const { return time_; }
     friend std::ostream& operator<<(std::ostream& stream, const ResultEntry& entry);
     static ResultEntry Null() { return ResultEntry("Null", 0.0); }
     static ResultEntry Default() { return ResultEntry("Default", 0.0); }
@@ -53,14 +51,12 @@ class TORCH_CUDA_CPP_API ResultEntry {
   private:
     std::string key_;
     double time_;
-    std::string blas_sig_;
 };
 
 typedef std::unordered_map<std::string, ResultEntry> KernelMap;
 typedef std::unordered_map<std::string, KernelMap> ResultsMap;
-typedef std::unordered_map<std::string, std::unordered_set<std::string>> UntunedMap;
 
-struct TORCH_CUDA_CPP_API TuningResults {
+struct TuningResults {
   // Validates if these results are compatible with the libraries
   std::unordered_map<std::string, std::string> validators;
 
@@ -68,7 +64,7 @@ struct TORCH_CUDA_CPP_API TuningResults {
   ResultsMap results;
 };
 
-class TORCH_CUDA_CPP_API TuningResultsManager {
+class TuningResultsManager {
   public:
     TuningResultsManager() = default;
     ~TuningResultsManager() = default;
@@ -77,7 +73,7 @@ class TORCH_CUDA_CPP_API TuningResultsManager {
 
     ResultEntry Lookup(const std::string& op_signature, const std::string& params_signature);
 
-    void AddImpl(const std::string& op_signature,
+    inline void AddImpl(const std::string& op_signature,
         const std::string& params_signature,
         ResultEntry best,
         KernelMap& kernel_map);
@@ -88,7 +84,7 @@ class TORCH_CUDA_CPP_API TuningResultsManager {
 
     void Delete(const std::string& op_signature, const std::string& params_signature);
 
-    void DisjointMergeImpl(
+    inline void DisjointMergeImpl(
         const std::string& op_signature,
         const KernelMap& kernel_map,
         /*out*/ ResultsMap& results);
@@ -101,16 +97,12 @@ class TORCH_CUDA_CPP_API TuningResultsManager {
 
     size_t GetSize();
 
-    void RecordUntuned( std::ofstream& untuned_file, const std::string& op_signature,
-      const std::string& params_signature, const std::string& blas_signature);
   private:
     std::mutex lock_;
     ResultsMap results_;
-    UntunedMap untuned_results_;
-
 };
 
-class TORCH_CUDA_CPP_API TuningResultsValidator {
+class TuningResultsValidator {
   public:
     using GetFunc = std::function<std::string()>;
     using ValidateFunc = std::function<TuningStatus(const std::string&)>;
@@ -124,7 +116,7 @@ class TORCH_CUDA_CPP_API TuningResultsValidator {
     void RegisterValidator(const std::string& key, const GetFunc& gf, const ValidateFunc& vf);
 
   protected:
-    static std::string GetPyTorchVersion() ;
+    std::string GetPyTorchVersion() const;
     TuningStatus ValidatePyTorchVersion(const std::string& value) const;
 
   public:
@@ -134,7 +126,7 @@ class TORCH_CUDA_CPP_API TuningResultsValidator {
     GetValidateFuncs validators_;
 };
 
-class TORCH_CUDA_CPP_API TuningContext {
+class TuningContext {
   public:
     TuningContext();
     ~TuningContext();
@@ -143,18 +135,13 @@ class TORCH_CUDA_CPP_API TuningContext {
     TuningContext &operator=(TuningContext &) = delete;
     TuningContext &operator=(TuningContext &&) = delete;
 
-    void EnableTunableOp(bool value);
+    void EnableTunableOp();
+    void DisableTunableOp();
     bool IsTunableOpEnabled() const;
 
-    void EnableTuning(bool value);
+    void EnableTuning();
+    void DisableTuning();
     bool IsTuningEnabled() const;
-
-    void EnableRecordUntuned(bool value);
-    bool IsRecordUntunedEnabled() const;
-    std::ofstream& GetUntunedFile();
-
-    void EnableNumericsCheck(bool value);
-    bool IsNumericsCheckEnabled() const;
 
     void SetMaxTuningDurationMs(int max_duration_ms);
     int GetMaxTuningDurationMs() const;
@@ -168,11 +155,8 @@ class TORCH_CUDA_CPP_API TuningContext {
     void SetMaxWarmupIterations(int max_iter);
     int GetMaxWarmupIterations() const;
 
-    void EnableICacheFlush(bool value);
-    bool IsICacheFlushEnabled() const;
-
-    void SetRotatingBufferSize(int size);
-    int GetRotatingBufferSize() const;
+    void EnableTunableOpAndTuning();
+    void DisableTunableOpAndTuning();
 
     TuningResultsManager& GetTuningResultsManager();
 
@@ -182,49 +166,29 @@ class TORCH_CUDA_CPP_API TuningContext {
 
     TuningStatus LoadTuningResults(const TuningResults& tr);
 
-    void SetFilename(const std::string& filename, bool insert_device_ordinal=false);
+    void SetFilename(const std::string& filename);
     std::string GetFilename() const;
 
-    void WriteFileOnExit(bool value);
-
-    bool ReadFile(const std::string& filename={});
-    bool WriteFile(const std::string& filename={});
-
-    template<class... Types>
-    void Log(int level, Types... args) {
-      if (GetLogOkay() && GetLogLevel() >= level) {
-        GetLog() << c10::str(args...) << std::endl;
-      }
-    }
+  protected:
+    bool ReadFile(const std::string& filename);
+    bool WriteFile(const std::string& filename);
 
   private:
-    std::string GetLogFilename() const;
-    int GetLogLevel() const;
-    bool GetLogOkay() const;
-    std::ostream& GetLog() const;
-
     bool enable_;
     bool tuning_enable_;
-    bool record_untuned_enable_;
     bool manager_initialized_;
-    bool write_file_on_exit_;
-    bool numerics_check_enable_;
     int max_tuning_duration_ms_;
     int max_tuning_iterations_;
     int max_warmup_duration_ms_;
     int max_warmup_iterations_;
-    bool icache_flush_;
-    int rotating_buffer_size_;
     mutable TuningResultsManager manager_;
     mutable c10::once_flag manager_init_once_;
     TuningResultsValidator validator_;
     std::string filename_;
-    std::ofstream untuned_file_;
     size_t results_count_from_input_file_;
-    bool is_shutting_down_;
 };
 
-TORCH_CUDA_CPP_API TuningContext* getTuningContext();
+TuningContext* getTuningContext();
 
 class ITimer {
   public:

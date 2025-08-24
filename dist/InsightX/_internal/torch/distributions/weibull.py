@@ -1,15 +1,10 @@
-# mypy: allow-untyped-defs
-from typing import Optional, Union
-
 import torch
-from torch import Tensor
 from torch.distributions import constraints
 from torch.distributions.exponential import Exponential
 from torch.distributions.gumbel import euler_constant
 from torch.distributions.transformed_distribution import TransformedDistribution
 from torch.distributions.transforms import AffineTransform, PowerTransform
 from torch.distributions.utils import broadcast_all
-
 
 __all__ = ["Weibull"]
 
@@ -28,21 +23,14 @@ class Weibull(TransformedDistribution):
     Args:
         scale (float or Tensor): Scale parameter of distribution (lambda).
         concentration (float or Tensor): Concentration parameter of distribution (k/shape).
-        validate_args (bool, optional): Whether to validate arguments. Default: None.
     """
-
     arg_constraints = {
         "scale": constraints.positive,
         "concentration": constraints.positive,
     }
     support = constraints.positive
 
-    def __init__(
-        self,
-        scale: Union[Tensor, float],
-        concentration: Union[Tensor, float],
-        validate_args: Optional[bool] = None,
-    ) -> None:
+    def __init__(self, scale, concentration, validate_args=None):
         self.scale, self.concentration = broadcast_all(scale, concentration)
         self.concentration_reciprocal = self.concentration.reciprocal()
         base_dist = Exponential(
@@ -69,11 +57,11 @@ class Weibull(TransformedDistribution):
         return new
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return self.scale * torch.exp(torch.lgamma(1 + self.concentration_reciprocal))
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return (
             self.scale
             * ((self.concentration - 1) / self.concentration)
@@ -81,7 +69,7 @@ class Weibull(TransformedDistribution):
         )
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return self.scale.pow(2) * (
             torch.exp(torch.lgamma(1 + 2 * self.concentration_reciprocal))
             - torch.exp(2 * torch.lgamma(1 + self.concentration_reciprocal))

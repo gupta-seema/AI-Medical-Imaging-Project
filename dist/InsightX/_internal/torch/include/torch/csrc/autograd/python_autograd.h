@@ -1,6 +1,5 @@
 #ifndef THP_AUTOGRAD_H
 #define THP_AUTOGRAD_H
-#include <torch/csrc/utils/pythoncapi_compat.h>
 
 PyObject* THPAutograd_initExtension(PyObject* _unused, PyObject* unused);
 void THPAutograd_initFunctions();

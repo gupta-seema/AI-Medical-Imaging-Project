@@ -1,20 +1,17 @@
-# mypy: allow-untyped-defs
 import random
-from collections.abc import Iterator
-from typing import Optional, TypeVar
 
 import torch
 from torch.utils.data.datapipes.datapipe import IterDataPipe, MapDataPipe
+from typing import Iterator, List, Optional, TypeVar
+
+__all__ = ["ShufflerIterDataPipe", ]
 
 
-__all__ = ["ShufflerIterDataPipe"]
-
-
-_T_co = TypeVar("_T_co", covariant=True)
+T_co = TypeVar('T_co', covariant=True)
 
 
 # @functional_datapipe('shuffle')
-class ShufflerIterDataPipe(IterDataPipe[_T_co]):
+class ShufflerIterDataPipe(IterDataPipe[T_co]):
     r"""
     Shuffle the input MapDataPipe via its indices (functional name: ``shuffle``).
 
@@ -51,24 +48,23 @@ class ShufflerIterDataPipe(IterDataPipe[_T_co]):
         of data during data-processing.
     """
 
-    datapipe: MapDataPipe[_T_co]
+    datapipe: MapDataPipe[T_co]
     _enabled: bool
     _seed: Optional[int]
     _rng: random.Random
 
-    def __init__(
-        self,
-        datapipe: MapDataPipe[_T_co],
-        *,
-        indices: Optional[list] = None,
-    ) -> None:
+    def __init__(self,
+                 datapipe: MapDataPipe[T_co],
+                 *,
+                 indices: Optional[List] = None,
+                 ) -> None:
         super().__init__()
         self.datapipe = datapipe
         self.indices = list(range(len(datapipe))) if indices is None else indices
         self._enabled = True
         self._seed = None
         self._rng = random.Random()
-        self._shuffled_indices: list = self.indices
+        self._shuffled_indices: List = self.indices
 
     def set_shuffle(self, shuffle=True):
         self._enabled = shuffle
@@ -78,7 +74,7 @@ class ShufflerIterDataPipe(IterDataPipe[_T_co]):
         self._seed = seed
         return self
 
-    def __iter__(self) -> Iterator[_T_co]:
+    def __iter__(self) -> Iterator[T_co]:
         if not self._enabled:
             for idx in self.indices:
                 yield self.datapipe[idx]

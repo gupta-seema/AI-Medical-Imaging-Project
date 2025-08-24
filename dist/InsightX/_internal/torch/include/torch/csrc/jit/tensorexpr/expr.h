@@ -6,15 +6,17 @@
 #pragma once
 
 #include <c10/core/MemoryFormat.h>
+#include <c10/util/Optional.h>
 #include <torch/csrc/jit/tensorexpr/fwd_decls.h>
 #include <torch/csrc/jit/tensorexpr/ir_mutator.h>
 #include <torch/csrc/jit/tensorexpr/ir_visitor.h>
 #include <torch/csrc/jit/tensorexpr/types.h>
-#include <optional>
 
 #include <utility>
 
-namespace torch::jit::tensorexpr {
+namespace torch {
+namespace jit {
+namespace tensorexpr {
 
 enum IRNodeType {
   kPrimitive,
@@ -66,7 +68,7 @@ class TORCH_API Expr : public std::enable_shared_from_this<Expr> {
    * All sub-expressions inside the given expressions are also cloned. Note
    * that the variables are not deep-copied since they are immutable.
    */
-  static ExprPtr clone(const ExprPtr& s);
+  static ExprPtr clone(ExprPtr s);
 
  protected:
   std::shared_ptr<Expr> getptr() {
@@ -112,7 +114,7 @@ class TORCH_API ExprHandle {
   }
 
 #define IMM_EXPR_DECLARE(Type, Name) ExprHandle(Type v);
-  AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, IMM_EXPR_DECLARE)
+  AT_FORALL_SCALAR_TYPES_AND3(Bool, Half, BFloat16, IMM_EXPR_DECLARE);
 #undef IMM_EXPR_DECLARE
 
   template <class Op>
@@ -205,10 +207,10 @@ class TORCH_API Buf : public ExprNode<Buf> {
       const std::string& name_hint,
       const std::vector<ExprHandle>& dims,
       Dtype dtype,
-      std::optional<ExprHandle> initializer = std::nullopt,
-      const std::optional<std::vector<ExprHandle>>& strides = std::nullopt,
-      std::optional<ExprHandle> qscale = std::nullopt,
-      std::optional<ExprHandle> qzero = std::nullopt);
+      c10::optional<ExprHandle> initializer = c10::nullopt,
+      c10::optional<std::vector<ExprHandle>> strides = c10::nullopt,
+      c10::optional<ExprHandle> qscale = c10::nullopt,
+      c10::optional<ExprHandle> qzero = c10::nullopt);
 
   // TODO: unique_name
   VarPtr base_handle() const {
@@ -225,11 +227,12 @@ class TORCH_API Buf : public ExprNode<Buf> {
     base_handle_->set_name_hint(name_hint);
   }
 
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
   Buf(const std::string& name_hint,
       const std::vector<ExprPtr>& dims,
       Dtype dtype,
       ExprPtr initializer = nullptr,
-      std::optional<std::vector<ExprPtr>> strides = std::nullopt,
+      c10::optional<std::vector<ExprPtr>> strides = c10::nullopt,
       ExprPtr qscale = nullptr,
       ExprPtr qzero = nullptr)
       : Buf(alloc<Var>(name_hint, kHandle),
@@ -240,11 +243,12 @@ class TORCH_API Buf : public ExprNode<Buf> {
             std::move(qscale),
             std::move(qzero)) {}
 
-  Buf(const VarPtr& var,
+  // NOLINTNEXTLINE(cppcoreguidelines-pro-type-member-init)
+  Buf(VarPtr var,
       std::vector<ExprPtr> dims,
       Dtype dtype,
       ExprPtr initializer = nullptr,
-      std::optional<std::vector<ExprPtr>> strides = std::nullopt,
+      c10::optional<std::vector<ExprPtr>> strides = c10::nullopt,
       ExprPtr qscale = nullptr,
       ExprPtr qzero = nullptr);
 
@@ -274,7 +278,7 @@ class TORCH_API Buf : public ExprNode<Buf> {
 
   ExprPtr initializer() const {
     return initializer_;
-  }
+  };
 
   ExprPtr qzero() const {
     return qzero_;
@@ -411,7 +415,7 @@ class TORCH_API BufHandle : public ExprHandle {
 class TORCH_API VarHandle : public ExprHandle {
  public:
   // Creates an empty VarHandle whose base Var is set to nullptr.
-  VarHandle() = default;
+  VarHandle() : ExprHandle() {}
 
   explicit VarHandle(Dtype dtype) : ExprHandle(Var::make(dtype)) {}
 
@@ -488,6 +492,8 @@ TORCH_API ExprHandle Relu(const ExprHandle& v1);
 TORCH_API ExprHandle
 ifThenElse(const ExprHandle& c, const ExprHandle& t, const ExprHandle& f);
 
-TORCH_API ExprHandle expr_to_vec(const ExprHandle& v, int lanes);
+TORCH_API ExprHandle expr_to_vec(ExprHandle v, int lanes);
 
-} // namespace torch::jit::tensorexpr
+} // namespace tensorexpr
+} // namespace jit
+} // namespace torch

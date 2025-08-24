@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -24,7 +23,7 @@ namespace at {
 
 
 // aten::einsum(str equation, Tensor[] tensors, *, int[]? path=None) -> Tensor
-inline at::Tensor einsum(c10::string_view equation, at::TensorList tensors, at::OptionalIntArrayRef path=::std::nullopt) {
+inline at::Tensor einsum(c10::string_view equation, at::TensorList tensors, at::OptionalIntArrayRef path=c10::nullopt) {
     return at::_ops::einsum::call(equation, tensors, path);
 }
 

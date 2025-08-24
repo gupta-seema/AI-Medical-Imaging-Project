@@ -1,4 +1,3 @@
-# mypy: allow-untyped-defs
 # Copyright (c) Facebook, Inc. and its affiliates.
 # All rights reserved.
 #
@@ -7,16 +6,17 @@
 
 import binascii
 from base64 import b64decode, b64encode
-from typing import cast, Optional
+from typing import Optional, Tuple, cast
 
 import urllib3.exceptions  # type: ignore[import]
-
-
-try:
-    import etcd  # type: ignore[import]
-except ModuleNotFoundError:
-    from . import _etcd_stub as etcd
-
+from etcd import Client as EtcdClient  # type: ignore[import]
+from etcd import (
+    EtcdAlreadyExist,
+    EtcdCompareFailed,
+    EtcdException,
+    EtcdKeyNotFound,
+    EtcdResult,
+)
 from torch.distributed import Store
 
 from .api import RendezvousConnectionError, RendezvousParameters, RendezvousStateError
@@ -41,13 +41,13 @@ class EtcdRendezvousBackend(RendezvousBackend):
 
     _DEFAULT_TTL = 7200  # 2 hours
 
-    _client: etcd.Client
+    _client: EtcdClient
     _key: str
     _ttl: int
 
     def __init__(
         self,
-        client: etcd.Client,
+        client: EtcdClient,
         run_id: str,
         key_prefix: Optional[str] = None,
         ttl: Optional[int] = None,
@@ -72,13 +72,13 @@ class EtcdRendezvousBackend(RendezvousBackend):
         """See base class."""
         return "etcd-v2"
 
-    def get_state(self) -> Optional[tuple[bytes, Token]]:
+    def get_state(self) -> Optional[Tuple[bytes, Token]]:
         """See base class."""
         try:
             result = self._client.read(self._key)
-        except etcd.EtcdKeyNotFound:
+        except EtcdKeyNotFound:
             return None
-        except (etcd.EtcdException, urllib3.exceptions.TimeoutError) as exc:
+        except (EtcdException, urllib3.exceptions.TimeoutError) as exc:
             raise RendezvousConnectionError(
                 "The connection to etcd has failed. See inner exception for details."
             ) from exc
@@ -87,7 +87,7 @@ class EtcdRendezvousBackend(RendezvousBackend):
 
     def set_state(
         self, state: bytes, token: Optional[Token] = None
-    ) -> Optional[tuple[bytes, Token, bool]]:
+    ) -> Optional[Tuple[bytes, Token, bool]]:
         """See base class."""
         base64_state = b64encode(state).decode()
 
@@ -115,9 +115,9 @@ class EtcdRendezvousBackend(RendezvousBackend):
 
         try:
             result = self._client.write(self._key, base64_state, self._ttl, **kwargs)
-        except (etcd.EtcdAlreadyExist, etcd.EtcdCompareFailed):
+        except (EtcdAlreadyExist, EtcdCompareFailed):
             result = None
-        except (etcd.EtcdException, urllib3.exceptions.TimeoutError) as exc:
+        except (EtcdException, urllib3.exceptions.TimeoutError) as exc:
             raise RendezvousConnectionError(
                 "The connection to etcd has failed. See inner exception for details."
             ) from exc
@@ -128,7 +128,7 @@ class EtcdRendezvousBackend(RendezvousBackend):
         tmp = *self._decode_state(result), True
         return tmp
 
-    def _decode_state(self, result: etcd.EtcdResult) -> tuple[bytes, Token]:
+    def _decode_state(self, result: EtcdResult) -> Tuple[bytes, Token]:
         base64_state = result.value.encode()
 
         try:
@@ -141,7 +141,7 @@ class EtcdRendezvousBackend(RendezvousBackend):
         return state, result.modifiedIndex
 
 
-def _create_etcd_client(params: RendezvousParameters) -> etcd.Client:
+def _create_etcd_client(params: RendezvousParameters) -> EtcdClient:
     host, port = parse_rendezvous_endpoint(params.endpoint, default_port=2379)
 
     # The timeout
@@ -167,7 +167,7 @@ def _create_etcd_client(params: RendezvousParameters) -> etcd.Client:
     ca_cert = params.get("ca_cert")
 
     try:
-        return etcd.Client(
+        return EtcdClient(
             host,
             port,
             read_timeout=read_timeout,
@@ -176,13 +176,13 @@ def _create_etcd_client(params: RendezvousParameters) -> etcd.Client:
             ca_cert=ca_cert,
             allow_reconnect=True,
         )
-    except (etcd.EtcdException, urllib3.exceptions.TimeoutError) as exc:
+    except (EtcdException, urllib3.exceptions.TimeoutError) as exc:
         raise RendezvousConnectionError(
             "The connection to etcd has failed. See inner exception for details."
         ) from exc
 
 
-def create_backend(params: RendezvousParameters) -> tuple[EtcdRendezvousBackend, Store]:
+def create_backend(params: RendezvousParameters) -> Tuple[EtcdRendezvousBackend, Store]:
     """Create a new :py:class:`EtcdRendezvousBackend` from the specified parameters.
 
     +--------------+-----------------------------------------------------------+
@@ -206,9 +206,7 @@ def create_backend(params: RendezvousParameters) -> tuple[EtcdRendezvousBackend,
     """
     client = _create_etcd_client(params)
 
-    backend = EtcdRendezvousBackend(
-        client, params.run_id, key_prefix="/torch/elastic/rendezvous"
-    )
+    backend = EtcdRendezvousBackend(client, params.run_id, key_prefix="/torch/elastic/rendezvous")
 
     store = EtcdStore(client, "/torch/elastic/store")
 

@@ -1,20 +1,16 @@
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 import torch
 import torch.nn.functional as F
 import torchvision
-from torch import nn
+from torch import nn, Tensor
 from torchvision.ops import boxes as box_ops, roi_align
 
 from . import _utils as det_utils
 
 
-def fastrcnn_loss(
-    class_logits: torch.Tensor,
-    box_regression: torch.Tensor,
-    labels: list[torch.Tensor],
-    regression_targets: list[torch.Tensor],
-) -> tuple[torch.Tensor, torch.Tensor]:
+def fastrcnn_loss(class_logits, box_regression, labels, regression_targets):
+    # type: (Tensor, Tensor, List[Tensor], List[Tensor]) -> Tuple[Tensor, Tensor]
     """
     Computes the loss for Faster R-CNN.
 
@@ -53,7 +49,8 @@ def fastrcnn_loss(
     return classification_loss, box_loss
 
 
-def maskrcnn_inference(x: torch.Tensor, labels: list[torch.Tensor]) -> list[torch.Tensor]:
+def maskrcnn_inference(x, labels):
+    # type: (Tensor, List[Tensor]) -> List[Tensor]
     """
     From the results of the CNN, post process the masks
     by taking the mask corresponding to the class with max
@@ -63,7 +60,7 @@ def maskrcnn_inference(x: torch.Tensor, labels: list[torch.Tensor]) -> list[torc
     Args:
         x (Tensor): the mask logits
         labels (list[BoxList]): bounding boxes that are used as
-            reference, one for each image
+            reference, one for ech image
 
     Returns:
         results (list[BoxList]): one BoxList for each image, containing
@@ -98,7 +95,7 @@ def project_masks_on_boxes(gt_masks, boxes, matched_idxs, M):
 
 
 def maskrcnn_loss(mask_logits, proposals, gt_masks, gt_labels, mask_matched_idxs):
-    # type: (Tensor, list[Tensor], list[Tensor], list[Tensor], list[Tensor]) -> Tensor
+    # type: (Tensor, List[Tensor], List[Tensor], List[Tensor], List[Tensor]) -> Tensor
     """
     Args:
         proposals (list[BoxList])
@@ -130,7 +127,7 @@ def maskrcnn_loss(mask_logits, proposals, gt_masks, gt_labels, mask_matched_idxs
 
 
 def keypoints_to_heatmap(keypoints, rois, heatmap_size):
-    # type: (Tensor, Tensor, int) -> tuple[Tensor, Tensor]
+    # type: (Tensor, Tensor, int) -> Tuple[Tensor, Tensor]
     offset_x = rois[:, 0]
     offset_y = rois[:, 1]
     scale_x = heatmap_size / (rois[:, 2] - rois[:, 0])
@@ -299,7 +296,7 @@ def heatmaps_to_keypoints(maps, rois):
 
 
 def keypointrcnn_loss(keypoint_logits, proposals, gt_keypoints, keypoint_matched_idxs):
-    # type: (Tensor, list[Tensor], list[Tensor], list[Tensor]) -> Tensor
+    # type: (Tensor, List[Tensor], List[Tensor], List[Tensor]) -> Tensor
     N, K, H, W = keypoint_logits.shape
     if H != W:
         raise ValueError(
@@ -330,7 +327,7 @@ def keypointrcnn_loss(keypoint_logits, proposals, gt_keypoints, keypoint_matched
 
 
 def keypointrcnn_inference(x, boxes):
-    # type: (Tensor, list[Tensor]) -> tuple[list[Tensor], list[Tensor]]
+    # type: (Tensor, List[Tensor]) -> Tuple[List[Tensor], List[Tensor]]
     kp_probs = []
     kp_scores = []
 
@@ -393,7 +390,7 @@ def expand_masks_tracing_scale(M, padding):
 
 
 def expand_masks(mask, padding):
-    # type: (Tensor, int) -> tuple[Tensor, float]
+    # type: (Tensor, int) -> Tuple[Tensor, float]
     M = mask.shape[-1]
     if torch._C._get_tracing_state():  # could not import is_tracing(), not sure why
         scale = expand_masks_tracing_scale(M, padding)
@@ -475,7 +472,7 @@ def _onnx_paste_masks_in_image_loop(masks, boxes, im_h, im_w):
 
 
 def paste_masks_in_image(masks, boxes, img_shape, padding=1):
-    # type: (Tensor, Tensor, tuple[int, int], int) -> Tensor
+    # type: (Tensor, Tensor, Tuple[int, int], int) -> Tensor
     masks, scale = expand_masks(masks, padding=padding)
     boxes = expand_boxes(boxes, scale).to(dtype=torch.int64)
     im_h, im_w = img_shape
@@ -569,7 +566,7 @@ class RoIHeads(nn.Module):
         return True
 
     def assign_targets_to_proposals(self, proposals, gt_boxes, gt_labels):
-        # type: (list[Tensor], list[Tensor], list[Tensor]) -> tuple[list[Tensor], list[Tensor]]
+        # type: (List[Tensor], List[Tensor], List[Tensor]) -> Tuple[List[Tensor], List[Tensor]]
         matched_idxs = []
         labels = []
         for proposals_in_image, gt_boxes_in_image, gt_labels_in_image in zip(proposals, gt_boxes, gt_labels):
@@ -604,7 +601,7 @@ class RoIHeads(nn.Module):
         return matched_idxs, labels
 
     def subsample(self, labels):
-        # type: (list[Tensor]) -> list[Tensor]
+        # type: (List[Tensor]) -> List[Tensor]
         sampled_pos_inds, sampled_neg_inds = self.fg_bg_sampler(labels)
         sampled_inds = []
         for img_idx, (pos_inds_img, neg_inds_img) in enumerate(zip(sampled_pos_inds, sampled_neg_inds)):
@@ -613,13 +610,13 @@ class RoIHeads(nn.Module):
         return sampled_inds
 
     def add_gt_proposals(self, proposals, gt_boxes):
-        # type: (list[Tensor], list[Tensor]) -> list[Tensor]
+        # type: (List[Tensor], List[Tensor]) -> List[Tensor]
         proposals = [torch.cat((proposal, gt_box)) for proposal, gt_box in zip(proposals, gt_boxes)]
 
         return proposals
 
     def check_targets(self, targets):
-        # type: (Optional[list[dict[str, Tensor]]]) -> None
+        # type: (Optional[List[Dict[str, Tensor]]]) -> None
         if targets is None:
             raise ValueError("targets should not be None")
         if not all(["boxes" in t for t in targets]):
@@ -632,10 +629,10 @@ class RoIHeads(nn.Module):
 
     def select_training_samples(
         self,
-        proposals,  # type: list[Tensor]
-        targets,  # type: Optional[list[dict[str, Tensor]]]
+        proposals,  # type: List[Tensor]
+        targets,  # type: Optional[List[Dict[str, Tensor]]]
     ):
-        # type: (...) -> tuple[list[Tensor], list[Tensor], list[Tensor], list[Tensor]]
+        # type: (...) -> Tuple[List[Tensor], List[Tensor], List[Tensor], List[Tensor]]
         self.check_targets(targets)
         if targets is None:
             raise ValueError("targets should not be None")
@@ -672,10 +669,10 @@ class RoIHeads(nn.Module):
         self,
         class_logits,  # type: Tensor
         box_regression,  # type: Tensor
-        proposals,  # type: list[Tensor]
-        image_shapes,  # type: list[tuple[int, int]]
+        proposals,  # type: List[Tensor]
+        image_shapes,  # type: List[Tuple[int, int]]
     ):
-        # type: (...) -> tuple[list[Tensor], list[Tensor], list[Tensor]]
+        # type: (...) -> Tuple[List[Tensor], List[Tensor], List[Tensor]]
         device = class_logits.device
         num_classes = class_logits.shape[-1]
 
@@ -729,11 +726,12 @@ class RoIHeads(nn.Module):
 
     def forward(
         self,
-        features: dict[str, torch.Tensor],
-        proposals: list[torch.Tensor],
-        image_shapes: list[tuple[int, int]],
-        targets: Optional[list[dict[str, torch.Tensor]]] = None,
-    ) -> tuple[list[dict[str, torch.Tensor]], dict[str, torch.Tensor]]:
+        features,  # type: Dict[str, Tensor]
+        proposals,  # type: List[Tensor]
+        image_shapes,  # type: List[Tuple[int, int]]
+        targets=None,  # type: Optional[List[Dict[str, Tensor]]]
+    ):
+        # type: (...) -> Tuple[List[Dict[str, Tensor]], Dict[str, Tensor]]
         """
         Args:
             features (List[Tensor])
@@ -745,7 +743,7 @@ class RoIHeads(nn.Module):
             for t in targets:
                 # TODO: https://github.com/pytorch/pytorch/issues/26731
                 floating_point_types = (torch.float, torch.double, torch.half)
-                if t["boxes"].dtype not in floating_point_types:
+                if not t["boxes"].dtype in floating_point_types:
                     raise TypeError(f"target boxes must of float type, instead got {t['boxes'].dtype}")
                 if not t["labels"].dtype == torch.int64:
                     raise TypeError(f"target labels must of int64 type, instead got {t['labels'].dtype}")
@@ -764,7 +762,7 @@ class RoIHeads(nn.Module):
         box_features = self.box_head(box_features)
         class_logits, box_regression = self.box_predictor(box_features)
 
-        result: list[dict[str, torch.Tensor]] = []
+        result: List[Dict[str, torch.Tensor]] = []
         losses = {}
         if self.training:
             if labels is None:

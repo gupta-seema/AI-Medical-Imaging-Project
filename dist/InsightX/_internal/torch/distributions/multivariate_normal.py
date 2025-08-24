@@ -1,14 +1,9 @@
-# mypy: allow-untyped-defs
 import math
-from typing import Optional
 
 import torch
-from torch import Tensor
 from torch.distributions import constraints
 from torch.distributions.distribution import Distribution
 from torch.distributions.utils import _standard_normal, lazy_property
-from torch.types import _size
-
 
 __all__ = ["MultivariateNormal"]
 
@@ -122,7 +117,6 @@ class MultivariateNormal(Distribution):
         :attr:`precision_matrix` is passed instead, it is only used to compute
         the corresponding lower triangular matrices using a Cholesky decomposition.
     """
-
     arg_constraints = {
         "loc": constraints.real_vector,
         "covariance_matrix": constraints.positive_definite,
@@ -134,12 +128,12 @@ class MultivariateNormal(Distribution):
 
     def __init__(
         self,
-        loc: Tensor,
-        covariance_matrix: Optional[Tensor] = None,
-        precision_matrix: Optional[Tensor] = None,
-        scale_tril: Optional[Tensor] = None,
-        validate_args: Optional[bool] = None,
-    ) -> None:
+        loc,
+        covariance_matrix=None,
+        precision_matrix=None,
+        scale_tril=None,
+        validate_args=None,
+    ):
         if loc.dim() < 1:
             raise ValueError("loc must be at least one-dimensional.")
         if (covariance_matrix is not None) + (scale_tril is not None) + (
@@ -168,7 +162,6 @@ class MultivariateNormal(Distribution):
             )
             self.covariance_matrix = covariance_matrix.expand(batch_shape + (-1, -1))
         else:
-            assert precision_matrix is not None  # helps mypy
             if precision_matrix.dim() < 2:
                 raise ValueError(
                     "precision_matrix must be at least two-dimensional, "
@@ -210,40 +203,40 @@ class MultivariateNormal(Distribution):
         return new
 
     @lazy_property
-    def scale_tril(self) -> Tensor:
+    def scale_tril(self):
         return self._unbroadcasted_scale_tril.expand(
             self._batch_shape + self._event_shape + self._event_shape
         )
 
     @lazy_property
-    def covariance_matrix(self) -> Tensor:
+    def covariance_matrix(self):
         return torch.matmul(
             self._unbroadcasted_scale_tril, self._unbroadcasted_scale_tril.mT
         ).expand(self._batch_shape + self._event_shape + self._event_shape)
 
     @lazy_property
-    def precision_matrix(self) -> Tensor:
+    def precision_matrix(self):
         return torch.cholesky_inverse(self._unbroadcasted_scale_tril).expand(
             self._batch_shape + self._event_shape + self._event_shape
         )
 
     @property
-    def mean(self) -> Tensor:
+    def mean(self):
         return self.loc
 
     @property
-    def mode(self) -> Tensor:
+    def mode(self):
         return self.loc
 
     @property
-    def variance(self) -> Tensor:
+    def variance(self):
         return (
             self._unbroadcasted_scale_tril.pow(2)
             .sum(-1)
             .expand(self._batch_shape + self._event_shape)
         )
 
-    def rsample(self, sample_shape: _size = torch.Size()) -> Tensor:
+    def rsample(self, sample_shape=torch.Size()):
         shape = self._extended_shape(sample_shape)
         eps = _standard_normal(shape, dtype=self.loc.dtype, device=self.loc.device)
         return self.loc + _batch_mv(self._unbroadcasted_scale_tril, eps)

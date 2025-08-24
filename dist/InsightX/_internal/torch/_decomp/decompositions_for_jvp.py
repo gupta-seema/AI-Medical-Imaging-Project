@@ -1,16 +1,13 @@
-# mypy: allow-untyped-decorators
-# mypy: allow-untyped-defs
 import inspect
-from typing import Callable, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 import torch
 import torch._decomp
 from torch import Tensor
 from torch._prims_common.wrappers import _maybe_remove_out_wrapper
 
-
 decomposition_table = torch._decomp.decomposition_table
-decomposition_table_for_jvp: dict[torch._ops.OperatorBase, Callable] = {}
+decomposition_table_for_jvp: Dict[torch._ops.OperatorBase, Callable] = {}
 register_decomposition = torch._decomp.register_decomposition
 aten = torch.ops.aten
 
@@ -19,7 +16,7 @@ aten = torch.ops.aten
 # The mechanism is in VariableType,
 #   IF any inputs have forward grad
 #      AND there is no forward AD formula implemented
-#      AND the functions are actually differentiable
+#      AND the functions is actually differentiable
 #   run the decomposition
 #      See run_jit_decomposition_with_args_for_jvp
 #      We currently use python decompositions that we torchscript.
@@ -34,7 +31,7 @@ aten = torch.ops.aten
 # (and possibly produce an unintelligible error) vs erroring out earlier and
 # printing that the forward AD formula is not implemented.
 #
-# The solution to this may be to have an explicitly white list control when
+# The solution to this may be to have a explicitly white list control when
 # to enable the decomposition.
 
 
@@ -104,10 +101,10 @@ def trace(self: Tensor) -> Tensor:
 
 
 @maybe_register_decomposition(aten.log_sigmoid_forward.default)
-def log_sigmoid_forward(self: Tensor) -> tuple[Tensor, Tensor]:
+def log_sigmoid_forward(self: Tensor) -> Tuple[Tensor, Tensor]:
     min = torch.minimum(self.new_zeros(()), self)
     z = torch.exp(-torch.abs(self))
-    if self.is_cuda or self.is_xpu:
+    if self.is_cuda:
         buffer = self.new_zeros((0,))
     else:
         buffer = z
@@ -115,7 +112,7 @@ def log_sigmoid_forward(self: Tensor) -> tuple[Tensor, Tensor]:
 
 
 def recompute_mean_var(
-    input: Tensor, rstd: Tensor, inner_dim_indices: list[int], keepdim: bool
+    input: Tensor, rstd: Tensor, inner_dim_indices: List[int], keepdim: bool
 ):
     # for most norm decompositions, it will be the same as the core version except for here.
     # We recompute the mean and variance so that they track gradients through input
@@ -132,13 +129,13 @@ def recompute_mean_var(
 def native_layer_norm_backward(
     grad_out: Tensor,
     input: Tensor,
-    normalized_shape: list[int],
+    normalized_shape: List[int],
     mean: Tensor,
     rstd: Tensor,
     weight: Optional[Tensor],
     bias: Optional[Tensor],
-    output_mask: list[bool],
-) -> tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor]]:
+    output_mask: List[bool],
+) -> Tuple[Optional[Tensor], Optional[Tensor], Optional[Tensor]]:
     input_shape = input.shape
     input_ndim = input.dim()
 
@@ -205,7 +202,7 @@ def native_layer_norm_backward(
     return (d_input, d_weight, d_bias)
 
 
-def prod(x: list[int]):
+def prod(x: List[int]):
     r = 1
     for i in x:
         r *= i
@@ -223,8 +220,8 @@ def native_batch_norm_backward(
     save_invstd: Optional[Tensor],
     train: bool,
     eps: float,
-    output_mask: list[bool],
-) -> tuple[Tensor, Optional[Tensor], Optional[Tensor]]:
+    output_mask: List[bool],
+) -> Tuple[Tensor, Optional[Tensor], Optional[Tensor]]:
     input_shape = input.shape
     input_rank = input.dim()
     assert input_rank >= 2, "rank of the input must be at least 2"
@@ -234,9 +231,9 @@ def native_batch_norm_backward(
     mean = save_mean
     invstd = save_invstd
     if train:
-        assert save_mean is not None and save_invstd is not None, (
-            "when train=True, save_mean and save_invstd are required"
-        )
+        assert (
+            save_mean is not None and save_invstd is not None
+        ), "when train=True, save_mean and save_invstd are required"
 
         reduciton_dims = [0] + list(range(2, input.dim()))
         assert invstd is not None  # for typing
@@ -251,7 +248,7 @@ def native_batch_norm_backward(
     broadcast_mask = [1] * input_rank
     broadcast_mask[axis] = input_shape[axis]
 
-    reduction_axes: list[int] = []
+    reduction_axes: List[int] = []
     for i in range(input_rank):
         if i != axis:
             reduction_axes.append(i)
@@ -294,34 +291,6 @@ def native_batch_norm_backward(
     return (grad_input, grad_weight, grad_bias)
 
 
-@register_decomposition_for_jvp(aten.batch_norm_backward)
-def batch_norm_backward(
-    grad_out: Tensor,
-    input: Tensor,
-    weight: Tensor,
-    running_mean: Optional[Tensor],
-    running_var: Optional[Tensor],
-    save_mean: Optional[Tensor],
-    save_var: Optional[Tensor],
-    update: bool,
-    eps: float,
-    output_mask: list[bool],
-    reserve: Tensor,
-) -> tuple[Tensor, Optional[Tensor], Optional[Tensor]]:
-    return native_batch_norm_backward(
-        grad_out,
-        input,
-        weight,
-        running_mean,
-        running_var,
-        save_mean,
-        save_var,
-        update,
-        eps,
-        output_mask,
-    )
-
-
 _register_jit_decomposition_for_jvp(torch.ops.aten.trace.default, use_python=True)
 _register_jit_decomposition_for_jvp(torch.ops.aten.nll_loss_backward.default)
 _register_jit_decomposition_for_jvp(torch.ops.aten.nll_loss2d_backward.default)
@@ -331,5 +300,3 @@ _register_jit_decomposition_for_jvp(torch.ops.aten.log_sigmoid_forward.default)
 _register_jit_decomposition_for_jvp(torch.ops.aten.native_layer_norm_backward.default)
 _register_jit_decomposition_for_jvp(torch.ops.aten.native_batch_norm_backward.default)
 _register_jit_decomposition_for_jvp(torch.ops.aten.cudnn_batch_norm_backward.default)
-_register_jit_decomposition_for_jvp(torch.ops.aten.batch_norm_backward.default)
-_register_jit_decomposition_for_jvp(torch.ops.aten.miopen_batch_norm_backward.default)

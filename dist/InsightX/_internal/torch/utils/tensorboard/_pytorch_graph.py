@@ -1,7 +1,6 @@
-# mypy: allow-untyped-defs
 from collections import OrderedDict
 import contextlib
-from typing import Any
+from typing import Dict, Any
 
 from tensorboard.compat.proto.config_pb2 import RunMetadata
 from tensorboard.compat.proto.graph_pb2 import GraphDef
@@ -55,11 +54,11 @@ class NodeBase:
     def __repr__(self):
         repr = []
         repr.append(str(type(self)))
-        repr.extend(
-            m + ": " + str(getattr(self, m)) + str(type(getattr(self, m)))
-            for m in dir(self)
-            if "__" not in m
-        )
+        for m in dir(self):
+            if "__" not in m:
+                repr.append(
+                    m + ": " + str(getattr(self, m)) + str(type(getattr(self, m)))
+                )
         return "\n".join(repr) + "\n\n"
 
 
@@ -216,16 +215,17 @@ class GraphPy:
         """Convert graph representation of GraphPy object to TensorBoard required format."""
         # TODO: compute correct memory usage and CPU time once
         # PyTorch supports it
-        nodes = [
-            node_proto(
-                v.debugName,
-                input=v.inputs,
-                outputsize=v.tensor_size,
-                op=v.kind,
-                attributes=v.attributes,
+        nodes = []
+        for v in self.nodes_io.values():
+            nodes.append(
+                node_proto(
+                    v.debugName,
+                    input=v.inputs,
+                    outputsize=v.tensor_size,
+                    op=v.kind,
+                    attributes=v.attributes,
+                )
             )
-            for v in self.nodes_io.values()
-        ]
         return nodes
 
 
@@ -240,6 +240,9 @@ def parse(graph, trace, args=None, omit_useless_nodes=True):
       args (tuple): input tensor[s] for the model.
       omit_useless_nodes (boolean): Whether to remove nodes from the graph.
     """
+    n_inputs = len(args)
+
+    scope = {}
     nodes_py = GraphPy()
     for node in graph.inputs():
         if omit_useless_nodes:
@@ -251,7 +254,7 @@ def parse(graph, trace, args=None, omit_useless_nodes=True):
         if node.type().kind() != CLASSTYPE_KIND:
             nodes_py.append(NodePyIO(node, "input"))
 
-    attr_to_scope: dict[Any, str] = {}
+    attr_to_scope: Dict[Any, str] = {}
     for node in graph.nodes():
         if node.kind() == GETATTR_KIND:
             attr_name = node.s("name")
@@ -260,6 +263,7 @@ def parse(graph, trace, args=None, omit_useless_nodes=True):
             if (
                 parent.kind() == GETATTR_KIND
             ):  # If the parent node is not the top-level "self" node
+                parent_attr_name = parent.s("name")
                 parent_attr_key = parent.output().debugName()
                 parent_scope = attr_to_scope[parent_attr_key]
                 attr_scope = parent_scope.split("/")[-1]
@@ -341,7 +345,7 @@ def graph(model, args, verbose=False, use_strict_trace=True):
     # and pass it correctly to TensorBoard.
     #
     # Definition of StepStats and DeviceStepStats can be found at
-    # https://github.com/tensorflow/tensorboard/blob/master/tensorboard/plugins/graph/tf_graph_common/proto.ts
+    # https://github.com/tensorflow/tensorboard/blob/master/tensorboard/plugins/graph/tf_graph_common/test/graph-test.ts
     # and
     # https://github.com/tensorflow/tensorboard/blob/master/tensorboard/compat/proto/step_stats.proto
     stepstats = RunMetadata(

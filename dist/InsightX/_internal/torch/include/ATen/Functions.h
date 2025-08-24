@@ -68,7 +68,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
+#include <c10/util/Optional.h>
 #include <c10/util/OptionalArrayRef.h>
 
 #include <ATen/ops/from_blob.h>
@@ -92,8 +92,6 @@
 #include <ATen/ops/_backward.h>
 #include <ATen/ops/_batch_norm_impl_index.h>
 #include <ATen/ops/_batch_norm_impl_index_backward.h>
-#include <ATen/ops/_batch_norm_no_update.h>
-#include <ATen/ops/_batch_norm_with_update.h>
 #include <ATen/ops/_cast_Byte.h>
 #include <ATen/ops/_cast_Char.h>
 #include <ATen/ops/_cast_Double.h>
@@ -117,7 +115,6 @@
 #include <ATen/ops/_convert_indices_from_coo_to_csr.h>
 #include <ATen/ops/_convert_indices_from_csr_to_coo.h>
 #include <ATen/ops/_convert_weight_to_int4pack.h>
-#include <ATen/ops/_convert_weight_to_int4pack_for_cpu.h>
 #include <ATen/ops/_convolution.h>
 #include <ATen/ops/_convolution_double_backward.h>
 #include <ATen/ops/_convolution_mode.h>
@@ -128,7 +125,6 @@
 #include <ATen/ops/_cslt_sparse_mm_search.h>
 #include <ATen/ops/_ctc_loss.h>
 #include <ATen/ops/_ctc_loss_backward.h>
-#include <ATen/ops/_cudnn_attention_forward.h>
 #include <ATen/ops/_cudnn_ctc_loss.h>
 #include <ATen/ops/_cudnn_init_dropout_state.h>
 #include <ATen/ops/_cudnn_rnn.h>
@@ -145,8 +141,6 @@
 #include <ATen/ops/_dimV.h>
 #include <ATen/ops/_dim_arange.h>
 #include <ATen/ops/_dirichlet_grad.h>
-#include <ATen/ops/_dyn_quant_matmul_4bit.h>
-#include <ATen/ops/_dyn_quant_pack_4bit_weight.h>
 #include <ATen/ops/_efficient_attention_backward.h>
 #include <ATen/ops/_efficient_attention_forward.h>
 #include <ATen/ops/_efficientzerotensor.h>
@@ -197,7 +191,6 @@
 #include <ATen/ops/_foreach_log10.h>
 #include <ATen/ops/_foreach_log1p.h>
 #include <ATen/ops/_foreach_log2.h>
-#include <ATen/ops/_foreach_max.h>
 #include <ATen/ops/_foreach_maximum.h>
 #include <ATen/ops/_foreach_minimum.h>
 #include <ATen/ops/_foreach_mul.h>
@@ -206,7 +199,6 @@
 #include <ATen/ops/_foreach_pow.h>
 #include <ATen/ops/_foreach_reciprocal.h>
 #include <ATen/ops/_foreach_round.h>
-#include <ATen/ops/_foreach_rsqrt.h>
 #include <ATen/ops/_foreach_sigmoid.h>
 #include <ATen/ops/_foreach_sign.h>
 #include <ATen/ops/_foreach_sin.h>
@@ -221,12 +213,10 @@
 #include <ATen/ops/_functional_assert_scalar.h>
 #include <ATen/ops/_functional_sym_constrain_range.h>
 #include <ATen/ops/_functional_sym_constrain_range_for_size.h>
-#include <ATen/ops/_fused_adagrad.h>
 #include <ATen/ops/_fused_adam.h>
 #include <ATen/ops/_fused_adamw.h>
 #include <ATen/ops/_fused_dropout.h>
 #include <ATen/ops/_fused_moving_avg_obs_fq_helper.h>
-#include <ATen/ops/_fused_rms_norm.h>
 #include <ATen/ops/_fused_sdp_choice.h>
 #include <ATen/ops/_fused_sgd.h>
 #include <ATen/ops/_fw_primal.h>
@@ -234,7 +224,6 @@
 #include <ATen/ops/_gather_sparse_backward.h>
 #include <ATen/ops/_grid_sampler_2d_cpu_fallback.h>
 #include <ATen/ops/_grid_sampler_2d_cpu_fallback_backward.h>
-#include <ATen/ops/_grouped_mm.h>
 #include <ATen/ops/_has_compatible_shallow_copy_type.h>
 #include <ATen/ops/_has_same_storage_numel.h>
 #include <ATen/ops/_histogramdd_bin_edges.h>
@@ -247,7 +236,6 @@
 #include <ATen/ops/_is_all_true.h>
 #include <ATen/ops/_is_any_true.h>
 #include <ATen/ops/_is_zerotensor.h>
-#include <ATen/ops/_jagged_to_padded_dense_forward.h>
 #include <ATen/ops/_lazy_clone.h>
 #include <ATen/ops/_linalg_check_errors.h>
 #include <ATen/ops/_linalg_det.h>
@@ -280,14 +268,10 @@
 #include <ATen/ops/_native_multi_head_attention.h>
 #include <ATen/ops/_neg_view.h>
 #include <ATen/ops/_neg_view_copy.h>
-#include <ATen/ops/_nested_compute_contiguous_strides_offsets.h>
 #include <ATen/ops/_nested_from_padded.h>
 #include <ATen/ops/_nested_from_padded_and_nested_example.h>
-#include <ATen/ops/_nested_from_padded_tensor.h>
 #include <ATen/ops/_nested_get_jagged_dummy.h>
 #include <ATen/ops/_nested_get_lengths.h>
-#include <ATen/ops/_nested_get_max_seqlen.h>
-#include <ATen/ops/_nested_get_min_seqlen.h>
 #include <ATen/ops/_nested_get_offsets.h>
 #include <ATen/ops/_nested_get_ragged_idx.h>
 #include <ATen/ops/_nested_get_values.h>
@@ -314,7 +298,6 @@
 #include <ATen/ops/_pad_circular.h>
 #include <ATen/ops/_pad_enum.h>
 #include <ATen/ops/_pad_packed_sequence.h>
-#include <ATen/ops/_padded_dense_to_jagged_forward.h>
 #include <ATen/ops/_pdist_backward.h>
 #include <ATen/ops/_pdist_forward.h>
 #include <ATen/ops/_pin_memory.h>
@@ -329,22 +312,16 @@
 #include <ATen/ops/_reshape_from_tensor.h>
 #include <ATen/ops/_resize_output.h>
 #include <ATen/ops/_rowwise_prune.h>
-#include <ATen/ops/_safe_softmax.h>
 #include <ATen/ops/_sample_dirichlet.h>
 #include <ATen/ops/_saturate_weight_to_fp16.h>
 #include <ATen/ops/_scaled_dot_product_attention_math.h>
-#include <ATen/ops/_scaled_dot_product_attention_math_for_mps.h>
 #include <ATen/ops/_scaled_dot_product_cudnn_attention.h>
-#include <ATen/ops/_scaled_dot_product_cudnn_attention_backward.h>
 #include <ATen/ops/_scaled_dot_product_efficient_attention.h>
 #include <ATen/ops/_scaled_dot_product_efficient_attention_backward.h>
 #include <ATen/ops/_scaled_dot_product_flash_attention.h>
 #include <ATen/ops/_scaled_dot_product_flash_attention_backward.h>
 #include <ATen/ops/_scaled_dot_product_flash_attention_for_cpu.h>
 #include <ATen/ops/_scaled_dot_product_flash_attention_for_cpu_backward.h>
-#include <ATen/ops/_scaled_dot_product_fused_attention_overrideable.h>
-#include <ATen/ops/_scaled_dot_product_fused_attention_overrideable_backward.h>
-#include <ATen/ops/_scaled_grouped_mm.h>
 #include <ATen/ops/_scaled_mm.h>
 #include <ATen/ops/_segment_reduce_backward.h>
 #include <ATen/ops/_shape_as_tensor.h>
@@ -362,7 +339,6 @@
 #include <ATen/ops/_sparse_bsc_tensor_unsafe.h>
 #include <ATen/ops/_sparse_bsr_tensor_unsafe.h>
 #include <ATen/ops/_sparse_compressed_tensor_unsafe.h>
-#include <ATen/ops/_sparse_compressed_tensor_with_dims.h>
 #include <ATen/ops/_sparse_coo_tensor_unsafe.h>
 #include <ATen/ops/_sparse_coo_tensor_with_dims.h>
 #include <ATen/ops/_sparse_coo_tensor_with_dims_and_tensors.h>
@@ -376,19 +352,13 @@
 #include <ATen/ops/_sparse_mm.h>
 #include <ATen/ops/_sparse_mm_reduce_impl.h>
 #include <ATen/ops/_sparse_mm_reduce_impl_backward.h>
-#include <ATen/ops/_sparse_semi_structured_addmm.h>
-#include <ATen/ops/_sparse_semi_structured_apply.h>
-#include <ATen/ops/_sparse_semi_structured_apply_dense.h>
 #include <ATen/ops/_sparse_semi_structured_linear.h>
-#include <ATen/ops/_sparse_semi_structured_mm.h>
-#include <ATen/ops/_sparse_semi_structured_tile.h>
 #include <ATen/ops/_sparse_softmax.h>
 #include <ATen/ops/_sparse_softmax_backward_data.h>
 #include <ATen/ops/_sparse_sparse_matmul.h>
 #include <ATen/ops/_sparse_sum.h>
 #include <ATen/ops/_sparse_sum_backward.h>
 #include <ATen/ops/_spdiags.h>
-#include <ATen/ops/_spsolve.h>
 #include <ATen/ops/_stack.h>
 #include <ATen/ops/_standard_gamma.h>
 #include <ATen/ops/_standard_gamma_grad.h>
@@ -431,8 +401,6 @@
 #include <ATen/ops/_unpack_dual.h>
 #include <ATen/ops/_unsafe_index.h>
 #include <ATen/ops/_unsafe_index_put.h>
-#include <ATen/ops/_unsafe_masked_index.h>
-#include <ATen/ops/_unsafe_masked_index_put_accumulate.h>
 #include <ATen/ops/_unsafe_view.h>
 #include <ATen/ops/_upsample_bicubic2d_aa.h>
 #include <ATen/ops/_upsample_bicubic2d_aa_backward.h>
@@ -457,15 +425,11 @@
 #include <ATen/ops/_values_copy.h>
 #include <ATen/ops/_version.h>
 #include <ATen/ops/_weight_int4pack_mm.h>
-#include <ATen/ops/_weight_int4pack_mm_for_cpu.h>
-#include <ATen/ops/_weight_int4pack_mm_with_scales_and_zeros.h>
 #include <ATen/ops/_weight_int8pack_mm.h>
 #include <ATen/ops/_weight_norm.h>
 #include <ATen/ops/_weight_norm_differentiable_backward.h>
 #include <ATen/ops/_weight_norm_interface.h>
 #include <ATen/ops/_weight_norm_interface_backward.h>
-#include <ATen/ops/_wrapped_linear_prepack.h>
-#include <ATen/ops/_wrapped_quantized_linear_prepacked.h>
 #include <ATen/ops/abs.h>
 #include <ATen/ops/absolute.h>
 #include <ATen/ops/acos.h>
@@ -534,7 +498,6 @@
 #include <ATen/ops/baddbmm.h>
 #include <ATen/ops/bartlett_window.h>
 #include <ATen/ops/batch_norm.h>
-#include <ATen/ops/batch_norm_backward.h>
 #include <ATen/ops/batch_norm_backward_elemt.h>
 #include <ATen/ops/batch_norm_backward_reduce.h>
 #include <ATen/ops/batch_norm_elemt.h>
@@ -1146,7 +1109,6 @@
 #include <ATen/ops/result_type.h>
 #include <ATen/ops/retain_grad.h>
 #include <ATen/ops/retains_grad.h>
-#include <ATen/ops/rms_norm.h>
 #include <ATen/ops/rnn_relu.h>
 #include <ATen/ops/rnn_relu_cell.h>
 #include <ATen/ops/rnn_tanh.h>

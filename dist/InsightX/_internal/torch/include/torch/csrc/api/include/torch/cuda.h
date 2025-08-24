@@ -1,14 +1,15 @@
 #pragma once
 
-#include <c10/core/Device.h>
-#include <c10/macros/Export.h>
+#include <torch/csrc/Export.h>
 
+#include <cstddef>
 #include <cstdint>
 
-namespace torch::cuda {
+namespace torch {
+namespace cuda {
 
 /// Returns the number of CUDA devices available.
-c10::DeviceIndex TORCH_API device_count();
+size_t TORCH_API device_count();
 
 /// Returns true if at least one CUDA device is available.
 bool TORCH_API is_available();
@@ -25,4 +26,5 @@ void TORCH_API manual_seed_all(uint64_t seed);
 /// Waits for all kernels in all streams on a CUDA device to complete.
 void TORCH_API synchronize(int64_t device_index = -1);
 
-} // namespace torch::cuda
+} // namespace cuda
+} // namespace torch

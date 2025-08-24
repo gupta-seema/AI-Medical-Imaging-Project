@@ -2,8 +2,7 @@
 
 import datetime
 from enum import Enum
-from types import TracebackType
-from typing import Callable
+from typing import Callable, Dict, List, Union
 
 class Aggregation(Enum):
     VALUE = ...
@@ -19,22 +18,22 @@ class Stat:
     def __init__(
         self,
         name: str,
-        aggregations: list[Aggregation],
+        aggregations: List[Aggregation],
         window_size: int,
         max_samples: int = -1,
     ) -> None: ...
     def add(self, v: float) -> None: ...
-    def get(self) -> dict[Aggregation, float]: ...
+    def get(self) -> Dict[Aggregation, float]: ...
 
 class Event:
     name: str
     timestamp: datetime.datetime
-    data: dict[str, int | float | bool | str]
+    data: Dict[str, Union[int, float, bool, str]]
     def __init__(
         self,
         name: str,
         timestamp: datetime.datetime,
-        data: dict[str, int | float | bool | str],
+        data: Dict[str, Union[int, float, bool, str]],
     ) -> None: ...
 
 def log_event(e: Event) -> None: ...
@@ -43,16 +42,3 @@ class EventHandlerHandle: ...
 
 def register_event_handler(handler: Callable[[Event], None]) -> EventHandlerHandle: ...
 def unregister_event_handler(handle: EventHandlerHandle) -> None: ...
-
-class _WaitCounterTracker:
-    def __enter__(self) -> None: ...
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None = None,
-        exc_value: BaseException | None = None,
-        traceback: TracebackType | None = None,
-    ) -> None: ...
-
-class _WaitCounter:
-    def __init__(self, key: str) -> None: ...
-    def guard(self) -> _WaitCounterTracker: ...

@@ -17,10 +17,12 @@
 #include <exception>
 #include <memory>
 #include <thread>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
-namespace torch::data {
+namespace torch {
+namespace data {
 template <typename Dataset, typename Batch, typename BatchRequest>
 class DataLoaderBase {
  public:
@@ -33,14 +35,10 @@ class DataLoaderBase {
   DataLoaderBase(
       DataLoaderOptions options,
       std::unique_ptr<Dataset> main_thread_dataset = nullptr)
-      : options_(options),
+      : options_(std::move(options)),
         main_thread_dataset_(std::move(main_thread_dataset)),
         sequencer_(new_sequencer()) {}
 
-  DataLoaderBase(const DataLoaderBase&) = delete;
-  DataLoaderBase(DataLoaderBase&&) = delete;
-  DataLoaderBase& operator=(const DataLoaderBase&) = delete;
-  DataLoaderBase& operator=(DataLoaderBase&&) = delete;
   // NOLINTNEXTLINE(bugprone-exception-escape)
   virtual ~DataLoaderBase() {
     join();
@@ -84,7 +82,8 @@ class DataLoaderBase {
     // Send one 'quit' message per worker. Since a worker dies (exits its
     // thread) after receiving this message, each `QuitWorker()` message will be
     // read by exactly one worker.
-    for ([[maybe_unused]] const auto w : c10::irange(options_.workers)) {
+    for (const auto w : c10::irange(options_.workers)) {
+      (void)w; // Suppress unused variable warning
       push_job(QuitWorker());
     }
     for (auto& worker : workers_) {
@@ -115,25 +114,25 @@ class DataLoaderBase {
     Job(QuitWorker q, size_t sqn) : Sequenced(sqn), quit(q) {}
     Job(BatchRequest&& i, size_t sqn)
         : Sequenced(sqn), batch_request(std::move(i)) {}
-    std::optional<QuitWorker> quit;
-    std::optional<BatchRequest> batch_request;
+    optional<QuitWorker> quit;
+    optional<BatchRequest> batch_request;
   };
 
   /// The finished result of a job.
   struct Result : Sequenced {
     Result() = default;
-    Result(std::optional<Batch>&& b, size_t sqn)
+    Result(optional<Batch>&& b, size_t sqn)
         : Sequenced(sqn), batch(std::move(b)) {}
     Result(std::exception_ptr exception, size_t sqn)
         : Sequenced(sqn), exception(std::move(exception)) {}
-    std::optional<Batch> batch;
+    optional<Batch> batch;
     std::exception_ptr exception;
   };
 
   /// Subclass hook for getting the next batch request. The stateless case will
   /// ask the sampler for a new batch request (e.g. a vector of indices), while
   /// the stateful one will simply return the batch size.
-  virtual std::optional<BatchRequestType> get_batch_request() = 0;
+  virtual optional<BatchRequestType> get_batch_request() = 0;
 
   /// Resets the internal state of the DataLoader, optionally pre-fetching
   /// new jobs.
@@ -147,7 +146,8 @@ class DataLoaderBase {
   /// Schedules `requested_jobs` many new batches to be fetched. The actual
   /// number of jobs scheduled may be less if the DataLoader exhausts.
   void prefetch(size_t requested_jobs) {
-    for ([[maybe_unused]] const auto r : c10::irange(requested_jobs)) {
+    for (const auto r : c10::irange(requested_jobs)) {
+      (void)r; // Suppress unused variable
       if (auto batch_request = get_batch_request()) {
         this->push_job(std::move(*batch_request));
       } else {
@@ -164,9 +164,9 @@ class DataLoaderBase {
   /// Returns the next batch of data, or an empty `optional` if the DataLoader
   /// is exhausted. This operation will block until a batch is available if one
   /// is still expected.
-  std::optional<BatchType> next() {
+  optional<BatchType> next() {
     if (options_.workers > 0) {
-      while (std::optional<Result> result = this->pop_result()) {
+      while (optional<Result> result = this->pop_result()) {
         if (result->exception) {
           throw WorkerException(result->exception);
         } else if (result->batch) {
@@ -177,7 +177,7 @@ class DataLoaderBase {
     } else if (auto batch_request = get_batch_request()) {
       return this->main_thread_dataset_->get_batch(std::move(*batch_request));
     }
-    return std::nullopt;
+    return nullopt;
   }
 
   /// The function that worker threads run.
@@ -204,7 +204,7 @@ class DataLoaderBase {
   }
 
   /// Convenience method that gets the next result from the sequencer.
-  std::optional<Result> pop_result() {
+  optional<Result> pop_result() {
     return sequencer_->next(
         [this] { return this->shuttle_.pop_result(this->options_.timeout); });
   }
@@ -220,7 +220,7 @@ class DataLoaderBase {
   }
 
   /// The options the DataLoader was configured with.
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   const FullDataLoaderOptions options_;
 
   /// The dataset for the main thread, only has a value if the number of
@@ -251,4 +251,5 @@ class DataLoaderBase {
   // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   bool joined_ = false;
 };
-} // namespace torch::data
+} // namespace data
+} // namespace torch

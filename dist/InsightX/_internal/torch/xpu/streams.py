@@ -1,8 +1,8 @@
-# mypy: allow-untyped-defs
 import ctypes
 
 import torch
-from torch._utils import _dummy_type
+from torch._streambase import _EventBase, _StreamBase
+from .._utils import _dummy_type
 
 
 if not hasattr(torch._C, "_XpuStreamBase"):
@@ -11,23 +11,19 @@ if not hasattr(torch._C, "_XpuStreamBase"):
     torch._C.__dict__["_XpuEventBase"] = _dummy_type("_XpuEventBase")
 
 
-class Stream(torch._C._XpuStreamBase):
+class Stream(torch._C._XpuStreamBase, _StreamBase):
     r"""Wrapper around a XPU stream.
 
     A XPU stream is a linear sequence of execution that belongs to a specific
-    device, independent from other streams. It supports with statement as a
-    context manager to ensure the operators within the with block are running
-    on the corresponding stream.
+    device, independent from other streams.
 
     Args:
         device(torch.device or int, optional): a device on which to allocate
             the stream. If :attr:`device` is ``None`` (default) or a negative
             integer, this will use the current device.
-        priority(int, optional): priority of the stream, which can be positive, 0, or negative.
-            A lower number indicates a higher priority. By default, the priority is set to 0.
-            If the value falls outside of the allowed priority range, it will automatically be
-            mapped to the nearest valid priority (lowest for large positive numbers or
-            highest for large negative numbers).
+        priority(int, optional): priority of the stream, should be 0 or
+            negative, where negative numbers indicate higher priority. By default,
+            streams have priority 0.
     """
 
     def __new__(cls, device=None, priority=0, **kwargs):
@@ -38,7 +34,7 @@ class Stream(torch._C._XpuStreamBase):
             with torch.xpu.device(device):
                 return super().__new__(cls, priority=priority, **kwargs)
 
-    def wait_event(self, event) -> None:
+    def wait_event(self, event):
         r"""Make all future work submitted to the stream wait for an event.
 
         Args:
@@ -46,7 +42,7 @@ class Stream(torch._C._XpuStreamBase):
         """
         event.wait(self)
 
-    def wait_stream(self, stream) -> None:
+    def wait_stream(self, stream):
         r"""Synchronize with another stream.
 
         All future work submitted to this stream will wait until all kernels
@@ -72,7 +68,7 @@ class Stream(torch._C._XpuStreamBase):
         event.record(self)
         return event
 
-    def query(self) -> bool:
+    def query(self):
         r"""Check if all the work submitted has been completed.
 
         Returns:
@@ -80,7 +76,7 @@ class Stream(torch._C._XpuStreamBase):
         """
         return super().query()
 
-    def synchronize(self) -> None:
+    def synchronize(self):
         r"""Wait for all the kernels in this stream to complete."""
         super().synchronize()
 
@@ -100,7 +96,7 @@ class Stream(torch._C._XpuStreamBase):
         return f"torch.xpu.Stream(device={self.device} sycl_queue={self.sycl_queue:#x})"
 
 
-class Event(torch._C._XpuEventBase):
+class Event(torch._C._XpuEventBase, _EventBase):
     r"""Wrapper around a XPU event.
 
     XPU events are synchronization markers that can be used to monitor the
@@ -118,7 +114,7 @@ class Event(torch._C._XpuEventBase):
     def __new__(cls, enable_timing=False):
         return super().__new__(cls, enable_timing=enable_timing)
 
-    def record(self, stream=None) -> None:
+    def record(self, stream=None):
         r"""Record the event in a given stream.
 
         Uses ``torch.xpu.current_stream()`` if no stream is specified. The
@@ -128,7 +124,7 @@ class Event(torch._C._XpuEventBase):
             stream = torch.xpu.current_stream()
         super().record(stream)
 
-    def wait(self, stream=None) -> None:
+    def wait(self, stream=None):
         r"""Make all future work submitted to the given stream wait for this event.
 
         Use ``torch.xpu.current_stream()`` if no stream is specified.
@@ -137,7 +133,7 @@ class Event(torch._C._XpuEventBase):
             stream = torch.xpu.current_stream()
         super().wait(stream)
 
-    def query(self) -> bool:
+    def query(self):
         r"""Check if all work currently captured by event has completed.
 
         Returns:
@@ -154,7 +150,7 @@ class Event(torch._C._XpuEventBase):
         """
         return super().elapsed_time(end_event)
 
-    def synchronize(self) -> None:
+    def synchronize(self):
         r"""Wait for the event to complete.
 
         Waits until the completion of all work currently captured in this event.

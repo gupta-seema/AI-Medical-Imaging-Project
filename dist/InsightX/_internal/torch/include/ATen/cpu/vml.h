@@ -35,8 +35,8 @@
 #include <mkl.h>
 #endif
 
-
-namespace at::vml {
+namespace at {
+namespace vml {
 inline namespace CPU_CAPABILITY {
 
 using namespace vec;
@@ -108,12 +108,12 @@ static_assert(
 #define IMPLEMENT_VML_MKL_STUB(op, mklop, type, mkltype)                \
   template <>                                                           \
   inline void v##op(type * out, const type * in, int64_t size) {        \
-    auto constexpr max_mkl_ind = std::numeric_limits<MKL_INT>::max();   \
+    int64_t max_mkl_ind = std::numeric_limits<MKL_INT>::max();          \
     if (size <= static_cast<int64_t>(max_mkl_ind)) {                    \
       vm##mkltype##mklop(                                               \
           size, in, out, VML_HA | VML_FTZDAZ_OFF | VML_ERRMODE_IGNORE); \
     } else {                                                            \
-      int64_t ind = 0;                                                  \
+      MKL_INT ind = 0;                                                  \
       int64_t chunks = size / max_mkl_ind;                              \
       int64_t rest = size % max_mkl_ind;                                \
       for (; ind < chunks; ind++) {                                     \
@@ -167,4 +167,5 @@ IMPLEMENT_VML_MKL(log2, Log2)
 #endif
 
 } // namespace
-} // namespace at::vml
+} // namespace vml
+} // namespace at

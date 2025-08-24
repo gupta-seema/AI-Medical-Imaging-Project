@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline ::std::vector<at::Tensor> split_copy(const at::Tensor & self, int64_t spl
     return at::_ops::split_copy_Tensor::call(self, split_size, dim);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   ::std::vector<at::Tensor> split_copy(const at::Tensor & self, int64_t split_size, int64_t dim=0) {
     return at::_ops::split_copy_Tensor::call(self, split_size, dim);
   }
@@ -39,7 +38,7 @@ inline ::std::vector<at::Tensor> split_copy_symint(const at::Tensor & self, c10:
     return at::_ops::split_copy_Tensor::call(self, split_size, dim);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   ::std::vector<at::Tensor> split_copy(const at::Tensor & self, c10::SymInt split_size, int64_t dim=0) {
     return at::_ops::split_copy_Tensor::call(self, split_size, dim);
   }
@@ -50,7 +49,7 @@ inline void split_copy_out(at::TensorList out, const at::Tensor & self, int64_t 
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   void split_copy_out(at::TensorList out, const at::Tensor & self, int64_t split_size, int64_t dim=0) {
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
   }
@@ -61,7 +60,7 @@ inline void split_copy_outf(const at::Tensor & self, int64_t split_size, int64_t
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   void split_copy_outf(const at::Tensor & self, int64_t split_size, int64_t dim, at::TensorList out) {
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
   }
@@ -72,7 +71,7 @@ inline void split_copy_symint_out(at::TensorList out, const at::Tensor & self, c
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   void split_copy_out(at::TensorList out, const at::Tensor & self, c10::SymInt split_size, int64_t dim=0) {
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
   }
@@ -83,7 +82,7 @@ inline void split_copy_symint_outf(const at::Tensor & self, c10::SymInt split_si
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   void split_copy_outf(const at::Tensor & self, c10::SymInt split_size, int64_t dim, at::TensorList out) {
     return at::_ops::split_copy_Tensor_out::call(self, split_size, dim, out);
   }

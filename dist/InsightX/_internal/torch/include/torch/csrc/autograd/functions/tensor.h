@@ -6,16 +6,17 @@
 
 #include <ATen/TensorGeometry.h>
 #include <ATen/core/DeprecatedTypeProperties.h>
-#include <optional>
+#include <c10/util/Optional.h>
 
 #include <cstdint>
 #include <memory>
 
-namespace torch::autograd {
+namespace torch {
+namespace autograd {
 
 struct TORCH_API CopyBackwards : public Node {
   variable_list apply(variable_list&& grads) override;
-  void compiled_args(CompiledNodeArgs& args) const override;
+  void compiled_args(CompiledNodeArgs& args) override;
   variable_list apply_with_saved(
       const variable_list& inputs,
       SwapSavedVariables& saved) override;
@@ -168,11 +169,10 @@ struct TORCH_API CopySlices : public Node {
 
   variable_list apply(variable_list&& inputs) override;
   void release_variables() override;
-  void compiled_args(CompiledNodeArgs& args) const override;
+  void compiled_args(CompiledNodeArgs& args) override;
   variable_list apply_with_saved(
       const variable_list& inputs,
       SwapSavedVariables& saved) override;
-  void update_exec_info();
 
   at::TensorGeometry base;
   // view and view_fn are redundant and view_fn will be used if available.
@@ -182,4 +182,5 @@ struct TORCH_API CopySlices : public Node {
   std::shared_ptr<Node> fn;
 };
 
-} // namespace torch::autograd
+} // namespace autograd
+} // namespace torch

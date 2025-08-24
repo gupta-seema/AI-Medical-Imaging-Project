@@ -1,31 +1,27 @@
-# mypy: allow-untyped-defs
+
 import warnings
-from typing import Any, Callable, Optional, TYPE_CHECKING, TypeVar, Union
-from typing_extensions import ParamSpec, TypeAlias
+
+# A workaround to support both TorchScript and MyPy:
+from typing import Any, List, Optional, Tuple, TYPE_CHECKING, Union
 
 import torch
-from torch import sym_float, Tensor
+from torch import Tensor
+from torch.masked import as_masked_tensor, is_masked_tensor, MaskedTensor
+from . import _docs
 from torch._prims_common import corresponding_real_dtype
-from torch.masked import _docs
-from torch.masked.maskedtensor.core import is_masked_tensor, MaskedTensor
-from torch.masked.maskedtensor.creation import as_masked_tensor
-
+from torch import sym_float
 
 if TYPE_CHECKING:
-    from torch._prims_common import DimsType
     from torch.types import _dtype as DType
 
-    DimOrDims: TypeAlias = Optional[DimsType]
+    DimOrDims = Optional[Union[int, Tuple[int], List[int]]]
 else:
     # The JIT doesn't understand Union, nor torch.dtype here
     DType = int
-    DimOrDims = Optional[tuple[int, ...]]
+    DimOrDims = Optional[Tuple[int]]
 
 
-__all__: list[str] = []
-
-_T = TypeVar("_T")
-_P = ParamSpec("_P")
+__all__: List[str] = []
 
 # All masked reduction/normalization operations have the same
 # signatures. Here we introduce docstring templates that are applied
@@ -33,7 +29,7 @@ _P = ParamSpec("_P")
 # _apply_docstring_templates decorator.
 
 
-def _apply_docstring_templates(func: Callable[_P, _T]) -> Callable[_P, _T]:
+def _apply_docstring_templates(func):
     """Decorator that applies docstring templates to function docstring
     and returns the function instance.
     """
@@ -214,7 +210,7 @@ ord (int, float, optional): the order of vector norm. Default: 2.
 ord (int, float): the order of vector norm. Default: 2.
   See :func:`torch.linalg.vector_norm` for a list of supported norms.""",
         unbiased="""\
-unbiased (bool): when True, use Bessel's correction, otherwise, compute
+unbiased (bool): when True, use Bessel’s correction, otherwise, compute
   the uncorrected sample variance.""",
         eps="""\
 eps (float, optional): small value to avoid division by zero. Default: {default}.""",
@@ -292,7 +288,7 @@ defined as ``prod(x[:i])``.""",
     example_dim = 1
     example_input = torch.tensor([[-3, -2, -1], [0, 1, 2]])
     example_mask = torch.tensor([[True, False, True], [False, False, False]])
-    example_args: tuple[Any, ...]
+    example_args: Tuple[Any, ...]
     if func.__name__ in {"norm", "normalize"}:
         example_args = (2.0, example_dim)
         example_input = example_input.to(dtype=torch.float32)
@@ -304,19 +300,19 @@ defined as ``prod(x[:i])``.""",
     else:
         example_args = (example_dim,)
 
-    operation_args: tuple[str, ...]
-    operation_kwargs: tuple[str, ...]
+    operation_args: Tuple[str, ...]
+    operation_kwargs: Tuple[str, ...]
     operation_args, operation_kwargs = args_and_kwargs[func.__name__]
     arg_declarations = [
         "\n    ".join(
-            argument_declarations.get(a, f"{a.split('__', 1)[0]}: TBD.").splitlines()
+            argument_declarations.get(a, f'{a.split("__", 1)[0]}: TBD.').splitlines()
         )
         for a in operation_args
     ]
     kwarg_declarations = [
         "\n    ".join(
             argument_declarations.get(
-                a.split("=", 1)[0], f"{a.split('__', 1)[0]}: TBD."
+                a.split("=", 1)[0], f'{a.split("__", 1)[0]}: TBD.'
             )
             .format(default=a.split("=", 1)[1])
             .splitlines()
@@ -422,16 +418,9 @@ def _reduction_identity(op_name: str, input: Tensor, *args):
         return torch.tensor(0, dtype=dtype, device=device)
     elif op_name in {"prod", "cumprod"}:
         return torch.tensor(1, dtype=dtype, device=device)
-    elif op_name in {"amax", "argmax", "logaddexp"}:
+    elif op_name in {"amax", "argmax", "logsumexp"}:
         if torch.is_floating_point(input):
             return torch.tensor(-torch.inf, dtype=dtype, device=device)
-        elif torch.is_signed(input) or dtype == torch.uint8:
-            return torch.tensor(torch.iinfo(dtype).min, dtype=dtype, device=device)
-    elif op_name in {"logsumexp"}:
-        if torch.is_floating_point(input):
-            return torch.tensor(-torch.inf, dtype=dtype, device=device)
-        elif torch.is_complex(input):
-            return torch.tensor(-torch.inf + 0j, dtype=dtype, device=device)
         elif torch.is_signed(input) or dtype == torch.uint8:
             return torch.tensor(torch.iinfo(dtype).min, dtype=dtype, device=device)
     elif op_name in {"amin", "argmin"}:
@@ -462,9 +451,9 @@ def _reduction_identity(op_name: str, input: Tensor, *args):
     raise NotImplementedError(f"identity of {op_name} on {dtype} input")
 
 
-def _canonical_dim(dim: DimOrDims, ndim: int) -> tuple[int, ...]:
+def _canonical_dim(dim: DimOrDims, ndim: int) -> Tuple[int, ...]:
     """Return dim argument as a tuple of sorted dim values."""
-    dims: list[int] = []
+    dims: List[int] = []
     if dim == ():
         # Currently, `dim=()` in reductions operations means "reduce
         # over all dimensions" while in future, it will read "no
@@ -480,7 +469,7 @@ def _canonical_dim(dim: DimOrDims, ndim: int) -> tuple[int, ...]:
             raise RuntimeError(f"dim={d} appears multiple times in the list of dims")
         if d >= ndim or d < -ndim:
             raise IndexError(
-                f"Dimension out of range (expected to be in range of [{-ndim}, {ndim - 1}], but got {d})"
+                f"Dimension out of range (expected to be in range of [{-ndim}, {ndim-1}], but got {d})"
             )
         dims.append(d % ndim)
     return tuple(sorted(dims))
@@ -619,7 +608,7 @@ def _sparse_coo_where(mask: Tensor, input: Tensor, fill_value: Tensor) -> Tensor
 def _sparse_coo_scatter_reduction_helper(
     op,
     mask_input: Tensor,
-    dims: tuple[int, ...],
+    dims: Tuple[int, ...],
     keepdim: bool,
     dtype: Optional[DType] = None,
 ) -> Tensor:
@@ -739,15 +728,15 @@ def _sparse_coo_scatter_reduction_helper(
 def _sparse_csr_segment_reduction_helper(
     op,
     mask_input: Tensor,
-    dims: tuple[int, ...],
+    dims: Tuple[int, ...],
     keepdim: bool,
     dtype: Optional[DType] = None,
 ) -> Tensor:
     # Currently, while sparse CSR is always 2D with no dense dimensions keepdim must be True
     # FIXME: when dense dimensions are implemented for CSR tensors
-    assert keepdim, (
-        "reduction operations on CSR tensors with keepdim=False is unsupported"
-    )
+    assert (
+        keepdim
+    ), "reduction operations on CSR tensors with keepdim=False is unsupported"
     reduce = op.__name__
     valid_reductions = ["sum", "prod", "mean", "amax", "amin"]
     if reduce not in valid_reductions:
@@ -781,9 +770,9 @@ def _sparse_csr_segment_reduction_helper(
             )
             new_shape = [1, mask_input.size(1)]
         else:
-            assert dims[0] == 1, (
-                "Sparse CSR tensors are 2D and only support reduction along dim 0 or 1."
-            )
+            assert (
+                dims[0] == 1
+            ), "Sparse CSR tensors are 2D and only support reduction along dim 0 or 1."
             # all intervals new_crow_indices[i] - new_crow_indices[i-1] are 1
             # except for where crow_indices[i] == crow_indices[i-1] where the interval remains as 0
             new_crow_indices = torch.cat(
@@ -794,7 +783,7 @@ def _sparse_csr_segment_reduction_helper(
                 0,
             )
             new_nnz = new_crow_indices[-1]
-            new_col_indices = col_indices.new_zeros(new_nnz)  # type: ignore[call-overload]
+            new_col_indices = col_indices.new_zeros(new_nnz)
             new_values = torch._segment_reduce(values, reduce, offsets=crow_indices)  # type: ignore[attr-defined]
             new_shape = [mask_input.size(0), 1]
     else:
@@ -1385,16 +1374,8 @@ elements, have ``nan`` values.
 {reduction_args}
 
 {reduction_example}"""
-    dtype_source = "Optional"
     if dtype is None:
         dtype = input.dtype
-        dtype_source = "Input"
-
-    if not (dtype.is_floating_point or dtype.is_complex):
-        raise ValueError(
-            f"mean(): Could not infer output dtype. {dtype_source} dtype must be either "
-            f"a floating point or complex dtype. Got: {dtype}"
-        )
     if input.layout == torch.strided:
         if mask is None:
             # TODO: compute count analytically
@@ -1406,7 +1387,12 @@ elements, have ``nan`` values.
             total = sum(input, dim, keepdim=keepdim, dtype=dtype)
         else:
             inmask = _input_mask(input, mask=mask)
-            count = inmask.sum(dim=dim, keepdim=bool(keepdim))
+            count = sum(
+                inmask.new_ones(input.shape, dtype=torch.int64),
+                dim,
+                keepdim=keepdim,
+                mask=inmask,
+            )
             total = sum(input, dim, keepdim=keepdim, dtype=dtype, mask=inmask)
         return total / count
     elif input.layout == torch.sparse_csr:
@@ -1434,6 +1420,7 @@ def median(
     dtype: Optional[DType] = None,
     mask: Optional[Tensor] = None,
 ) -> Tensor:
+
     """\
 {reduction_signature}
 {reduction_descr}
@@ -1500,50 +1487,51 @@ def logaddexp(
 ) -> Tensor:
     """logaddexp(input, other, *, dtype=None, input_mask=None, other_mask=None) -> Tensor
 
-    Returns logaddexp of all the elements in the :attr:`input` and the :attr:`other`
-    tensor. The :attr:`input` elements are masked out according to the boolean tensor
-    :attr:`input_mask` and the attr:`other` elements are masked out according to the boolean tensor
-    :attr:`other_mask`.
+Returns logaddexp of all the elements in the :attr:`input` and the :attr:`other`
+tensor. The :attr:`input` elements are masked out according to the boolean tensor
+:attr:`input_mask` and the attr:`other` elements are masked out according to the boolean tensor
+:attr:`other_mask`.
 
-    The shapes of a mask tensor and the tensor to be masked
-    don't need to match, but they must be :ref:`broadcastable
-    <broadcasting-semantics>` and the dimensionality of the mask
-    tensor must not be greater than of the tensor to be masked.
+The shapes of a mask tensor and the tensor to be masked
+don't need to match, but they must be :ref:`broadcastable
+<broadcasting-semantics>` and the dimensionality of the mask
+tensor must not be greater than of the tensor to be masked.
 
-    Args:
-        input (Tensor): the input tensor
-        other (Tensor): the second input tensor
+Args:
+    input (Tensor): the input tensor
+    other (Tensor): the second input tensor
 
-    Keyword args:
-        dtype (:class:`torch.dtype`, optional): the desired data type
-          of returned tensor.  If specified, the output tensor is
-          casted to :attr:`dtype` after the operation is
-          performed. Default: None.
-        input_mask (:class:`torch.Tensor`, optional): the boolean tensor
-          containing the binary mask of validity of :attr:`input` tensor elements.
-          Default: None that is equivalent to ``torch.ones(input.shape, dtype=torch.bool)``.
-        other_mask (:class:`torch.Tensor`, optional): the boolean tensor
-          containing the binary mask of validity of :attr:`other` tensor elements.
-          Default: None that is equivalent to ``torch.ones(other.shape, dtype=torch.bool)``.
+Keyword args:
+    dtype (:class:`torch.dtype`, optional): the desired data type
+      of returned tensor.  If specified, the output tensor is
+      casted to :attr:`dtype` after the operation is
+      performed. Default: None.
+    input_mask (:class:`torch.Tensor`, optional): the boolean tensor
+      containing the binary mask of validity of :attr:`input` tensor elements.
+      Default: None that is equivalent to ``torch.ones(input.shape, dtype=torch.bool)``.
+    other_mask (:class:`torch.Tensor`, optional): the boolean tensor
+      containing the binary mask of validity of :attr:`other` tensor elements.
+      Default: None that is equivalent to ``torch.ones(other.shape, dtype=torch.bool)``.
 
-    Example::
+Example::
 
-        >>> input = torch.tensor([-100.0, -200, -300])
-        >>> input
-        tensor([-100., -200., -300.])
-        >>> other = torch.tensor([-1.0, -2, -3])
-        >>> other
-        tensor([-1., -2., -3.])
-        >>> mask = torch.tensor([True, False, True])
-        >>> mask
-        tensor([ True, False,  True])
-        >>> torch.masked._ops.logaddexp(input, other, input_mask=mask, other_mask=mask)
-        tensor([-1., -inf, -3.])"""
+    >>> input = torch.tensor([-100.0, -200, -300])
+    >>> input
+    tensor([-100., -200., -300.])
+    >>> other = torch.tensor([-1.0, -2, -3])
+    >>> other
+    tensor([-1., -2., -3.])
+    >>> mask = torch.tensor([True, False, True])
+    >>> mask
+    tensor([ True, False,  True])
+    >>> torch.masked._ops.logaddexp(input, other, input_mask=mask, other_mask=mask)
+    tensor([-1., -inf, -3.])
+"""
     if dtype is None:
         dtype = input.dtype
     if input.layout == torch.strided and other.layout == torch.strided:
-        mask_input = _combine_input_and_mask(logaddexp, input, input_mask)
-        mask_other = _combine_input_and_mask(logaddexp, other, other_mask)
+        mask_input = _combine_input_and_mask(logsumexp, input, input_mask)
+        mask_other = _combine_input_and_mask(logsumexp, other, other_mask)
         return torch.logaddexp(mask_input, mask_other).to(dtype=dtype)
     else:
         raise ValueError(
@@ -1598,9 +1586,7 @@ def _std_var(
     mask: Optional[Tensor],
     take_sqrt: Optional[bool],
 ) -> Tensor:
-    assert unbiased is None or correction_opt is None, (
-        "Only one of unbiased and correction may be given"
-    )
+    assert (unbiased is None or correction_opt is None), "Only one of unbiased and correction may be given"
     correction = 1.0
     if unbiased is not None:
         correction = 1.0 if unbiased else 0.0
@@ -1625,7 +1611,12 @@ def _std_var(
             sample_total = sum(input, dim, keepdim=True, dtype=dtype)
         else:
             inmask = _input_mask(input, mask=mask)
-            count = inmask.sum(dim=dim, keepdim=True)
+            count = sum(
+                inmask.new_ones(input.shape, dtype=torch.int64),
+                dim,
+                keepdim=True,
+                mask=inmask,
+            )
             sample_total = sum(input, dim, keepdim=True, dtype=dtype, mask=inmask)
         # TODO: replace torch.subtract/divide/square/maximum with
         # masked subtract/divide/square/maximum when these will be
@@ -1636,20 +1627,13 @@ def _std_var(
             total = sum(x * x.conj(), dim, keepdim=keepdim, dtype=compute_dtype)
         else:
             total = sum(
-                x * x.conj(),
-                dim,
-                keepdim=keepdim,
-                dtype=compute_dtype,
-                mask=inmask,  # type: ignore[possibly-undefined]
+                x * x.conj(), dim, keepdim=keepdim, dtype=compute_dtype, mask=inmask  # type: ignore[possibly-undefined]
             )
         if not keepdim:
             count = count.reshape(total.shape)
         if correction != 0:
-            real_dtype = (
-                corresponding_real_dtype(compute_dtype)
-                if compute_dtype.is_complex
-                else compute_dtype
-            )
+            real_dtype = (corresponding_real_dtype(compute_dtype)
+                          if compute_dtype.is_complex else compute_dtype)
             count = count.to(real_dtype)
             count = torch.subtract(count, correction)
             count = torch.maximum(count, count.new_zeros([]))
@@ -1797,6 +1781,7 @@ def normalize(
 ) -> Tensor:
     if dtype is None:
         dtype = input.dtype
+    dim_ = _canonical_dim(dim, input.ndim)[0]
     # TODO: eliminate mask_input as unnecessary when using masked divide.
     mask_input = _combine_input_and_mask(sum, input, mask)
     if mask_input.layout == torch.strided:

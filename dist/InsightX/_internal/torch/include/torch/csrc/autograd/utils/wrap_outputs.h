@@ -18,7 +18,9 @@
 #include <torch/csrc/utils/python_numbers.h>
 #include <torch/csrc/utils/tensor_qschemes.h>
 
-namespace torch::autograd::utils {
+namespace torch {
+namespace autograd {
+namespace utils {
 
 inline PyObject* wrap(bool value) {
   if (value) {
@@ -47,27 +49,29 @@ inline PyObject* wrap(c10::complex<double> value) {
 }
 
 inline PyObject* wrap(void* value) {
-  return PyLong_FromVoidPtr(value);
+  return THPUtils_packInt64(reinterpret_cast<intptr_t>(value));
 }
 
 inline PyObject* wrap(THPDtype* dtype) {
-  return Py_NewRef(dtype);
+  Py_INCREF(dtype);
+  return (PyObject*)dtype;
 }
 
 inline PyObject* wrap(at::ScalarType scalarType) {
-  return Py_NewRef(getTHPDtype(scalarType));
+  return wrap(getTHPDtype(scalarType));
 }
 
 inline PyObject* wrap(THPLayout* layout) {
-  return Py_NewRef(layout);
+  Py_INCREF(layout);
+  return (PyObject*)layout;
 }
 
 inline PyObject* wrap(at::Layout layout) {
-  return Py_NewRef(getTHPLayout(layout));
+  return wrap(getTHPLayout(layout));
 }
 
-inline PyObject* wrap(const at::Tensor& tensor) {
-  return THPVariable_Wrap(tensor);
+inline PyObject* wrap(at::Tensor tensor) {
+  return THPVariable_Wrap(Variable(std::move(tensor)));
 }
 
 inline PyObject* wrap(const at::Scalar& scalar) {
@@ -81,7 +85,7 @@ inline PyObject* wrap(at::QScheme qscheme) {
 }
 
 inline PyObject* wrap(at::TensorList tl) {
-  auto r = THPObjectPtr{PyTuple_New(static_cast<Py_ssize_t>(tl.size()))};
+  auto r = THPObjectPtr{PyTuple_New(tl.size())};
   if (!r)
     throw python_error();
   for (const auto i : c10::irange(tl.size())) {
@@ -91,7 +95,7 @@ inline PyObject* wrap(at::TensorList tl) {
 }
 
 inline PyObject* wrap(at::IntArrayRef list) {
-  auto r = THPObjectPtr{PyTuple_New(static_cast<Py_ssize_t>(list.size()))};
+  auto r = THPObjectPtr{PyTuple_New(list.size())};
   if (!r)
     throw python_error();
   for (const auto i : c10::irange(list.size())) {
@@ -146,4 +150,6 @@ PyObject* wrap(PyTypeObject* type, std::tuple<Ts...> values) {
   return r.release();
 }
 
-} // namespace torch::autograd::utils
+} // namespace utils
+} // namespace autograd
+} // namespace torch

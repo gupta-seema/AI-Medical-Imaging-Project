@@ -1,10 +1,17 @@
 #pragma once
 
 #include <c10/core/Allocator.h>
+#include <c10/core/GeneratorImpl.h>
 #include <c10/util/Exception.h>
+
 #include <c10/util/Registry.h>
 
-#include <ATen/detail/AcceleratorHooksInterface.h>
+#include <cstddef>
+#include <memory>
+
+namespace at {
+class Context;
+}
 
 // NB: Class must live in `at` due to limitations of Registry.h.
 namespace at {
@@ -13,18 +20,18 @@ namespace at {
 // which we may want to call into from CPU code (and thus must be dynamically
 // dispatched, to allow for separate compilation of HIP code).  See
 // CUDAHooksInterface for more detailed motivation.
-struct TORCH_API HIPHooksInterface : AcceleratorHooksInterface {
+struct TORCH_API HIPHooksInterface {
   // This should never actually be implemented, but it is used to
   // squelch -Werror=non-virtual-dtor
-  ~HIPHooksInterface() override = default;
+  virtual ~HIPHooksInterface() = default;
 
-  void init() const override {
-    TORCH_CHECK(false, "Cannot initialize HIP without ATen_hip library.");
+  // Initialize the HIP library state
+  virtual void initHIP() const {
+    AT_ERROR("Cannot initialize HIP without ATen_hip library.");
   }
 
-  const Generator& getDefaultGenerator(
-      [[maybe_unused]] DeviceIndex device_index = -1) const override {
-    TORCH_CHECK(false, "Cannot initialize HIP without ATen_hip library.");
+  virtual std::unique_ptr<c10::GeneratorImpl> initHIPGenerator(Context*) const {
+    AT_ERROR("Cannot initialize HIP generator without ATen_hip library.");
   }
 
   virtual bool hasHIP() const {
@@ -35,20 +42,16 @@ struct TORCH_API HIPHooksInterface : AcceleratorHooksInterface {
     return -1;
   }
 
-  bool isPinnedPtr(const void* /*data*/ ) const override {
-    return false;
+  virtual Allocator* getPinnedMemoryAllocator() const {
+    AT_ERROR("Pinned memory requires HIP.");
   }
 
-  Allocator* getPinnedMemoryAllocator() const override {
-    TORCH_CHECK(false, "Pinned memory requires HIP.");
+  virtual void registerHIPTypes(Context*) const {
+    AT_ERROR("Cannot registerHIPTypes() without ATen_hip library.");
   }
 
   virtual int getNumGPUs() const {
     return 0;
-  }
-
-  bool hasPrimaryContext(DeviceIndex /*device_index*/ ) const override {
-    TORCH_CHECK(false, "Cannot check primary context without ATen_hip library.");
   }
 };
 

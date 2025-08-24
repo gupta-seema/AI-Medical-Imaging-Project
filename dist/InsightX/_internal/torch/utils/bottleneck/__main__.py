@@ -1,9 +1,9 @@
-# mypy: allow-untyped-defs
 import argparse
 import cProfile
 import pstats
 import sys
 import os
+from typing import Dict
 
 import torch
 from torch.autograd import profiler
@@ -36,7 +36,7 @@ def run_env_analysis():
     print('Running environment analysis...')
     info = get_env_info()
 
-    result: dict[str, str] = {}
+    result: Dict[str, str] = {}
 
     debug_str = ''
     if info.is_debug_build:
@@ -156,7 +156,7 @@ exits in a finite amount of time.
 
 For more complicated uses of the profilers, please see
 https://docs.python.org/3/library/profile.html and
-https://pytorch.org/docs/main/autograd.html#profiler for more information.
+https://pytorch.org/docs/master/autograd.html#profiler for more information.
 """.strip()
 
 
@@ -171,7 +171,7 @@ def parse_args():
 
 
 def cpu_time_total(autograd_prof):
-    return sum(event.cpu_time_total for event in autograd_prof.function_events)
+    return sum([event.cpu_time_total for event in autograd_prof.function_events])
 
 
 def main():

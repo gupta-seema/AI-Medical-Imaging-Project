@@ -1,34 +1,21 @@
-# mypy: allow-untyped-defs
 import operator
 from collections import defaultdict
-from typing import Any, Callable, Optional
-
-import sympy
+from typing import Any, Callable, DefaultDict, Dict, Optional, Tuple, Type
 
 import torch
 import torch.fx
-from torch._dispatch.python import enable_python_dispatcher
-from torch._subclasses.fake_tensor import FakeTensorMode
-from torch.fx.experimental.symbolic_shapes import (
-    compute_unbacked_bindings,
-    rebind_unbacked,
-    statically_known_true,
-    sym_eq,
-)
+from torch.fx.experimental.symbolic_shapes import statically_known_true, sym_eq
 from torch.utils import _pytree as pytree
-from torch.utils._ordered_set import OrderedSet
 from torch.utils._pytree import tree_map
-from torch.utils.flop_counter import flop_registry
-
 from .virtualized import V
 
 
 # Check the pattern: (nn.module, F.function/torch.Tensor.method) matched.
 # Works for length 2 patterns with 1 module and 1 function/method.
 def matches_module_function_pattern(
-    pattern: tuple[type[torch.nn.modules.Module], Callable[..., Any]],
+    pattern: Tuple[Type[torch.nn.modules.Module], Callable[..., Any]],
     node: torch.fx.node.Node,
-    modules: dict[str, torch.nn.modules.Module],
+    modules: Dict[str, torch.nn.modules.Module],
 ) -> bool:
     if len(node.args) == 0:
         return False
@@ -76,8 +63,8 @@ class FakeTensorUpdater:
     fake tensors stop changing.
     """
 
-    def __init__(self, graph: torch.fx.Graph) -> None:
-        self.processed_hashes = OrderedSet[Any]()
+    def __init__(self, graph: torch.fx.Graph):
+        self.processed_hashes = set()
         self.graph = graph
 
         for node in self.graph.nodes:
@@ -88,7 +75,8 @@ class FakeTensorUpdater:
         return (node, node.target, id(node.args), id(node.kwargs))
 
     def incremental_update(self):
-        existing_storages: defaultdict[Optional[int], int] = defaultdict(int)
+        processed = set()
+        existing_storages: DefaultDict[Optional[int], int] = defaultdict(int)
         for node in self.graph.nodes:
             existing_storages[get_node_storage(node)] += 1
 
@@ -104,18 +92,7 @@ class FakeTensorUpdater:
                 return all(
                     is_fake_tensor_same(new_i, old_i) for new_i, old_i in zip(new, old)
                 )
-            if new is None:
-                return old is None
-            if not isinstance(new, torch.Tensor):
-                assert isinstance(new, (torch.SymInt, torch.SymBool, torch.SymFloat)), (
-                    f"Unknown type {type(new)} in {self.graph}"
-                )
-                return (
-                    new.node.shape_env._maybe_evaluate_static(
-                        sympy.Eq(new.node.expr, old.node.expr)
-                    )
-                    == sympy.true
-                )
+            assert isinstance(new, torch.Tensor)
             if not is_intlist_same(new.shape, old.shape) or new.layout != old.layout:
                 return False
             if new.layout == torch.strided and (
@@ -124,9 +101,6 @@ class FakeTensorUpdater:
                     new.storage_offset() == old.storage_offset()
                 )
             ):
-                return False
-
-            if new.device != old.device:
                 return False
 
             if get_storage(new) == get_storage(old):
@@ -140,52 +114,44 @@ class FakeTensorUpdater:
                 return True
             return False
 
-        def should_process_node(node):
-            # node.target for nodes returning true from this function
-            # are called under fake mode and does not work for inductor
-            # lowerings. We check if the node.target is an aten operator
-            # or operator.getitem which is used when returning multiple
-            # tensors from an op.
-            return node.op == "call_function" and (
-                isinstance(node.target, torch._ops.OpOverload)
-                or node.target == operator.getitem
-            )
-
-        to_process = OrderedSet[int]()
         for node in self.graph.nodes:
-            if (
-                self.hash_node(node) in self.processed_hashes
-                and id(node) not in to_process
-            ):
+            if self.hash_node(node) in self.processed_hashes:
                 continue
 
-            if not should_process_node(node):
+            def is_aten_node(node):
+                return node.op == "call_function" and isinstance(
+                    node.target, torch._ops.OpOverload
+                )
+
+            if not is_aten_node(node):
                 continue
 
-            is_valid, args, kwargs = get_fake_args_kwargs(node)
-            if not is_valid:
-                continue
-            with V.fake_mode, enable_python_dispatcher():
-                new_fake_tensor = node.target(*args, **kwargs)
-            if "val" in node.meta and is_fake_tensor_same(
-                new_fake_tensor, node.meta["val"]
-            ):
-                continue
+            processing = [node]
+            while len(processing) > 0:
+                updating_node = processing.pop()
+                if updating_node in processed:
+                    continue
+                if is_aten_node(updating_node):
+                    continue
 
-            rebind_unbacked(V.fake_mode.shape_env, node, new_fake_tensor)
+                is_valid, args, kwargs = get_fake_args_kwargs(updating_node)
+                if not is_valid:
+                    continue
+                with V.fake_mode:
+                    new_fake_tensor = updating_node.target(*args, **kwargs)
+                if "val" in updating_node.meta and is_fake_tensor_same(
+                    new_fake_tensor, updating_node.meta["val"]
+                ):
+                    continue
+                updating_node.meta["val"] = new_fake_tensor
 
-            node.meta["val"] = new_fake_tensor
-            if (shape_env := V.fake_mode.shape_env) and (
-                symbol_to_path := compute_unbacked_bindings(shape_env, new_fake_tensor)
-            ):
-                # Refresh the bindings to the new symbols
-                node.meta["unbacked_bindings"] = symbol_to_path
+                # todo(chilli): This code path is not exercised by our existing
+                # tests - add a test
+                existing_storages[get_node_storage(new_fake_tensor)] += 1
+                processed.add(updating_node)
+                processing.extend(updating_node.users)
 
-            existing_storages[get_node_storage(node)] += 1
-
-            to_process.update([id(user) for user in node.users])
-
-            self.processed_hashes.add(self.hash_node(node))
+                self.processed_hashes.add(self.hash_node(updating_node))
 
 
 def get_storage(t: torch.Tensor) -> int:
@@ -210,7 +176,7 @@ def get_fake(x):
     return x
 
 
-def get_fake_args_kwargs(x: torch.fx.Node) -> tuple[bool, tuple[Any], dict[str, Any]]:
+def get_fake_args_kwargs(x: torch.fx.Node) -> Tuple[bool, Tuple[Any], Dict[str, Any]]:
     """
     First value returns a boolean if any of the input nodes don't have a faketensor.
     """
@@ -252,34 +218,3 @@ def is_node_realized(node: torch.fx.Node) -> bool:
 
     # Otherwise, assume node isn't realized
     return False
-
-
-def count_flops_fx(node: torch.fx.Node) -> Optional[int]:
-    if isinstance(node.target, str):
-        return None
-    with FakeTensorMode(allow_non_fake_inputs=True):
-        success, args, kwargs = get_fake_args_kwargs(node)
-
-        if success:
-            with torch.utils.flop_counter.FlopCounterMode(
-                display=False
-            ) as flop_counter_mode:
-                node.target(*args, **kwargs)
-
-            counted_flops = flop_counter_mode.get_total_flops()
-            return counted_flops
-    return None
-
-
-def countable_fx(node: torch.fx.Node) -> bool:
-    """
-    Whether or not we can count the flops of an FX node.
-    """
-    assert isinstance(node, torch.fx.Node)
-    if not hasattr(node, "target"):
-        return False
-    target = node.target
-    if not hasattr(target, "overloadpacket"):
-        return target in flop_registry
-    packet = target.overloadpacket
-    return packet in flop_registry

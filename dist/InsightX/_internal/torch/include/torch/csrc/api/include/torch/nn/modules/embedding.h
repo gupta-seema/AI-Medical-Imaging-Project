@@ -9,13 +9,14 @@
 
 #include <cstddef>
 
-namespace torch::nn {
+namespace torch {
+namespace nn {
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ Embedding
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 /// Performs a lookup in a fixed size embedding table.
-/// See https://pytorch.org/docs/main/nn.html#torch.nn.Embedding to learn
+/// See https://pytorch.org/docs/master/nn.html#torch.nn.Embedding to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::EmbeddingOptions` class to learn what
@@ -69,8 +70,10 @@ class Embedding : public torch::nn::ModuleHolder<EmbeddingImpl> {
         embeddings.dim() == 2,
         "Embeddings parameter is expected to be 2-dimensional");
 
-    auto rows = embeddings.size(0);
-    auto cols = embeddings.size(1);
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+    int64_t rows, cols;
+    rows = embeddings.size(0);
+    cols = embeddings.size(1);
 
     Embedding embedding(EmbeddingOptions(rows, cols)
                             ._weight(embeddings)
@@ -89,7 +92,7 @@ class Embedding : public torch::nn::ModuleHolder<EmbeddingImpl> {
 
 /// Computes sums or means of 'bags' of embeddings, without instantiating the
 /// intermediate embeddings.
-/// See https://pytorch.org/docs/main/nn.html#torch.nn.EmbeddingBag to learn
+/// See https://pytorch.org/docs/master/nn.html#torch.nn.EmbeddingBag to learn
 /// about the exact behavior of this module.
 ///
 /// See the documentation for `torch::nn::EmbeddingBagOptions` class to learn
@@ -146,8 +149,10 @@ class EmbeddingBag : public torch::nn::ModuleHolder<EmbeddingBagImpl> {
         embeddings.dim() == 2,
         "Embeddings parameter is expected to be 2-dimensional");
 
-    auto rows = embeddings.size(0);
-    auto cols = embeddings.size(1);
+    // NOLINTNEXTLINE(cppcoreguidelines-init-variables)
+    int64_t rows, cols;
+    rows = embeddings.size(0);
+    cols = embeddings.size(1);
 
     EmbeddingBag embeddingbag(
         EmbeddingBagOptions(rows, cols)
@@ -162,4 +167,5 @@ class EmbeddingBag : public torch::nn::ModuleHolder<EmbeddingBagImpl> {
     return embeddingbag;
   }
 };
-} // namespace torch::nn
+} // namespace nn
+} // namespace torch

@@ -22,7 +22,6 @@ from warnings import WarningMessage
 import torch._numpy as np
 from torch._numpy import arange, asarray as asanyarray, empty, float32, intp, ndarray
 
-
 __all__ = [
     "assert_equal",
     "assert_almost_equal",
@@ -248,7 +247,7 @@ def assert_equal(actual, desired, err_msg="", verbose=True):
             assert_equal(actualr, desiredr)
             assert_equal(actuali, desiredi)
         except AssertionError:
-            raise AssertionError(msg)  # noqa: B904
+            raise AssertionError(msg)  # noqa: TRY200
 
     # isscalar test to check cases such as [np.nan] != np.nan
     if isscalar(desired) != isscalar(actual):
@@ -260,6 +259,10 @@ def assert_equal(actual, desired, err_msg="", verbose=True):
         isactnan = gisnan(actual)
         if isdesnan and isactnan:
             return  # both nan, so equal
+
+        # handle signed zero specially for floats
+        array_actual = np.asarray(actual)
+        array_desired = np.asarray(desired)
 
         if desired == 0 and actual == 0:
             if not signbit(desired) == signbit(actual):
@@ -276,7 +279,7 @@ def assert_equal(actual, desired, err_msg="", verbose=True):
     except (DeprecationWarning, FutureWarning) as e:
         # this handles the case when the two types are not even comparable
         if "elementwise == comparison" in e.args[0]:
-            raise AssertionError(msg)  # noqa: B904
+            raise AssertionError(msg)  # noqa: TRY200
         else:
             raise
 
@@ -403,7 +406,7 @@ def assert_almost_equal(actual, desired, decimal=7, err_msg="", verbose=True):
         usecomplex = False
 
     def _build_err_msg():
-        header = f"Arrays are not almost equal to {decimal:d} decimals"
+        header = "Arrays are not almost equal to %d decimals" % decimal
         return build_err_msg([actual, desired], err_msg, verbose=verbose, header=header)
 
     if usecomplex:
@@ -423,7 +426,7 @@ def assert_almost_equal(actual, desired, decimal=7, err_msg="", verbose=True):
             assert_almost_equal(actualr, desiredr, decimal=decimal)
             assert_almost_equal(actuali, desiredi, decimal=decimal)
         except AssertionError:
-            raise AssertionError(_build_err_msg())  # noqa: B904
+            raise AssertionError(_build_err_msg())  # noqa: TRY200
 
     if isinstance(actual, (ndarray, tuple, list)) or isinstance(
         desired, (ndarray, tuple, list)
@@ -526,7 +529,7 @@ def assert_approx_equal(actual, desired, significant=7, err_msg="", verbose=True
     msg = build_err_msg(
         [actual, desired],
         err_msg,
-        header=f"Items are not equal to {significant:d} significant digits:",
+        header="Items are not equal to %d significant digits:" % significant,
         verbose=verbose,
     )
     try:
@@ -596,7 +599,7 @@ def assert_array_compare(
         if (x_id == y_id).all().item() is not True:
             msg = build_err_msg(
                 [x, y],
-                err_msg + f"\nx and y {hasval} location mismatch:",
+                err_msg + "\nx and y %s location mismatch:" % (hasval),
                 verbose=verbose,
                 header=header,
                 names=("x", "y"),
@@ -723,7 +726,7 @@ def assert_array_compare(
             names=("x", "y"),
             precision=precision,
         )
-        raise ValueError(msg)  # noqa: B904
+        raise ValueError(msg)  # noqa: TRY200
 
 
 def assert_array_equal(x, y, err_msg="", verbose=True, *, strict=False):
@@ -944,7 +947,7 @@ def assert_array_almost_equal(x, y, decimal=6, err_msg="", verbose=True):
         y,
         err_msg=err_msg,
         verbose=verbose,
-        header=f"Arrays are not almost equal to {decimal:d} decimals",
+        header=("Arrays are not almost equal to %d decimals" % decimal),
         precision=decimal,
     )
 
@@ -1165,7 +1168,7 @@ def decorate_methods(cls, decorator, testmatch=None):
 
     """
     if testmatch is None:
-        testmatch = re.compile(rf"(?:^|[\\b_\\.{os.sep}-])[Tt]est")
+        testmatch = re.compile(r"(?:^|[\\b_\\.%s-])[Tt]est" % os.sep)
     else:
         testmatch = re.compile(testmatch)
     cls_attr = cls.__dict__
@@ -1207,7 +1210,7 @@ def _assert_valid_refcount(op):
     gc.disable()
     try:
         rc = sys.getrefcount(i)
-        for _ in range(15):
+        for j in range(15):
             d = op(b, c)
         assert_(sys.getrefcount(i) >= rc)
     finally:
@@ -1359,10 +1362,10 @@ def assert_array_almost_equal_nulp(x, y, nulp=1):
     ref = nulp * np.spacing(np.where(ax > ay, ax, ay))
     if not np.all(np.abs(x - y) <= ref):
         if np.iscomplexobj(x) or np.iscomplexobj(y):
-            msg = f"X and Y are not equal to {nulp:d} ULP"
+            msg = "X and Y are not equal to %d ULP" % nulp
         else:
             max_nulp = np.max(nulp_diff(x, y))
-            msg = f"X and Y are not equal to {nulp:d} ULP (max is {max_nulp:g})"
+            msg = "X and Y are not equal to %d ULP (max is %g)" % (nulp, max_nulp)
         raise AssertionError(msg)
 
 
@@ -1963,11 +1966,11 @@ class suppress_warnings:
                 self._clear_registries()
 
             self._tmp_suppressions.append(
-                (category, message, re.compile(message, re.IGNORECASE), module, record)
+                (category, message, re.compile(message, re.I), module, record)
             )
         else:
             self._suppressions.append(
-                (category, message, re.compile(message, re.IGNORECASE), module, record)
+                (category, message, re.compile(message, re.I), module, record)
             )
 
         return record
@@ -2143,7 +2146,7 @@ def _assert_no_gc_cycles_context(name=None):
     gc.disable()
     gc_debug = gc.get_debug()
     try:
-        for _ in range(100):
+        for i in range(100):
             if gc.collect() == 0:
                 break
         else:
@@ -2269,12 +2272,12 @@ def check_free_memory(free_bytes):
         try:
             mem_free = _parse_size(env_value)
         except ValueError as exc:
-            raise ValueError(  # noqa: B904
+            raise ValueError(  # noqa: TRY200
                 f"Invalid environment variable {env_var}: {exc}"
             )
 
         msg = (
-            f"{free_bytes / 1e9} GB memory required, but environment variable "
+            f"{free_bytes/1e9} GB memory required, but environment variable "
             f"NPY_AVAILABLE_MEM={env_value} set"
         )
     else:
@@ -2288,7 +2291,9 @@ def check_free_memory(free_bytes):
             )
             mem_free = -1
         else:
-            msg = f"{free_bytes / 1e9} GB memory required, but {mem_free / 1e9} GB available"
+            msg = (
+                f"{free_bytes/1e9} GB memory required, but {mem_free/1e9} GB available"
+            )
 
     return msg if mem_free < free_bytes else None
 
@@ -2313,8 +2318,7 @@ def _parse_size(size_str):
     }
 
     size_re = re.compile(
-        r"^\s*(\d+|\d+\.\d+)\s*({})\s*$".format("|".join(suffixes.keys())),
-        re.IGNORECASE,
+        r"^\s*(\d+|\d+\.\d+)\s*({})\s*$".format("|".join(suffixes.keys())), re.I
     )
 
     m = size_re.match(size_str.lower())
@@ -2373,7 +2377,7 @@ def _no_tracing(func):
 def _get_glibc_version():
     try:
         ver = os.confstr("CS_GNU_LIBC_VERSION").rsplit(" ")[1]
-    except Exception:
+    except Exception as inst:
         ver = "0.0"
 
     return ver

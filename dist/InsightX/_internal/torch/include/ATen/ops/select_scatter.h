@@ -13,8 +13,7 @@
 #include <c10/core/Storage.h>
 #include <c10/core/TensorOptions.h>
 #include <c10/util/Deprecated.h>
-#include <optional>
-#include <string_view>
+#include <c10/util/Optional.h>
 
 
 
@@ -28,7 +27,7 @@ inline at::Tensor select_scatter(const at::Tensor & self, const at::Tensor & src
     return at::_ops::select_scatter::call(self, src, dim, index);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor select_scatter(const at::Tensor & self, const at::Tensor & src, int64_t dim, int64_t index) {
     return at::_ops::select_scatter::call(self, src, dim, index);
   }
@@ -39,7 +38,7 @@ inline at::Tensor select_scatter_symint(const at::Tensor & self, const at::Tenso
     return at::_ops::select_scatter::call(self, src, dim, index);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor select_scatter(const at::Tensor & self, const at::Tensor & src, int64_t dim, c10::SymInt index) {
     return at::_ops::select_scatter::call(self, src, dim, index);
   }
@@ -50,7 +49,7 @@ inline at::Tensor & select_scatter_out(at::Tensor & out, const at::Tensor & self
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & select_scatter_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & src, int64_t dim, int64_t index) {
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
   }
@@ -61,7 +60,7 @@ inline at::Tensor & select_scatter_outf(const at::Tensor & self, const at::Tenso
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, int64_t>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, int64_t>::value>>
   at::Tensor & select_scatter_outf(const at::Tensor & self, const at::Tensor & src, int64_t dim, int64_t index, at::Tensor & out) {
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
   }
@@ -72,7 +71,7 @@ inline at::Tensor & select_scatter_symint_out(at::Tensor & out, const at::Tensor
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & select_scatter_out(at::Tensor & out, const at::Tensor & self, const at::Tensor & src, int64_t dim, c10::SymInt index) {
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
   }
@@ -83,7 +82,7 @@ inline at::Tensor & select_scatter_symint_outf(const at::Tensor & self, const at
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
 }
 namespace symint {
-  template <typename T, typename = std::enable_if_t<std::is_same_v<T, c10::SymInt>>>
+  template <typename T, typename = std::enable_if_t<std::is_same<T, c10::SymInt>::value>>
   at::Tensor & select_scatter_outf(const at::Tensor & self, const at::Tensor & src, int64_t dim, c10::SymInt index, at::Tensor & out) {
     return at::_ops::select_scatter_out::call(self, src, dim, index, out);
   }

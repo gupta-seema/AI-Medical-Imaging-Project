@@ -8,7 +8,8 @@
 #include <torch/csrc/lazy/core/shape.h>
 #include <torch/csrc/lazy/ts_backend/ts_lowering_context.h>
 
-namespace torch::lazy {
+namespace torch {
+namespace lazy {
 
 using TSOpVector = std::vector<torch::jit::Value*>;
 
@@ -78,7 +79,7 @@ const OpKind tensor_list_opkind = OpKind::Get("lazy_tensors::tensor_list");
 // Note: shape is undefined for TensorList.  We assert in some places that
 // #shapes matches #outputs and this stems from
 //       the fact that currently all IR nodes represent tensors (there is no
-//       type system for this IR).  Because of this, TensorList is a bit of a
+//       type system for this IR).  Becuase of this, TensorList is a bit of a
 //       hack.
 //
 // TODO(whc) once Shape() API is moved to Node base, also make it virtual, and
@@ -101,4 +102,5 @@ struct TORCH_API TensorList : public TsNode {
       TSLoweringContext* loctx) const override;
 };
 
-} // namespace torch::lazy
+} // namespace lazy
+} // namespace torch

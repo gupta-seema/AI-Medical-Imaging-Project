@@ -2,6 +2,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -10,10 +11,10 @@
 
 namespace c10d {
 
-// callback function will be given arguments (std::optional<string> oldValue,
-// std::optional<string> newValue)
+// callback function will be given arguments (optional<string> oldValue,
+// optional<string> newValue)
 using WatchKeyCallback =
-    std::function<void(std::optional<std::string>, std::optional<std::string>)>;
+    std::function<void(c10::optional<std::string>, c10::optional<std::string>)>;
 
 class TORCH_API Store : public torch::CustomClassHolder {
  public:
@@ -32,10 +33,6 @@ class TORCH_API Store : public torch::CustomClassHolder {
 
   ~Store() override = default;
 
-  // Clone a thread safe copy of this store object that points to the same
-  // underlying store.
-  virtual c10::intrusive_ptr<Store> clone() = 0;
-
   void set(const std::string& key, const std::string& value);
 
   virtual void set(
@@ -51,7 +48,7 @@ class TORCH_API Store : public torch::CustomClassHolder {
       const std::string& key,
       const std::vector<uint8_t>& currentValue,
       const std::vector<uint8_t>& newValue) {
-    C10_THROW_ERROR(NotImplementedError, "Not implemented.");
+    TORCH_INTERNAL_ASSERT(false, "Not implemented.");
   }
 
   std::string get_to_str(const std::string& key);
@@ -79,11 +76,8 @@ class TORCH_API Store : public torch::CustomClassHolder {
   // watchKey() is deprecated and no longer supported.
   virtual void watchKey(
       const std::string& /* unused */,
-      // NOLINTNEXTLINE(performance-unnecessary-value-param)
       WatchKeyCallback /* unused */) {
-    C10_THROW_ERROR(
-        NotImplementedError,
-        "watchKey is deprecated, no implementation support it.");
+    TORCH_CHECK(false, "watchKey is deprecated, no implementation support it.");
   }
 
   virtual void append(
@@ -100,50 +94,8 @@ class TORCH_API Store : public torch::CustomClassHolder {
   // Returns true if this store support append, multiGet and multiSet
   virtual bool hasExtendedApi() const;
 
-  virtual void queuePush(
-      const std::string& key,
-      const std::vector<uint8_t>& value) {
-    C10_THROW_ERROR(NotImplementedError, "queue support is not implemented.");
-  }
-
-  virtual std::vector<uint8_t> queuePop(const std::string& key, bool block) {
-    C10_THROW_ERROR(NotImplementedError, "queue support is not implemented.");
-  }
-
-  virtual int64_t queueLen(const std::string& key) {
-    C10_THROW_ERROR(NotImplementedError, "queue support is not implemented.");
-  }
-
  protected:
   std::chrono::milliseconds timeout_;
-};
-
-/*
-StoreTimeoutGuard is a RAII guard that will set the store timeout and restore it
-when it returns.
-*/
-class StoreTimeoutGuard {
- public:
-  explicit StoreTimeoutGuard(
-      Store& store,
-      const std::chrono::milliseconds& timeout)
-      : store_(store), oldTimeout_(store.getTimeout()) {
-    store.setTimeout(timeout);
-  }
-
-  ~StoreTimeoutGuard() {
-    store_.setTimeout(oldTimeout_);
-  }
-
-  /* Disabling copy and move semantics */
-  StoreTimeoutGuard(const StoreTimeoutGuard&) = delete;
-  StoreTimeoutGuard& operator=(const StoreTimeoutGuard&) = delete;
-  StoreTimeoutGuard(StoreTimeoutGuard&&) = delete;
-  StoreTimeoutGuard& operator=(StoreTimeoutGuard&&) = delete;
-
- private:
-  Store& store_;
-  std::chrono::milliseconds oldTimeout_{};
 };
 
 } // namespace c10d

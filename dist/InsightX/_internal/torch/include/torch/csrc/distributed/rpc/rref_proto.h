@@ -7,7 +7,9 @@
 #include <torch/csrc/jit/serialization/pickler.h>
 #include <vector>
 
-namespace torch::distributed::rpc {
+namespace torch {
+namespace distributed {
+namespace rpc {
 
 // Temporary solution of RRef operations.
 // TODO: Remove all these messages and use rpc + registered functions instead.
@@ -19,9 +21,9 @@ class TORCH_API RRefMessageBase : public RpcCommandBase {
   const RRefId& rrefId();
 
  protected:
-  // NOLINTNEXTLINE(cppcoreguidelines*)
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   const RRefId rrefId_;
-  // NOLINTNEXTLINE(cppcoreguidelines*)
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   const MessageType type_;
 };
 
@@ -38,7 +40,7 @@ class TORCH_API ForkMessageBase : public RRefMessageBase {
       MessageType type);
 
  protected:
-  // NOLINTNEXTLINE(cppcoreguidelines*)
+  // NOLINTNEXTLINE(cppcoreguidelines-non-private-member-variables-in-classes)
   const ForkId forkId_;
 };
 
@@ -58,7 +60,6 @@ class TORCH_API ScriptRRefFetchCall final : public RRefMessageBase {
       const Message& message);
 
  private:
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const worker_id_t fromWorkerId_;
 };
 
@@ -73,7 +74,6 @@ class TORCH_API PythonRRefFetchCall final : public RRefMessageBase {
       const Message& message);
 
  private:
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const worker_id_t fromWorkerId_;
 };
 
@@ -88,7 +88,6 @@ class TORCH_API RRefFetchRet : public RpcCommandBase {
 
  private:
   std::vector<at::IValue> values_;
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const MessageType type_;
 };
 
@@ -140,7 +139,6 @@ class TORCH_API RRefChildAccept final : public RpcCommandBase {
   static std::unique_ptr<RRefChildAccept> fromMessage(const Message& message);
 
  private:
-  // NOLINTNEXTLINE(cppcoreguidelines-avoid-const-or-ref-data-members)
   const ForkId forkId_;
 };
 
@@ -161,4 +159,6 @@ class TORCH_API RRefAck final : public RpcCommandBase {
   static std::unique_ptr<RRefAck> fromMessage(const Message& message);
 };
 
-} // namespace torch::distributed::rpc
+} // namespace rpc
+} // namespace distributed
+} // namespace torch

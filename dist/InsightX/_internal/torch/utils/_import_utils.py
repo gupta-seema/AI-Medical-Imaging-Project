@@ -1,7 +1,5 @@
 import functools
 import importlib.util
-from types import ModuleType
-from typing import Optional
 
 import torch
 
@@ -21,7 +19,7 @@ def _check_module_exists(name: str) -> bool:
 
 
 @functools.lru_cache
-def dill_available() -> bool:
+def dill_available():
     return (
         _check_module_exists("dill")
         # dill fails to import under torchdeploy
@@ -30,7 +28,7 @@ def dill_available() -> bool:
 
 
 @functools.lru_cache
-def import_dill() -> Optional[ModuleType]:
+def import_dill():
     if not dill_available():
         return None
 

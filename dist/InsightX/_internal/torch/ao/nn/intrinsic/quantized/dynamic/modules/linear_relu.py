@@ -1,11 +1,10 @@
-# mypy: allow-untyped-defs
 import torch
-import torch.ao.nn.intrinsic as nni
 import torch.ao.nn.quantized.dynamic as nnqd
+import torch.ao.nn.intrinsic as nni
 
-
-__all__ = ["LinearReLU"]
-
+__all__ = [
+    "LinearReLU"
+]
 
 class LinearReLU(nnqd.Linear):
     r"""
@@ -27,7 +26,6 @@ class LinearReLU(nnqd.Linear):
         >>> print(output.size())
         torch.Size([128, 30])
     """
-
     _FLOAT_MODULE = nni.LinearReLU  # type: ignore[assignment]
 
     def __init__(self, in_features, out_features, bias=True, dtype=torch.qint8):
@@ -37,25 +35,21 @@ class LinearReLU(nnqd.Linear):
         if self._packed_params.dtype == torch.qint8:
             # TODO check if we should set reduce_rage = True by default here
             Y = torch.ops.quantized.linear_relu_dynamic(
-                x, self._packed_params._packed_params, reduce_range=True
-            )
+                x, self._packed_params._packed_params, reduce_range=True)
         elif self._packed_params.dtype == torch.float16:
             Y = torch.ops.quantized.linear_relu_dynamic_fp16(
-                x, self._packed_params._packed_params
-            )
+                x, self._packed_params._packed_params)
         else:
-            raise RuntimeError("Unsupported dtype on dynamic quantized linear relu!")
+            raise RuntimeError('Unsupported dtype on dynamic quantized linear relu!')
         return Y.to(x.dtype)
 
     def _get_name(self):
-        return "DynamicQuantizedLinearReLU"
+        return 'DynamicQuantizedLinearReLU'
 
     @classmethod
-    def from_float(cls, mod, use_precomputed_fake_quant=False):
-        return super().from_float(
-            mod, use_precomputed_fake_quant=use_precomputed_fake_quant
-        )
+    def from_float(cls, mod):
+        return super().from_float(mod)
 
     @classmethod
-    def from_reference(cls, ref_qlinear_relu):  # type: ignore[override]
+    def from_reference(cls, ref_qlinear_relu):
         return super().from_reference(ref_qlinear_relu[0])

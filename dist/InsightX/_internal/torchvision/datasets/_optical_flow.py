@@ -3,19 +3,18 @@ import os
 from abc import ABC, abstractmethod
 from glob import glob
 from pathlib import Path
-from typing import Any, Callable, Optional, Union
+from typing import Callable, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
 from PIL import Image
 
-from ..io.image import decode_png, read_file
-from .folder import default_loader
+from ..io.image import _read_png_16
 from .utils import _read_pfm, verify_str_arg
 from .vision import VisionDataset
 
-T1 = tuple[Image.Image, Image.Image, Optional[np.ndarray], Optional[np.ndarray]]
-T2 = tuple[Image.Image, Image.Image, Optional[np.ndarray]]
+T1 = Tuple[Image.Image, Image.Image, Optional[np.ndarray], Optional[np.ndarray]]
+T2 = Tuple[Image.Image, Image.Image, Optional[np.ndarray]]
 
 
 __all__ = (
@@ -33,22 +32,19 @@ class FlowDataset(ABC, VisionDataset):
     # and it's up to whatever consumes the dataset to decide what valid_flow_mask should be.
     _has_builtin_flow_mask = False
 
-    def __init__(
-        self,
-        root: Union[str, Path],
-        transforms: Optional[Callable] = None,
-        loader: Callable[[str], Any] = default_loader,
-    ) -> None:
+    def __init__(self, root: Union[str, Path], transforms: Optional[Callable] = None) -> None:
 
         super().__init__(root=root)
         self.transforms = transforms
 
-        self._flow_list: list[str] = []
-        self._image_list: list[list[str]] = []
-        self._loader = loader
+        self._flow_list: List[str] = []
+        self._image_list: List[List[str]] = []
 
-    def _read_img(self, file_name: str) -> Union[Image.Image, torch.Tensor]:
-        return self._loader(file_name)
+    def _read_img(self, file_name: str) -> Image.Image:
+        img = Image.open(file_name)
+        if img.mode != "RGB":
+            img = img.convert("RGB")
+        return img
 
     @abstractmethod
     def _read_flow(self, file_name: str):
@@ -74,9 +70,9 @@ class FlowDataset(ABC, VisionDataset):
 
         if self._has_builtin_flow_mask or valid_flow_mask is not None:
             # The `or valid_flow_mask is not None` part is here because the mask can be generated within a transform
-            return img1, img2, flow, valid_flow_mask  # type: ignore[return-value]
+            return img1, img2, flow, valid_flow_mask
         else:
-            return img1, img2, flow  # type: ignore[return-value]
+            return img1, img2, flow
 
     def __len__(self) -> int:
         return len(self._image_list)
@@ -124,9 +120,6 @@ class Sintel(FlowDataset):
             ``img1, img2, flow, valid_flow_mask`` and returns a transformed version.
             ``valid_flow_mask`` is expected for consistency with other datasets which
             return a built-in valid mask, such as :class:`~torchvision.datasets.KittiFlow`.
-        loader (callable, optional): A function to load an image given its path.
-            By default, it uses PIL as its image loader, but users could also pass in
-            ``torchvision.io.decode_image`` for decoding image data into tensors directly.
     """
 
     def __init__(
@@ -135,9 +128,8 @@ class Sintel(FlowDataset):
         split: str = "train",
         pass_name: str = "clean",
         transforms: Optional[Callable] = None,
-        loader: Callable[[str], Any] = default_loader,
     ) -> None:
-        super().__init__(root=root, transforms=transforms, loader=loader)
+        super().__init__(root=root, transforms=transforms)
 
         verify_str_arg(split, "split", valid_values=("train", "test"))
         verify_str_arg(pass_name, "pass_name", valid_values=("clean", "final", "both"))
@@ -194,21 +186,12 @@ class KittiFlow(FlowDataset):
         split (string, optional): The dataset split, either "train" (default) or "test"
         transforms (callable, optional): A function/transform that takes in
             ``img1, img2, flow, valid_flow_mask`` and returns a transformed version.
-        loader (callable, optional): A function to load an image given its path.
-            By default, it uses PIL as its image loader, but users could also pass in
-            ``torchvision.io.decode_image`` for decoding image data into tensors directly.
     """
 
     _has_builtin_flow_mask = True
 
-    def __init__(
-        self,
-        root: Union[str, Path],
-        split: str = "train",
-        transforms: Optional[Callable] = None,
-        loader: Callable[[str], Any] = default_loader,
-    ) -> None:
-        super().__init__(root=root, transforms=transforms, loader=loader)
+    def __init__(self, root: Union[str, Path], split: str = "train", transforms: Optional[Callable] = None) -> None:
+        super().__init__(root=root, transforms=transforms)
 
         verify_str_arg(split, "split", valid_values=("train", "test"))
 
@@ -242,7 +225,7 @@ class KittiFlow(FlowDataset):
         """
         return super().__getitem__(index)
 
-    def _read_flow(self, file_name: str) -> tuple[np.ndarray, np.ndarray]:
+    def _read_flow(self, file_name: str) -> Tuple[np.ndarray, np.ndarray]:
         return _read_16bits_png_with_flow_and_valid_mask(file_name)
 
 
@@ -341,9 +324,6 @@ class FlyingThings3D(FlowDataset):
             ``img1, img2, flow, valid_flow_mask`` and returns a transformed version.
             ``valid_flow_mask`` is expected for consistency with other datasets which
             return a built-in valid mask, such as :class:`~torchvision.datasets.KittiFlow`.
-        loader (callable, optional): A function to load an image given its path.
-            By default, it uses PIL as its image loader, but users could also pass in
-            ``torchvision.io.decode_image`` for decoding image data into tensors directly.
     """
 
     def __init__(
@@ -353,9 +333,8 @@ class FlyingThings3D(FlowDataset):
         pass_name: str = "clean",
         camera: str = "left",
         transforms: Optional[Callable] = None,
-        loader: Callable[[str], Any] = default_loader,
     ) -> None:
-        super().__init__(root=root, transforms=transforms, loader=loader)
+        super().__init__(root=root, transforms=transforms)
 
         verify_str_arg(split, "split", valid_values=("train", "test"))
         split = split.upper()
@@ -435,21 +414,12 @@ class HD1K(FlowDataset):
         split (string, optional): The dataset split, either "train" (default) or "test"
         transforms (callable, optional): A function/transform that takes in
             ``img1, img2, flow, valid_flow_mask`` and returns a transformed version.
-        loader (callable, optional): A function to load an image given its path.
-            By default, it uses PIL as its image loader, but users could also pass in
-            ``torchvision.io.decode_image`` for decoding image data into tensors directly.
     """
 
     _has_builtin_flow_mask = True
 
-    def __init__(
-        self,
-        root: Union[str, Path],
-        split: str = "train",
-        transforms: Optional[Callable] = None,
-        loader: Callable[[str], Any] = default_loader,
-    ) -> None:
-        super().__init__(root=root, transforms=transforms, loader=loader)
+    def __init__(self, root: Union[str, Path], split: str = "train", transforms: Optional[Callable] = None) -> None:
+        super().__init__(root=root, transforms=transforms)
 
         verify_str_arg(split, "split", valid_values=("train", "test"))
 
@@ -473,7 +443,7 @@ class HD1K(FlowDataset):
                 "Could not find the HD1K images. Please make sure the directory structure is correct."
             )
 
-    def _read_flow(self, file_name: str) -> tuple[np.ndarray, np.ndarray]:
+    def _read_flow(self, file_name: str) -> Tuple[np.ndarray, np.ndarray]:
         return _read_16bits_png_with_flow_and_valid_mask(file_name)
 
     def __getitem__(self, index: int) -> Union[T1, T2]:
@@ -509,9 +479,9 @@ def _read_flo(file_name: str) -> np.ndarray:
         return data.reshape(h, w, 2).transpose(2, 0, 1)
 
 
-def _read_16bits_png_with_flow_and_valid_mask(file_name: str) -> tuple[np.ndarray, np.ndarray]:
+def _read_16bits_png_with_flow_and_valid_mask(file_name: str) -> Tuple[np.ndarray, np.ndarray]:
 
-    flow_and_valid = decode_png(read_file(file_name)).to(torch.float32)
+    flow_and_valid = _read_png_16(file_name).to(torch.float32)
     flow, valid_flow_mask = flow_and_valid[:2, :, :], flow_and_valid[2, :, :]
     flow = (flow - 2**15) / 64  # This conversion is explained somewhere on the kitti archive
     valid_flow_mask = valid_flow_mask.bool()
