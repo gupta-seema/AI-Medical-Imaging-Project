@@ -165,7 +165,7 @@ See the [`LICENSE`](LICENSE) file for full details.
 | Aayusha Pokharel  | Front-end                     | [@ap4678](https://github.com/ap4678) |
 | Bivan Prajapati   | Front-end                     | [@BivanPrajapati](https://github.com/BivanPrajapati) |
 | Menuka Ghalan     | Back-end, Front-end, Data Processing | [@menukaghalan](https://github.com/menukaghalan) |
-| Seema Gupta       | Back-end                      | [@gupta-seema](https://github.com/gupta-seema) |
+| Seema Gupta       | Back-end, , Front-end, Data Processing | [@gupta-seema](https://github.com/gupta-seema) |
 
 ---
 
