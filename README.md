@@ -154,6 +154,8 @@ See the [`LICENSE`](LICENSE) file for full details.
 ---
 
 ## 👥 Team Members
+## 8848.arc
+![LOGO](static/group_logo.png) 
 
 > _Names listed alphabetically (except team lead); contribution levels may vary._
 
